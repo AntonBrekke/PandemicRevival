@@ -1,0 +1,197 @@
+#! /usr/bin/env python3
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FixedLocator, NullLocator, FixedFormatter
+
+import os
+import sys
+import inspect
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+grandparentdir = os.path.dirname(parentdir)
+sys.path.insert(0, parentdir)
+sys.path.insert(0, grandparentdir)
+
+import constants_functions as cf
+
+md1 = 1.0e-5
+md2 = 2.0e-5
+mphi1 = 2.5*md1
+mphi2 = 2.5*md2
+mY_relic = cf.rho_d0/cf.s0
+
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif', size=14)
+plt.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+
+fig = plt.figure(figsize=(0.4*12.0, 0.4*11.0), dpi=150, edgecolor="white")
+ax = fig.add_subplot(1,1,1)
+ax.tick_params(axis='both', which='both', labelsize=11, direction="in", width=0.5)
+ax.xaxis.set_ticks_position('both')
+ax.yaxis.set_ticks_position('both')
+for axis in ['top','bottom','left','right']:
+    ax.spines[axis].set_linewidth(0.5)
+
+xtMajor = np.array([np.log10(10**j) for j in np.linspace(-5, 2, 8)])
+xtMinor = np.array([np.log10(i*10**j) for j in xtMajor for i in range(10)[1:10]])
+xlMajor = [r"$10^{" + str(int(i)) + "}$" if i in xtMajor else "" for i in xtMajor]
+xtMajor = 10**xtMajor
+xtMinor = 10**xtMinor
+xMajorLocator = FixedLocator(xtMajor)
+xMinorLocator = FixedLocator(xtMinor)
+xMajorFormatter = FixedFormatter(xlMajor)
+
+ytMajor = np.array([np.log10(10**j) for j in np.linspace(-25, -9, 17)])
+ytMinor = np.array([np.log10(i*10**j) for j in ytMajor for i in range(10)[1:10]])
+ylMajor = [r"$10^{" + str(int(i+6)) + "}$" if i in ytMajor[::2] else "" for i in ytMajor]
+ytMajor = 10**ytMajor
+ytMinor = 10**ytMinor
+yMajorLocator = FixedLocator(ytMajor)
+yMinorLocator = FixedLocator(ytMinor)
+yMajorFormatter = FixedFormatter(ylMajor)
+
+data1 = np.loadtxt('./md_1.0000e-05_mphi_2.5000e-05_sin22th_3.5000e-13_y_1.3099e-04.dat')
+# data2 = np.loadtxt('./md_2.00e-05_mphi_5.00e-05_sin22th_3.50e-15_y_1.47e-03.dat')
+data2 = np.loadtxt('./md_2.0000e-05_mphi_5.0000e-05_sin22th_3.5000e-15_y_1.4740e-03.dat')
+
+T_SM1 = data1[:,1]
+T_SM2 = data2[:,1]
+T_nu1 = data1[:,2]
+T_nu2 = data2[:,2]
+ent1 = data1[:,3]
+ent2 = data2[:,3]
+Td1 = data1[:,6]
+xid1 = data1[:,7]
+xiphi1 = data1[:,8]
+nd1 = data1[:,9]
+nphi1 = data1[:,10]
+Td2 = data2[:,6]
+xid2 = data2[:,7]
+xiphi2 = data2[:,8]
+nd2 = data2[:,9]
+nphi2 = data2[:,10]
+
+T_grid_dw = np.logspace(np.log10(1.4e-3), 1, 400)
+mYd1_dw = cf.O_h2_dw_Tevo(T_grid_dw, md1, 0.5*np.arcsin(np.sqrt(3.5e-13)))*cf.rho_crit0_h2/cf.s0
+mYd2_dw = cf.O_h2_dw_Tevo(T_grid_dw, md2, 0.5*np.arcsin(np.sqrt(3.5e-15)))*cf.rho_crit0_h2/cf.s0
+
+if True:
+
+    x1_dw, x2_dw = md1/T_grid_dw, md2/T_grid_dw
+    y1_dw, y2_dw = mYd1_dw, mYd2_dw
+
+    x1_tr, x2_tr = md1/T_nu1, md2/T_nu2
+    y1_tr, y2_tr = md1*nd1/ent1, md2*nd2/ent2
+
+    x1_dw0, x1_tr0 = x1_dw[x1_dw < 1e-3], x1_tr[x1_tr > 1e-3]
+    y1_dw0, y1_tr0 = y1_dw[x1_dw < 1e-3], y1_tr[x1_tr > 1e-3]
+
+    cut = 1e-3
+    x2_dw0, x2_tr0 = x2_dw[x2_dw < cut], x2_tr[x2_tr > cut]
+    y2_dw0, y2_tr0 = y2_dw[x2_dw < cut], y2_tr[x2_tr > cut]
+
+    x1, y1 = np.array([*x1_dw0[::-1], *x1_tr0, 1e3]), np.array([*y1_dw0[::-1], *y1_tr0, y1_tr0[-1]])
+    x2, y2 = np.array([*x2_dw0[::-1], *x2_tr0, 1e3]), np.array([*y2_dw0[::-1], *y2_tr0, y1_tr0[-1]])
+
+    plt.loglog(x1, y1, color='dodgerblue', zorder=-1)
+    plt.loglog(x2, y2, color='dodgerblue', linestyle='--', zorder=-1)
+
+    N = 1000
+    for i in range(N)[:-1]:
+        x1 = -7 + (-4 - (-7))*i/(N-1)
+        x2 = -7 + (-4 - (-7))*(i+1)/(N-1)
+
+        amin = 0
+        amax = -5
+        a = amin + (amax - amin)*i/(N-1)
+
+        plt.fill_betweenx([1e-23, 1e-18], 10**x1, 10**x2, color='white', alpha=1-i/N)
+    plt.fill_betweenx([1e-23, 1e-18], 1e-5, 1e-3, color='white', alpha=1)
+
+    #plt.text(3e-5, 4.5e-23, 'Thermalisation', rotation=90, fontsize=10, color='darkorange')
+    plt.text(8e-5, 2e-21, 'Thermalization', fontsize=10, color='darkorange')
+    plt.text(5e-4, 1.3e-19, r'$\rightarrow$', color='darkorange', horizontalalignment='center', verticalalignment='center')
+    plt.text(5e-4, 1e-22, r'$\rightarrow$', color='darkorange', horizontalalignment='center', verticalalignment='center')
+
+    #plt.loglog(md1/T_grid_dw, mYd1_dw, color='dodgerblue', ls='-')
+    #plt.loglog(md2/T_grid_dw, mYd2_dw, color='dodgerblue', ls='--')
+
+    #plt.loglog(np.append(md1/T_nu1, 1e3), np.append(md1*nd1/ent1, md1*nd1[-1]/ent1[-1]), color='dodgerblue', ls='-')
+    #plt.loglog(np.append(md2/T_nu2, 1e3), np.append(md2*nd2/ent2, md2*nd2[-1]/ent2[-1]), color='dodgerblue', ls='--')
+
+    # plt.loglog([1e-6, 1e-6], [10., 10.], color='black', ls='-', label=r"$\sin^2(2 \theta) = 10^{-13}, \, y = 2.34 \times 10^{-4}$")
+    # plt.loglog([1e-6, 1e-6], [10., 10.], color='black', ls='--', label=r"$\sin^2(2 \theta) = 2.51 \times 10^{-16}, \, y = 3.47 \times 10^{-3}$")
+
+    plt.loglog(md1/T_nu1, mphi1*nphi1/ent1, color='darkorange', ls='-', zorder=-1)
+    plt.loglog(md2/T_nu2, mphi2*nphi2/ent2, color='darkorange', ls='--', zorder=-1)
+
+    plt.loglog([1e-8, 1e3], [mY_relic, mY_relic], color='0.65', ls='-.', zorder=-2)
+    plt.text(3e-5, 5e-11, r'$\Omega_s h^2 = 0.12$', fontsize=11, color='0.65')
+    #plt.text(3e-3, 5e-11, r'$\Omega_s h^2 = 0.12$', fontsize=11, color='0.65')
+
+    plt.text(2.5, 1e-11, r'$\nu_s$', color='dodgerblue', fontsize=11)
+    plt.text(2.0, 1e-17, r'$\phi$', color='darkorange', fontsize=11)
+
+    #plt.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='-' , color='black', label=r'$m_s = 10\,\mathrm{keV}, \sin^2(2\theta) = 3.5\cdot 10^{-13}, y \approx 1.31 \cdot 10^{-4}$')
+    #plt.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='--', color='black', label=r'$m_s = 20\,\mathrm{keV}, \sin^2(2\theta) = 3.5\cdot 10^{-15}, y \approx 1.47\cdot 10^{-3}$')
+    plt.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='-' , color='black', label=r'B1')
+    plt.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='--', color='black', label=r'B2')
+
+
+    # ax.text(1.3e-2, 1e-10, "$\Omega_s h^2 = 0.12$", color='0.65', fontsize=12)
+    # ax.text(1.3e-2, 2.5e-13, "$m_s Y_s$", color='dodgerblue', fontsize=12)
+    # ax.text(1.3e-2, 1.7e-19, "$m_\phi Y_\phi$", color='darkorange', fontsize=12)
+    # ax.text(3.8e0, 7.5e-6, r"$5.15$", fontsize=12)
+    # ax.text(3.8e0, 5e-5, r"$6.15$", fontsize=12)
+    # ax.text(1e0, 4e-4, r"$10^5 y = 7.15$", fontsize=12)
+
+    props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")
+    # ax.text(0.4e0, 2e-9, r"$m_\mathrm{d} = 10 \, \mathrm{keV}$" + "\n" + r"$m_\phi = 25 \, \mathrm{keV}$" + "\n" + r"$\sin^2 (2 \theta) = 10^{-12}$", horizontalalignment="left", fontsize=12, bbox=props)
+    # ax.text(6.4e-1, 3e-19, r"$m_s = 15 \, \mathrm{keV}$" + "\n" + r"$m_\phi = 2.5 m_s$" + "\n" + r"$\sin^2(2 \theta) = 1.5 \times 10^{-13}$" + "\n" + r"$y = 2.44 \times 10^{-4}$", horizontalalignment="left", fontsize=10, bbox=props)
+    # ax.legend(loc=(2.5e-2, 2.5e-2), handlelength=1.5, fontsize=10, framealpha=0.8, facecolor='white', edgecolor="0.8")
+
+    #plt.text(2e-2, 1e-11, r'$m_\phi = 2.5m_\chi$', fontsize=9, horizontalalignment='center', bbox=props)
+    #plt.text(1e0, 3e-23, r'$m_\phi = 2.5m_\chi$', fontsize=9, horizontalalignment='center', bbox=props, zorder=5)
+    plt.text(2e-3, 4e-25, r'$m_\phi = 2.5m_\chi$', fontsize=9, horizontalalignment='center', bbox=props, zorder=5)
+
+
+    plt.legend(fontsize=9, loc='lower left', framealpha=1, edgecolor='0.8')
+    ax.xaxis.set_label_text(r"$m_s / T_\nu$")
+    ax.yaxis.set_label_text(r"$m_x Y_x = m_x n_x / s\;\;\mathrm{[keV]}$")
+
+
+    ax.xaxis.set_major_locator(xMajorLocator)
+    ax.xaxis.set_minor_locator(xMinorLocator)
+    ax.xaxis.set_major_formatter(xMajorFormatter)
+    ax.yaxis.set_major_locator(yMajorLocator)
+    ax.yaxis.set_minor_locator(yMinorLocator)
+    ax.yaxis.set_major_formatter(yMajorFormatter)
+
+    ax.set_xlim(2e-5, 20)
+    #ax.set_xlim(3e-2, 6e-2)
+    ax.set_ylim(1e-25, 1e-9)
+    plt.tight_layout()
+    plt.savefig('evo.pdf')
+    plt.show()
+elif False:
+    plt.loglog(md1/T_nu1, 1e6*Td1, color='dodgerblue', ls='-')
+    plt.loglog(md2/T_nu2, 1e6*Td2, color='dodgerblue', ls='--')
+    ax.xaxis.set_label_text(r"$m_s / T_\nu$")
+    ax.yaxis.set_label_text(r"$T_s \; \; [\mathrm{keV}]$")
+    ax.set_xlim(1e-3, 1e1)
+    ax.set_ylim(1e-1, 1e2)
+    plt.tight_layout()
+    # plt.savefig('Td.pdf')
+    plt.show()
+else:
+    plt.semilogx(md1/T_nu1, xid1, color='dodgerblue', ls='-')
+    plt.semilogx(md2/T_nu2, xid2, color='dodgerblue', ls='--')
+    ax.xaxis.set_label_text(r"$m_\mathrm{d} / T_\nu$")
+    ax.yaxis.set_label_text(r"$\mu_\mathrm{d} / m_\mathrm{d}$")
+    ax.set_xlim(1e-3, 1e1)
+    # ax.set_ylim(1e-1, 1e2)
+    plt.tight_layout()
+    # plt.savefig('mud.pdf')
+    plt.show()

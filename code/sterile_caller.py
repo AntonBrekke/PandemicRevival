@@ -168,7 +168,7 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, spin
             
             def C_therm(T_d, xi_d, xi_X):
 
-                C_dd_X = C_res_vector.C_n_3_12(m1=m_d, m2=m_d, m3=m_X, k1=k_d, k2=k_d, k3=k_X, T1=T_d, T2=T_d, T3=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_X, M2=M2_X_12, type=1) / 2.
+                C_dd_X = C_res_vector.C_n_3_12(m1=m_N1, m2=m_N2, m3=m_X, k1=k_d, k2=k_d, k3=k_X, T1=T_d, T2=T_d, T3=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_X, M2=M2_X_12, type=1) / 2.
 
                 return 4.*(C_dd_X)
             

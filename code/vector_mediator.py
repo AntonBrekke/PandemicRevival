@@ -515,7 +515,8 @@ def M2_el(s, t, m_d2, vert, m_X2, m_Gamma_X2):
 def ker_sigma_gen_new(t, s, p1cm, m1, m2, m3, m4, vert, m_d2, m_X2, m_h2, m_Gamma_X2, m_Gamma_h2, sub):
     # Anton: Numerical issues with integration (some numbers get extremely large for sigma_el). 
     # Trick: Scale integrand by R and re-scale result back with 1/R
-    return 1e-3*M2_gen_new_3(s, t, m1, m2, m3, m4, vert, m_d2, m_X2, m_h2, m_Gamma_X2, m_Gamma_h2, sub)/(64.*np.pi*s*p1cm*p1cm)
+    # return 1e-3*M2_gen_new_3(s, t, m1, m2, m3, m4, vert, m_d2, m_X2, m_h2, m_Gamma_X2, m_Gamma_h2, sub)/(64.*np.pi*s*p1cm*p1cm)
+    return M2_gen(s, t, m1, m2, m3, m4, vert, m_X2, m_Gamma_X2, sub=False)/(64.*np.pi*s*p1cm*p1cm)
 
 # no factor taking care of identical particles (not known on this level)
 # @nb.jit(nopython=True, cache=True)

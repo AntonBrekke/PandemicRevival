@@ -567,7 +567,6 @@ if __name__ == '__main__':
     # load_str = './md_2.1e-05;mX_1.05e-04;mh_6.3e-05;sin22th_1.5e-15;y_1.4e-03;full_new.dat'    
     # var_list = load_str.split(';')[:-1]
     # m_d, m_X, m_h, sin2_2th, y = [eval(s.split('_')[-1]) for s in var_list]
-    # m_nu = 0.
     # Anton: Ignore these masses 
     m_h = 0
     m_nu = 0

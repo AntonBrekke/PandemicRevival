@@ -588,10 +588,12 @@ if __name__ == '__main__':
 
     # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12)
     y = 4e-4
+    # y = 3e-3
     m0 = 1e3
     m12 = m_d
     m2 = 1e-2
     ma = m12*1e-2
+    # ma = m12*1e-3
 
     sin2_2th = (m2*ma/(m0*m12))**2
     th = 1/2 * asin(sqrt(sin2_2th))

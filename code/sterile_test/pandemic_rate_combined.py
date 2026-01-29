@@ -55,9 +55,9 @@ plt.rcParams.update(params)
 x_therm = 1e-3
 save_fig = True
 data_skip_pan = 2
-data_skip_rate = 10
+data_skip_rate = 100
 plot_data_skip = 1
-force_write = False
+force_write = True
 ### Benchmark Points ###:
 BP = 0
 if BP == 1:
@@ -84,7 +84,8 @@ else:
     BP = None
 
 # load_str = './md_5e-05;mX_1.5e-04;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat' 
-load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-16;y_2.5e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-16;y_2.5e-03;full_new.dat' 
+load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-16;y_3e-03;full_new.dat'
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-14;y_4e-04;full_new.dat' 
 data = np.loadtxt(load_str)
 T_SM = data[::data_skip_pan, 1]

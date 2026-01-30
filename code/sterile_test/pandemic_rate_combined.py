@@ -40,15 +40,15 @@ def get_figsize(columnwidth, wf=1.0, hf=(5.**0.5-1.0)/2.0):
     fig_height = fig_width*hf      # height in inches
     return [fig_width, fig_height]
 
-columnwidth = 418.25368     # pt, given by \showthe\textwidth in LaTeX
+columnwidth = 426.39256    # pt, given by \showthe\textwidth in LaTeX
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 # plt.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
 plt.rc('text.latex', preamble=r'\usepackage{amsmath}')
-params = {'axes.labelsize': 13,
-            'axes.titlesize': 12,
-            'font.size': 11} # extend as needed
+params = {'axes.labelsize': 10,
+            'axes.titlesize': 10,
+            'font.size': 10} # extend as needed
 # print(plt.rcParams.keys())
 plt.rcParams.update(params)
 
@@ -57,7 +57,7 @@ save_fig = True
 data_skip_pan = 2
 data_skip_rate = 100
 plot_data_skip = 1
-force_write = True
+force_write = False
 ### Benchmark Points ###:
 BP = 0
 if BP == 1:
@@ -85,8 +85,14 @@ else:
 
 # load_str = './md_5e-05;mX_1.5e-04;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-16;y_2.5e-03;full_new.dat' 
-load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-16;y_3e-03;full_new.dat'
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-16;y_3e-03;full_new.dat'
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-14;y_4e-04;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_2e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.5e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.2e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.3e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.4e-03full_new.dat' 
+load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.8e-03;full_new.dat' 
 data = np.loadtxt(load_str)
 T_SM = data[::data_skip_pan, 1]
 T_nu = data[::data_skip_pan, 2]

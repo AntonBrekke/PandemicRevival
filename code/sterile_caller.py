@@ -28,18 +28,23 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, spin
     m_h2 = m_h*m_h
     C_10 = m2/m0
     # Anton: C_1nu = sin(2*theta)
-    C_1nu = C_10 * ma/m12
+    sin_2th = C_10 * ma/m12
+    sin2_2th = sin_2th**2
+    th = 1/2*asin(sqrt(sin2_2th))
+    sin_th = np.sin(th)
+    sin2_th = sin_th**2
     y2 = y*y
 
-    print(y**4, (y*C_1nu)**2)
+    print(f'y: {y:.3e}, sin^2(th): {sin2_2th:.3e}')
+    print(f'y^4: {y**4:.3e}, y^2 sin^2(2th): {y**2*sin2_2th:.3e}')
     
     M2_X_12 = 2.*y2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)/m_X2
     # Anton: M2_X_10 IS NEVER USED 
     M2_X_10 = 2.*y2*C_10**2 * (m_X+m_N1-m0)*(m_X-m_N1+m0)*(2*m_X2 + (m_N1+m0)**2)/m_X2
-    M2_X_1nu = 2.*y2*C_1nu**2 * (m_X2-m_N12)*(2*m_X2 + m_N12)/m_X2
+    M2_X_1nu = 2.*y2*sin2_th * (m_X2-m_N12)*(2*m_X2 + m_N12)/m_X2
 
-    vert_fi = y2*y2*(C_1nu**4.)
-    vert_tr = y2*y2*(C_1nu**2.)
+    vert_fi = y2*y2*sin2_th**2
+    vert_tr = y2*y2*sin2_th
     vert_el = y2*y2
 
     # Anton: X --> 12, 1nu
@@ -317,6 +322,7 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, spin
     # time1 = time.time()
     # print("Running Pandemolator.pandemolate ")
     pan.pandemolate()
+    plt.close()
     # print(f"Pandemolator.pandemolate ran in {time.time() - time1}s ")
 
     try:
@@ -586,18 +592,20 @@ if __name__ == '__main__':
     dof_d = 2.
     dof_X = 3.
 
-    # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12)
-    y = 4e-4
+    # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12), m1 = 0
+    y = 1.8e-3
     # y = 3e-3
     m0 = 1e3
     m12 = m_d
-    m2 = 1e-2
-    ma = m12*1e-2
+    m2 = m0*10**(-15./2)
+    ma = m12
+
+    print('mi/m0 << 1 :', f'{ma/m0:.3e}, {m2/m0:.3e}, {m12/m0:.3e}')
+    print('mi^2/m0 << m12 :', f'{ma**2/m12:.3e}, {m2**2/m12:.3e}')
     # ma = m12*1e-3
 
     sin2_2th = (m2*ma/(m0*m12))**2
     th = 1/2 * asin(sqrt(sin2_2th))
-    print(sin2_2th)
 
     # Anton: If spin-statistics (1+k*f) matters, if the mediator is off-shell or not 
     spin_facs = True

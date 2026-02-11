@@ -2,7 +2,7 @@
 
 import numpy as np
 import numba as nb
-from math import sin, cos, sqrt, atan, log
+from math import sin, cos, sqrt, atan, log, asin
 from scipy.integrate import quad
 from scalar_mediator import Gamma_phi
 import time
@@ -42,7 +42,10 @@ Implemented real intermediate state (RIS) subtraction
 def Gamma_X_new(y, m_X, m_N1, m_N2, m0, m12, m2, ma):
 
     g12 = y
-    g1nu = y * m2*ma/(m0*m12)
+    sin_2th = m2*ma/(m0*m12) 
+    th = 0.5*asin(sin_2th)
+    sin_th = sin(th)
+    g1nu = y * sin_th
 
     m_X2 = m_X*m_X
     m_N12 = m_N1*m_N1
@@ -521,7 +524,7 @@ def M2_el(s, t, m_d2, vert, m_X2, m_Gamma_X2):
 ########################################################
 # Anton: Cross-sections for each process gen, tr, fi, el
 
-@nb.jit(nopython=True, cache=True)
+# @nb.jit(nopython=True, cache=True)
 def ker_sigma_gen_new(t, s, p1cm, m1, m2, m3, m4, vert, m_d2, m_X2, m_h2, m_Gamma_X2, m_Gamma_h2, sub):
     # Anton: Numerical issues with integration (some numbers get extremely large for sigma_el). 
     # Trick: Scale integrand by R and re-scale result back with 1/R

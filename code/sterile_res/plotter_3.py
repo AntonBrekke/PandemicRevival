@@ -34,7 +34,7 @@ def get_figsize(columnwidth, wf=1.0, hf=(5.**0.5-1.0)/2.0):
     - hf [float]:  height fraction in columnwidth units.
                     Set by default to golden ratio.
     - columnwidth [float]: width of the column in latex. Get this from LaTeX 
-                            using \showthe\columnwidth
+                            using \\showthe\\columnwidth
     Returns:  [fig_width, fig_height]: that should be given to matplotlib
     """
     fig_width_pt = columnwidth*wf 
@@ -98,38 +98,43 @@ for axis in ['top','bottom','left','right']:
 # r_sound_3 = data[:,16].reshape((nx, ny))
 
 
+# nx, ny = 20, 20
+# data = np.loadtxt('rm_3.00e+00_y_relic_20x20x50.dat')
+# nx, ny = 40, 40
+# data = np.loadtxt('rm_3.00e+00_y_relic_40x40x50.dat')
+# nx, ny = 21, 81
+# data = np.loadtxt('rm_3.00e+00_y_relic_21x81x60.dat')
+# nx, ny = 30, 40
+# data = np.loadtxt('rm_3.00e+00_y_relic_30x40x70_part2.dat')
+# nx, ny = 20, 30
+# data = np.loadtxt('rm_3.00e+00_y_relic_20x30x70.dat')
+# nx, ny = 20, 20
+# data = np.loadtxt('rm_3.00e+00_y_relic_20x20x50_new.dat')
+# nx, ny = 20, 40
+# data = np.loadtxt('rm_3.00e+00_y_relic_20x40x60_new.dat')
+# nx, ny = 20, 20
+# data = np.loadtxt('rm_3.00e+00_y_relic_20x20x60_new.dat')
+# nx, ny = 20, 80
+# data = np.loadtxt('rm_3.00e+00_y_relic_20x80x70_new.dat')
+# nx, ny = 20, 20
+# data = np.loadtxt('rm_3.00e+00_y_relic_20x20x50_new.dat')
+# nx, ny = 10, 10
+# data = np.loadtxt('rmXd_5.00e+00_rmhd_3.00e+00_y_relic_test_10x10x70.dat')
+# nx, ny = 20, 20
+# data = np.loadtxt('rmXd_5.00e+00_rmhd_3.00e+00_y_relic_test_20x20x60.dat')
+# nx, ny = 20, 40
+# data = np.loadtxt('rmXd_5.00e+00_rmhd_3.00e+00_y_relic_test_20x40x60.dat')
+# nx, ny = 20, 40
+# data = np.loadtxt('rmXd_3.00e+00_rmhd_3.00e+00_y_relic_test_20x40x60.dat')
+# nx, ny = 20, 40
+# data = np.loadtxt('rmXd_3.00e+00_rmhd_3.00e+00_y_relic_test_20x40x60.dat')
+# nx, ny = 20, 40
+# data = np.loadtxt('rm_3.00e+00_y_relic_20x40x60_new.dat')
+
+# nx, ny = 10, 10
+# data = np.loadtxt('rmXd_2.50e+00_y_relic_test_10x10x60.dat')
 nx, ny = 20, 20
-data = np.loadtxt('rm_3.00e+00_y_relic_20x20x50.dat')
-nx, ny = 40, 40
-data = np.loadtxt('rm_3.00e+00_y_relic_40x40x50.dat')
-nx, ny = 21, 81
-data = np.loadtxt('rm_3.00e+00_y_relic_21x81x60.dat')
-nx, ny = 30, 40
-data = np.loadtxt('rm_3.00e+00_y_relic_30x40x70_part2.dat')
-nx, ny = 20, 30
-data = np.loadtxt('rm_3.00e+00_y_relic_20x30x70.dat')
-nx, ny = 20, 20
-data = np.loadtxt('rm_3.00e+00_y_relic_20x20x50_new.dat')
-nx, ny = 20, 40
-data = np.loadtxt('rm_3.00e+00_y_relic_20x40x60_new.dat')
-nx, ny = 20, 20
-data = np.loadtxt('rm_3.00e+00_y_relic_20x20x60_new.dat')
-nx, ny = 20, 80
-data = np.loadtxt('rm_3.00e+00_y_relic_20x80x70_new.dat')
-nx, ny = 20, 20
-data = np.loadtxt('rm_3.00e+00_y_relic_20x20x50_new.dat')
-nx, ny = 10, 10
-data = np.loadtxt('rmXd_5.00e+00_rmhd_3.00e+00_y_relic_test_10x10x70.dat')
-nx, ny = 20, 20
-data = np.loadtxt('rmXd_5.00e+00_rmhd_3.00e+00_y_relic_test_20x20x60.dat')
-nx, ny = 20, 40
-data = np.loadtxt('rmXd_5.00e+00_rmhd_3.00e+00_y_relic_test_20x40x60.dat')
-nx, ny = 20, 40
-data = np.loadtxt('rmXd_3.00e+00_rmhd_3.00e+00_y_relic_test_20x40x60.dat')
-nx, ny = 20, 40
-data = np.loadtxt('rmXd_3.00e+00_rmhd_3.00e+00_y_relic_test_20x40x60.dat')
-nx, ny = 20, 40
-data = np.loadtxt('rm_3.00e+00_y_relic_20x40x60_new.dat')
+data = np.loadtxt('rmXd_2.50e+00_y_relic_test_20x20x60.dat')
 
 # Removed max_step=1. in pandemolator for this one -- terrible result...
 # nx, ny = 30, 30
@@ -152,6 +157,25 @@ data = np.loadtxt('rm_3.00e+00_y_relic_20x40x60_new.dat')
 # T_d_kd_3 = data[:,14].reshape((nx, ny))
 # r_sound = data[:,15].reshape((nx, ny))
 # r_sound_3 = data[:,16].reshape((nx, ny))
+
+"""
+m_d, 0 
+m_X, 1
+sin2_2th, 2
+y_cur, 3
+O_d_h2, 4
+x_therm, 5
+x_d_therm, 6
+therm_ratio_max, 7
+fs_length, 8
+fs_length_3, 9
+T_kd, 10
+T_kd_3, 11
+T_d_kd, 12
+T_d_kd_3, 13
+r_sound, 14
+r_sound_3 15
+"""
 
 md = data[:,0].reshape((nx, ny))
 mX = data[:,1].reshape((nx, ny))
@@ -198,7 +222,7 @@ def fill_nan(data, method='linear'):
     # Anton: Points where data is NaN
     points_missing = np.vstack((x_flat[~valid], y_flat[~valid])).T
     
-    # Anton: Interpolate the missing data
+    # Anton: Interpolate the missing data, ~valid = not valid
     data_flat[~valid] = griddata(points_valid, values_valid, points_missing, method=method)
     
     # Anton: Reshape back to the original data shape
@@ -221,26 +245,33 @@ def interpolate_2d(x, y, z, nx=100, ny=100, method='cubic'):
     grid_z = grid_lz  # values are already in linear space
     return grid_x, grid_y, grid_z
 
-# y = np.sqrt(2)*md/mX*y
-y = fill_nan(y, method='cubic')
-y = fill_nan(y, method='nearest')
-r_sound = fill_nan(r_sound, method='cubic')
-r_sound = fill_nan(r_sound, method='nearest')
-fs_length = fill_nan(fs_length, method='cubic')
-fs_length = fill_nan(fs_length, method='nearest')
+make_interpolate = True
+# method = ['linear', 'cubic', 'nearest']
+if make_interpolate is True:
+    first_nan = 'linear'
+    second_nan = 'nearest'
+    first_interpol = 'linear'
+    second_interpol = 'nearest'
 
-X, Y, y = interpolate_2d(md, sin22th, y, method='cubic')
-_, _, y = interpolate_2d(X, Y, y, method='nearest')
-X, Y, r_sound = interpolate_2d(md, sin22th, r_sound, method='cubic')
-_, _, r_sound = interpolate_2d(X, Y, r_sound, method='nearest')
-X, Y, fs_length = interpolate_2d(md, sin22th, fs_length, method='cubic')
-md, sin22th, fs_length = interpolate_2d(X, Y, fs_length, method='cubic')
+    y = fill_nan(y, method=first_nan)
+    y = fill_nan(y, method=second_nan)
+    r_sound = fill_nan(r_sound, method=first_nan)
+    r_sound = fill_nan(r_sound, method=second_nan)
+    fs_length = fill_nan(fs_length, method=first_nan)
+    fs_length = fill_nan(fs_length, method=second_nan)
 
-y *= 0.9
-mX = 5*md
-mh = 3*md
+    X, Y, y = interpolate_2d(md, sin22th, y, method=first_interpol)
+    _, _, y = interpolate_2d(X, Y, y, method=second_interpol)
+    X, Y, r_sound = interpolate_2d(md, sin22th, r_sound, method=first_interpol)
+    _, _, r_sound = interpolate_2d(X, Y, r_sound, method=second_interpol)
+    X, Y, fs_length = interpolate_2d(md, sin22th, fs_length, method=first_interpol)
+    md, sin22th, fs_length = interpolate_2d(X, Y, fs_length, method=second_interpol)
 
-plt.contour(np.log10(1e6*md), np.log10(sin22th), np.log10(y), levels=[-6.,-5.,-4.,-3.,-2.,-1.], colors='forestgreen', linewidths = 0.4, zorder=-1, linestyles='-')
+# y *= 0.9
+mX = 2.5*md
+# mh = 3*md
+
+plt.contour(np.log10(1e6*md), np.log10(sin22th), np.log10(y), levels=[-6., -5., -4., -3., -2., -1.], colors='forestgreen', linewidths = 0.4, zorder=-1, linestyles='-')
 
 # plt.contour(np.log10(1e6*md), np.log10(sin22th), np.abs(Odh2_no_spin_stat-Odh2)/Odh2, levels=[0.1])
 # plt.contour(np.log10(1e6*md), np.log10(sin22th), t_life, levels=[1.])
@@ -289,7 +320,7 @@ plt.plot(np.log10(1e6*extp_proj[:,0]), np.log10(extp_proj[:,1]), color='black', 
 self_int_const = cf.conv_cm2_g
 # sigma_self_int = (y**4.)*(np.cos(0.5*np.arcsin(np.sqrt(sin22th)))**8.)*md/(4.*np.pi*(mX**4.))
 # sigma_self_int = 3*sigma_self_int       # Vector mediator give 3x enhancement
-sigma_self_int = (4*y**4*np.cos(0.5*np.arcsin(np.sqrt(sin22th)))**8.) * md*(mh**2-md**2)**2/(np.pi*mh**4*mX**4)
+sigma_self_int = (y**4*md*(4*md**4-2*md**2*mX**2+mX**4))/(mX**4*np.pi*(mX**2-4*md**2)**2)
 plt.contour(np.log10(1e6*md), np.log10(sin22th), np.log10(sigma_self_int), levels=[np.log10(self_int_const)], colors='#A300CC', linewidths=1.3, zorder=-5)
 plt.contourf(np.log10(1e6*md), np.log10(sin22th), np.log10(sigma_self_int), levels=[np.log10(self_int_const), np.log10(1e6*self_int_const)], colors='#A300CC', alpha=0.25, zorder=-5)
 
@@ -314,20 +345,20 @@ x3, y3 = get_xy(cs3)
 # plt.plot(x2[71:-18], y2[71:-18])
 # plt.plot(x3[18:], y3[18:])
 
-ip1 = interp1d(y1, x1, kind='linear')
-ip2 = interp1d(y2, x2, kind='linear')
-ip3 = interp1d(y3, x3, kind='linear')
+# ip1 = interp1d(y1, x1, kind='linear')
+# ip2 = interp1d(y2, x2, kind='linear')
+# ip3 = interp1d(y3, x3, kind='linear')
 
-Y1 = np.linspace(-14.38, -12, 100)
-X1 = [ip1(y) for y in Y1]
-Y2 = np.linspace(-16.05, -14.38, 100)
-X2 = [ip2(y) for y in Y2]
-Y3 = np.linspace(-17.16, -16.05, 100)
-X3 = [ip3(y) for y in Y3]
+# Y1 = np.linspace(-14.38, -12, 100)
+# X1 = [ip1(y) for y in Y1]
+# Y2 = np.linspace(-16.05, -14.38, 100)
+# X2 = [ip2(y) for y in Y2]
+# Y3 = np.linspace(-17.16, -16.05, 100)
+# X3 = [ip3(y) for y in Y3]
 
-plt.plot(X1, Y1, zorder=-3, color='darkorange', linestyle='--')
-plt.plot(X2, Y2, zorder=-3, color='#ff7b7b', linestyle='--')
-plt.plot(X3, Y3, zorder=-3, color='#A300CC', linestyle='--')
+# plt.plot(X1, Y1, zorder=-3, color='darkorange', linestyle='--')
+# plt.plot(X2, Y2, zorder=-3, color='#ff7b7b', linestyle='--')
+# plt.plot(X3, Y3, zorder=-3, color='#A300CC', linestyle='--')
 
 load_str_1 = './md_1.12884e-05;mX_5.64419e-05;mh_3.38651e-05;sin22th_1.83298e-13;y_1.93457e-04;full_new.dat' 
 load_str_2 = './md_2.1e-05;mX_1.05e-04;mh_6.3e-05;sin22th_1.5e-15;y_1.282e-03;full_new.dat'       
@@ -349,9 +380,9 @@ md_B2, sin22th_B2 = float(md_B2.replace('md_', '')), float(sin22th_B2.replace('s
 md_B3, sin22th_B3 = float(md_B3.replace('md_', '')), float(sin22th_B3.replace('sin22th_', ''))
 md_B4, sin22th_B4 = float(md_B4.replace('md_', '')), float(sin22th_B4.replace('sin22th_', ''))
 
-plt.plot(np.log10(1e6*md_B1), np.log10(sin22th_B1), marker='*', color='tomato')
-plt.plot(np.log10(1e6*md_B2), np.log10(sin22th_B2), marker='*', color='tomato')
-plt.plot(np.log10(1e6*md_B3), np.log10(sin22th_B3), marker='*', color='tomato')
+# plt.plot(np.log10(1e6*md_B1), np.log10(sin22th_B1), marker='*', color='tomato')
+# plt.plot(np.log10(1e6*md_B2), np.log10(sin22th_B2), marker='*', color='tomato')
+# plt.plot(np.log10(1e6*md_B3), np.log10(sin22th_B3), marker='*', color='tomato')
 # plt.plot(np.log10(1e6*md_B4), np.log10(sin22th_B4), marker='*', color='tomato')
 
 #plt.plot(np.log10(10), np.log10(3.5e-13), marker='*', color='tomato')
@@ -384,7 +415,7 @@ plt.xlim(0, np.log10(300))
 plt.ylim(-18, -8)
 
 props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")
-ax.text(2.05, -8.4, "$m_X = 5 m_s$" + "\n" + "$m_h \hspace{1mm}= 3 m_s$", color='black', bbox=props, va='top')
+ax.text(2.05, -8.4, "$m_X = 2.5 m_s$", color='black', bbox=props, va='top')
 # ax.text(1.9, -7.75, "$m_h = 3 m_s$", color='black', fontsize=12, bbox=props)
 ax.xaxis.set_label_text(r"$m_s\;\;[\mathrm{keV}]$")
 ax.xaxis.set_major_locator(xMajorLocator)
@@ -396,7 +427,7 @@ ax.yaxis.set_major_locator(yMajorLocator)
 ax.yaxis.set_minor_locator(yMinorLocator)
 ax.yaxis.set_major_formatter(yMajorFormatter)
 plt.tight_layout()
-savefig_str = './find_y_md_sin22th_' + f'mX_{(mX/md)[0,0]:.1f}md' + f'mh_{(mh/md)[0,0]:.1f}md.pdf'
+savefig_str = './find_y_md_sin22th_' + f'mX_{(mX/md)[0,0]:.1f}md.pdf'
 print('saved', savefig_str)
-# plt.savefig(savefig_str, dpi=300)
+plt.savefig(savefig_str, dpi=300)
 plt.show()

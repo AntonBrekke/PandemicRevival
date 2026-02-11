@@ -31,6 +31,7 @@ m0 = 1e3
 m12 = 1e-1
 m2 = 1e-2
 ma = m12*1e-2
+# sin2_2th = (m2*ma/(m0*m12))**2
 
 # Anton: Fermion (Fermi) = 1, Boson = 1 (Bose)
 k_d = 1.
@@ -143,7 +144,7 @@ def find_y(params):
     therm_ratio_max = np.amax(therm_ratio)
     O_d_h2 = n_d_grid[-1]*m_d*cf.s0/(ent_grid[-1]*cf.rho_crit0_h2)
     print(f'find_y.py returned {m_d:.2e}, sin2_2th: {sin2_2th:.2e}, y: {y_cur:.2e}')
-    print(f'Saved {filename} to benchmark_pts')
+    # print(f'Saved {filename} to benchmark_pts')
     return m_d, m_X, sin2_2th, y_cur, O_d_h2, x_therm, x_d_therm, therm_ratio_max, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3
 
 if __name__ == '__main__':
@@ -205,7 +206,7 @@ if __name__ == '__main__':
                     i_md += 1
                 openfile.close()
 
-        results = np.array(result_list).reshape(len(result_list), 17)
+        results = np.array(result_list).reshape(len(result_list), 16)
 
     dt = time.time() - time1
     print(f"find_y.py ran in {dt//60//60}h {dt//60%60}m {dt%60}s")

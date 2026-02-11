@@ -417,7 +417,7 @@ def ker_C_dd_dd_gon_gel(log_s, m_d, k_d, T_d, xi_d, vert_el, m_X2, m_h2, m_Gamma
     if s <= 4.*m_d*m_d:
         return 0.
 
-    sigma = vector_mediator.sigma_gen_new(s, m_d, m_d, m_d, m_d, vert_el, m_d2, m_X2, m_h2, m_Gamma_X2, m_Gamma_h2, sub=False)
+    sigma = vector_mediator.sigma_gen_new(s, m_d, m_d, m_d, m_d, vert_el, m_d**2, m_X2, m_h2, m_Gamma_X2, m_Gamma_h2, sub=False)
 
     sqrt_s = sqrt(s)
     if sqrt_s/T_d < max_exp_arg and 2.*xi_d < 6e2:
@@ -433,7 +433,7 @@ def ker_C_dd_dd_gon_gel(log_s, m_d, k_d, T_d, xi_d, vert_el, m_X2, m_h2, m_Gamma
 
 
 
-def C_dd_dd_gon_gel(m_d, k_d, T_d, xi_d, vert_el, m_X2, m_Gamma_X2, res_sub=False):
+def C_dd_dd_gon_gel(m_d, k_d, T_d, xi_d, vert_el, m_X2, m_h2, m_Gamma_X2, m_Gamma_h2, res_sub=False):
     s_min = 4.*m_d*m_d
     s_max = max((5e2*T_d)**2., 1e2*s_min)
 
@@ -443,7 +443,7 @@ def C_dd_dd_gon_gel(m_d, k_d, T_d, xi_d, vert_el, m_X2, m_Gamma_X2, res_sub=Fals
 
     res = 0.
     for i in range(len(s_vals)-1):
-        cur_res, err = quad(ker_C_dd_dd_gon_gel, log(s_vals[i]), log(s_vals[i+1]), args=(m_d, k_d, T_d, xi_d, vert_el, m_X2, m_Gamma_X2, res_sub), epsabs=0., epsrel=rtol_int, limit=100)
+        cur_res, err = quad(ker_C_dd_dd_gon_gel, log(s_vals[i]), log(s_vals[i+1]), args=(m_d, k_d, T_d, xi_d, vert_el, m_X2, m_h2, m_Gamma_X2, m_Gamma_h2, res_sub), epsabs=0., epsrel=rtol_int, limit=100)
         res += cur_res
     return res*T_d/(32.*(np.pi**4.))
 

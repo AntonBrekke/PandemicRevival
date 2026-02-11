@@ -19,17 +19,18 @@ GF = 1.166378e-5
 mZ = 91.1876
 mW = 80.379
 
-def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, spin_facs=True, off_shell=False):
+def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th=None, spin_facs=True, off_shell=False):
     m_N12 = m_N1*m_N1
     m_N22 = m_N2*m_N2
     m_nu = 0 
     m_X2 = m_X*m_X
     m_h = 0
     m_h2 = m_h*m_h
-    C_10 = m2/m0
+    # C_10 = m2/m0
     # Anton: C_1nu = sin(2*theta)
-    sin_2th = C_10 * ma/m12
-    sin2_2th = sin_2th**2
+    if sin2_2th is None:
+        sin_2th = m2/m0 * ma/m12
+        sin2_2th = sin_2th**2
     th = 1/2*asin(sqrt(sin2_2th))
     sin_th = np.sin(th)
     sin2_th = sin_th**2
@@ -40,7 +41,7 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, spin
     
     M2_X_12 = 2.*y2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)/m_X2
     # Anton: M2_X_10 IS NEVER USED 
-    M2_X_10 = 2.*y2*C_10**2 * (m_X+m_N1-m0)*(m_X-m_N1+m0)*(2*m_X2 + (m_N1+m0)**2)/m_X2
+    # M2_X_10 = 2.*y2*C_10**2 * (m_X+m_N1-m0)*(m_X-m_N1+m0)*(2*m_X2 + (m_N1+m0)**2)/m_X2
     M2_X_1nu = 2.*y2*sin2_th * (m_X2-m_N12)*(2*m_X2 + m_N12)/m_X2
 
     vert_fi = y2*y2*sin2_th**2
@@ -194,7 +195,7 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, spin
 
                 # Anton: Lacks the cross-term 
                 # return 2.*(C_dd_X_dd_gon_gel + C_dd_h_dd_gon_gel)
-                return 4.*(C_dd_X_dd_gon_gel)
+                return 2.*(C_dd_X_dd_gon_gel)
         else:
             # Anton: THIS IS NOT UPDATEED/IMPLEMENTED
             print("Implementation needs to be updated...")
@@ -530,7 +531,10 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, spin
             fs_length = utils.simp(Ttrel.t_grid, integrand_fs_length)
 
         return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, C_therm_grid, fs_length/cf.Mpc, fs_length_3/cf.Mpc, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound/cf.Mpc, r_sound_3/cf.Mpc, True#, V_SM_grid, V_d_grid, G_a_grid, G_d_grid
-    except:
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print('Error: return nan')
         return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, True
 
     # print(m_d/T_d_kd, lo_v_kd + nlo_v_kd +nnlo_v_kd)
@@ -583,6 +587,30 @@ if __name__ == '__main__':
     m_N2 = m_d
     m_X = 2.5*m_d
 
+    # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12), m1 = 0
+    y = 1.8e-3
+    # y = 3e-3
+    m0 = 1e3
+    m12 = m_d
+    m2 = m0*10**(-15./2)
+    ma = m12
+
+    sin2_2th = (m2*ma/(m0*m12))**2
+    th = 1/2 * asin(sqrt(sin2_2th))
+
+    # Anton: remember to run sterile_caller on this combination
+    m_d = 8.80e-05
+    m_N1 = m_d
+    m_N2 = m_d
+    m_X = 2.5*m_d
+    y = 2.44e-04
+    sin2_2th = 3.59e-13 
+
+    print('mi/m0 << 1 :', f'{ma/m0:.3e}, {m2/m0:.3e}, {m12/m0:.3e}')
+    print('mi^2/m0 << m12 :', f'{ma**2/m12:.3e}, {m2**2/m12:.3e}')
+    # ma = m12*1e-3
+
+
     # Anton: fermion = 1, boson = -1 (I did not choose this convention..)
     k_d = 1.
     k_X = -1.
@@ -592,20 +620,6 @@ if __name__ == '__main__':
     dof_d = 2.
     dof_X = 3.
 
-    # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12), m1 = 0
-    y = 1.8e-3
-    # y = 3e-3
-    m0 = 1e3
-    m12 = m_d
-    m2 = m0*10**(-15./2)
-    ma = m12
-
-    print('mi/m0 << 1 :', f'{ma/m0:.3e}, {m2/m0:.3e}, {m12/m0:.3e}')
-    print('mi^2/m0 << m12 :', f'{ma**2/m12:.3e}, {m2**2/m12:.3e}')
-    # ma = m12*1e-3
-
-    sin2_2th = (m2*ma/(m0*m12))**2
-    th = 1/2 * asin(sqrt(sin2_2th))
 
     # Anton: If spin-statistics (1+k*f) matters, if the mediator is off-shell or not 
     spin_facs = True
@@ -613,7 +627,7 @@ if __name__ == '__main__':
 
     print('Start sterile_caller')
     start = time.time()
-    t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, spin_facs=True, off_shell=False)
+    t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th, spin_facs=True, off_shell=False)
     # print(fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3)
     end = time.time()
     print(f'sterile_caller ran in {end-start:.5f}s')

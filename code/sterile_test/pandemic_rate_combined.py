@@ -92,7 +92,8 @@ else:
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.2e-03;full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.3e-03;full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.4e-03full_new.dat' 
-load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.8e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.8e-03;full_new.dat' 
+load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.55e-03;full_new.dat' 
 data = np.loadtxt(load_str)
 T_SM = data[::data_skip_pan, 1]
 T_nu = data[::data_skip_pan, 2]

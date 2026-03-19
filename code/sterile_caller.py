@@ -331,7 +331,7 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2
     except:
         C_therm_grid = np.zeros(pan.T_chi_grid_sol.size)
 
-    O_d_h2 = pan.n_chi_grid_sol[-1]*m_d*cf.s0/(ent_grid[pan.i_end]*cf.rho_crit0_h2)
+    O_d_h2 = 2*pan.n_chi_grid_sol[-1]*m_d*cf.s0/(ent_grid[pan.i_end]*cf.rho_crit0_h2)
 
     if pan.T_chi_grid_sol.size < i_end - i_ic + 1: # integration of ode was stopped (abundance too large); issues calculating fs_length
         return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False
@@ -384,8 +384,8 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2
             xi_X_grid[n_sol:] = 2.*xi_d_grid[n_sol:]
             n_d_grid[n_sol:] = n_d_grid[n_sol - 1] * ent_grid[i_ic + n_sol:] / ent_grid[i_ic + n_sol - 1]
             n_X_grid[n_sol:] = 0.
-            P_grid[n_sol:] = T_d_grid[n_sol:] * n_d_grid[n_sol:]
-            rho_grid[n_sol:] = (m_d + 1.5*T_d_grid[n_sol:]) * n_d_grid[n_sol:]
+            P_grid[n_sol:] = T_d_grid[n_sol:] * 2*n_d_grid[n_sol:]
+            rho_grid[n_sol:] = (m_d + 1.5*T_d_grid[n_sol:]) * 2*n_d_grid[n_sol:]
 
         dPdt_grid = utils.fpsder(Ttrel.t_grid[i_ic:], P_grid)
         drhodt_grid = utils.fpsder(Ttrel.t_grid[i_ic:], rho_grid)
@@ -603,8 +603,8 @@ if __name__ == '__main__':
     m_N1 = m_d
     m_N2 = m_d
     m_X = 2.5*m_d
-    y = 8e-3
-    sin2_2th = 5e-17
+    y = 2.55e-3
+    sin2_2th = 5e-16
 
     print('mi/m0 << 1 :', f'{ma/m0:.3e}, {m2/m0:.3e}, {m12/m0:.3e}')
     print('mi^2/m0 << m12 :', f'{ma**2/m12:.3e}, {m2**2/m12:.3e}')

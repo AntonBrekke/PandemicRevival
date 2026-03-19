@@ -503,6 +503,9 @@ class Pandemolator(object):
         self.n_X_grid_sol = self.n_X_grid_sol[:n_pts]
 
 if __name__ == '__main__':
+    """
+    DO NOT ASSUME THAT THIS IS UP TO DATE
+    """
     from math import asin, cos, sin
     import C_res_scalar
     import C_res_vector

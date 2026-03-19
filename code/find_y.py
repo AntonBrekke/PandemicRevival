@@ -70,7 +70,7 @@ def find_y(params):
     th = 0.5*np.arcsin(np.sqrt(sin2_2th))
     m_X = r_m_Xd*m_d 
 
-    O_d_h2_dw = cf.O_h2_dw(m_d, th)         # Anton: Omega_DM * h^2 from Dodelson-Widrow mechanism
+    O_d_h2_dw = 2*cf.O_h2_dw(m_d, th)         # Anton: Omega_DM * h^2 from Dodelson-Widrow mechanism
     log_enhance_req = np.log(cf.omega_d0/O_d_h2_dw)
     if log_enhance_req < 0.:
         print(f'find_y.py returned m_d: {m_d:.2e}, sin2_2th: {sin2_2th:.2e}, y: {np.nan:.2e}')
@@ -100,9 +100,10 @@ def find_y(params):
             print("something went wrong in find_y.py... ", e, exc_type, fname, exc_tb.tb_lineno)
             print(f'find_y.py returned {m_d:.2e}, sin2_2th: {sin2_2th:.2e}, y: {np.nan:.2e}')
             return m_d, m_X, sin2_2th, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
-
-        O_d_h2_cur = n_d_grid[-1]*m_d*cf.s0/(ent_grid[-1]*cf.rho_crit0_h2)
-        print(f'Use m_d: {m_d:.2e}, sin2_2th: {sin2_2th:.2e}, y_cur: {y_cur:.2e}, O_d_g2_cur: {O_d_h2_cur:.2e}')
+        
+        # Need factor 2 from n_1 ~ n_2 = n_chi, n_1 + n_2 = 2*n_chi
+        O_d_h2_cur = 2*n_d_grid[-1]*m_d*cf.s0/(ent_grid[-1]*cf.rho_crit0_h2)
+        print(f'Use m_d: {m_d:.2e}, sin2_2th: {sin2_2th:.2e}, y_cur: {y_cur:.2e}, O_d_h2_cur: {O_d_h2_cur:.2e}')
         if O_d_h2_cur > cf.omega_d0:
             max_y = min(y_cur, max_y)
         elif O_d_h2_cur < cf.omega_d0 and ((y_cur > y_old) == (O_d_h2_cur > O_d_h2_old) or i == 0):
@@ -142,7 +143,8 @@ def find_y(params):
     x_therm = m_d/T_nu_grid[np.argmax(therm_ratio > 1.)]
     x_d_therm = m_d/T_d_grid[np.argmax(therm_ratio > 1.)]
     therm_ratio_max = np.amax(therm_ratio)
-    O_d_h2 = n_d_grid[-1]*m_d*cf.s0/(ent_grid[-1]*cf.rho_crit0_h2)
+    # Need factor 2 from n_1 ~ n_2 = n_chi, n_1 + n_2 = 2*n_chi
+    O_d_h2 = 2*n_d_grid[-1]*m_d*cf.s0/(ent_grid[-1]*cf.rho_crit0_h2)
     print(f'find_y.py returned {m_d:.2e}, sin2_2th: {sin2_2th:.2e}, y: {y_cur:.2e}')
     # print(f'Saved {filename} to benchmark_pts')
     return m_d, m_X, sin2_2th, y_cur, O_d_h2, x_therm, x_d_therm, therm_ratio_max, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3

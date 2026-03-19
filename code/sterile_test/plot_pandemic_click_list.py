@@ -85,10 +85,10 @@ def plot_pandemic(load_str):
     mY_relic = cf.omega_d0 * cf.rho_crit0_h2 / cf.s0        # m*Y = m*n/s = Omega * rho_c0 / s0
 
     x1_dw = md/T_grid_dw
-    y1_dw = mYd_dw
+    y1_dw = 2*mYd_dw
 
     x1_tr = md/T_nu
-    y1_tr = md*nd/ent
+    y1_tr = md*2*nd/ent
 
     x1_dw0, x1_tr0 = x1_dw[x1_dw < 1e-3], x1_tr[x1_tr > 1e-3]
     y1_dw0, y1_tr0 = y1_dw[x1_dw < 1e-3], y1_tr[x1_tr > 1e-3]

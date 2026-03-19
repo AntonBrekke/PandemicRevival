@@ -132,9 +132,18 @@ for axis in ['top','bottom','left','right']:
 # data = np.loadtxt('rm_3.00e+00_y_relic_20x40x60_new.dat')
 
 # nx, ny = 10, 10
-# data = np.loadtxt('rmXd_2.50e+00_y_relic_test_10x10x60.dat')
-nx, ny = 20, 20
-data = np.loadtxt('rmXd_2.50e+00_y_relic_test_20x20x60.dat')
+# data5 = np.loadtxt('rmXd_2.50e+00_y_relic_test_10x10x60.dat')
+# nx, ny = 10, 10
+data1 = np.loadtxt('rmXd_2.50e+00_y_relic_test_10x10x20_lower.dat')
+# nx, ny = 20, 20
+data2 = np.loadtxt('rmXd_2.50e+00_y_relic_test_20x20x60.dat')
+# nx, ny = 10, 10
+data3 = np.loadtxt('rmXd_2.50e+00_y_relic_test_10x10x60.dat')
+# nx, ny = 20, 20
+# data4 = np.loadtxt('rm_3.00e+00_y_relic_20x20x50_new.dat')
+
+datas = [data3, data1]
+data = np.concatenate(datas, axis=0)
 
 # Removed max_step=1. in pandemolator for this one -- terrible result...
 # nx, ny = 30, 30
@@ -177,22 +186,39 @@ r_sound, 14
 r_sound_3 15
 """
 
-md = data[:,0].reshape((nx, ny))
-mX = data[:,1].reshape((nx, ny))
-sin22th = data[:,2].reshape((nx,ny))
-y = data[:,3].reshape((nx, ny))
-Odh2 = data[:,4].reshape((nx, ny))
-# Odh2_no_spin_stat = data[:,5].reshape((nx, ny))
-xtherm = data[:,5].reshape((nx, ny))
-xdtherm = data[:,6].reshape((nx, ny))
-fs_length = data[:,8].reshape((nx, ny))
-fs_length_3 = data[:,9].reshape((nx, ny))
-T_kd = data[:,10].reshape((nx, ny))
-T_kd_3 = data[:,11].reshape((nx, ny))
-T_d_kd = data[:,12].reshape((nx, ny))
-T_d_kd_3 = data[:,13].reshape((nx, ny))
-r_sound = data[:,14].reshape((nx, ny))
-r_sound_3 = data[:,15].reshape((nx, ny))
+# md = data[:,0].reshape((nx, ny))
+# mX = data[:,1].reshape((nx, ny))
+# sin22th = data[:,2].reshape((nx,ny))
+# y = data[:,3].reshape((nx, ny))
+# Odh2 = data[:,4].reshape((nx, ny))
+# # Odh2_no_spin_stat = data[:,5].reshape((nx, ny))
+# xtherm = data[:,5].reshape((nx, ny))
+# xdtherm = data[:,6].reshape((nx, ny))
+# fs_length = data[:,8].reshape((nx, ny))
+# fs_length_3 = data[:,9].reshape((nx, ny))
+# T_kd = data[:,10].reshape((nx, ny))
+# T_kd_3 = data[:,11].reshape((nx, ny))
+# T_d_kd = data[:,12].reshape((nx, ny))
+# T_d_kd_3 = data[:,13].reshape((nx, ny))
+# r_sound = data[:,14].reshape((nx, ny))
+# r_sound_3 = data[:,15].reshape((nx, ny))
+
+md = data[:,0]
+mX = data[:,1]
+sin22th = data[:,2]
+y = data[:,3]
+Odh2 = data[:,4]
+# Odh2_no_spin_stat = data[:,5]
+xtherm = data[:,5]
+xdtherm = data[:,6]
+fs_length = data[:,8]
+fs_length_3 = data[:,9]
+T_kd = data[:,10]
+T_kd_3 = data[:,11]
+T_d_kd = data[:,12]
+T_d_kd_3 = data[:,13]
+r_sound = data[:,14]
+r_sound_3 = data[:,15]
 
 # These just became nan for some reason
 # r_sound[np.isnan(r_sound)] = 0.34
@@ -204,74 +230,89 @@ t_life = 3e12*(1e-10/sin22th)*((1e-6/md)**5.)
 
 from scipy.interpolate import griddata
 # Anton: Function for interpolating nan-values in 2D array
-def fill_nan(data, method='linear'):
+def fill_nan(x, y, data, method='linear', fallback='nearest'):
     # Anton: Create x and y coordinate grids for the data
-    ny, nx = data.shape
-    x, y = np.meshgrid(np.arange(nx), np.arange(ny))
-    
-    # Anton: Flatten the arrays for use with griddata
-    x_flat = x.flatten()
-    y_flat = y.flatten()
-    data_flat = data.flatten()
-    
-    # Anton: Identify valid (non-NaN) points
-    valid = ~np.isnan(data_flat)
-    points_valid = np.vstack((x_flat[valid], y_flat[valid])).T
-    values_valid = data_flat[valid]
-    
+    # ny, nx = data.shape
+    # x, y = np.meshgrid(np.arange(nx), np.arange(ny))
+
+    # Anton: Identify valid (non-NaN) and missing (NaN) points 
+    valid = ~np.isnan(data)
+    missing = np.isnan(data)
+
+    if not np.any(valid):
+        raise ValueError("No valid points available for interpolation.")
+
+    if not np.any(missing):
+        return data
+
+    # Anton: Points where data is non-NaN
+    points_valid = np.column_stack((x[valid], y[valid]))
+    data_valid = data[valid]
     # Anton: Points where data is NaN
-    points_missing = np.vstack((x_flat[~valid], y_flat[~valid])).T
-    
-    # Anton: Interpolate the missing data, ~valid = not valid
-    data_flat[~valid] = griddata(points_valid, values_valid, points_missing, method=method)
-    
-    # Anton: Reshape back to the original data shape
-    return data_flat.reshape(data.shape)
+    points_missing = np.column_stack((x[missing], y[missing]))
+
+    # Anton: Interpolate the missing data
+    filled = griddata(points_valid, data_valid, points_missing, method=method)
+
+    if fallback is not None and np.any(np.isnan(filled)):
+        filled_fb = griddata(points_valid, data_valid, points_missing, method=fallback)
+        filled = np.where(np.isnan(filled), filled_fb, filled)
+
+    data[missing] = filled
+    return data
 
 # y = np.sqrt(2)*md/mX*y
 
-def interpolate_2d(x, y, z, nx=100, ny=100, method='cubic'):
+def interpolate_2d(x, y, z, nx=100, ny=100, method='cubic', fill_edges=True):
     points = np.array( (x.flatten(), y.flatten()) ).T
-    values = z.flatten()
     log_points = np.column_stack([np.log10(points[:,0]), np.log10(points[:,1])])
+    values = z.flatten()
 
     grid_logx = np.linspace(np.log10(x.min()), np.log10(x.max()), nx)
     grid_logy = np.linspace(np.log10(y.min()), np.log10(y.max()), ny)
     grid_lx, grid_ly = np.meshgrid(grid_logx, grid_logy)
     grid_lz = griddata(log_points, values, (grid_lx, grid_ly), method=method)
 
+    if fill_edges and method != 'nearest':
+        grid_lz_near = griddata(points, values, (grid_lx, grid_ly), method='nearest')
+        grid_lz = np.where(np.isnan(grid_lz), grid_lz_near, grid_lz)
+
     grid_x = 10**grid_lx
     grid_y = 10**grid_ly
     grid_z = grid_lz  # values are already in linear space
     return grid_x, grid_y, grid_z
 
+
+rmXd = mX[0]/md[0]
 make_interpolate = True
 # method = ['linear', 'cubic', 'nearest']
 if make_interpolate is True:
-    first_nan = 'linear'
-    second_nan = 'nearest'
+    first_nan = 'nearest'
+    second_nan = 'linear'
     first_interpol = 'linear'
     second_interpol = 'nearest'
 
-    y = fill_nan(y, method=first_nan)
-    y = fill_nan(y, method=second_nan)
-    r_sound = fill_nan(r_sound, method=first_nan)
-    r_sound = fill_nan(r_sound, method=second_nan)
-    fs_length = fill_nan(fs_length, method=first_nan)
-    fs_length = fill_nan(fs_length, method=second_nan)
+    ipx = 10
+    ipy = 10
+    y = fill_nan(md, sin22th, y, method=first_nan)
+    y = fill_nan(md, sin22th, y, method=second_nan)
+    r_sound = fill_nan(md, sin22th, r_sound, method=first_nan)
+    r_sound = fill_nan(md, sin22th, r_sound, method=second_nan)
+    fs_length = fill_nan(md, sin22th, fs_length, method=first_nan)
+    fs_length = fill_nan(md, sin22th, fs_length, method=second_nan)
 
-    X, Y, y = interpolate_2d(md, sin22th, y, method=first_interpol)
-    _, _, y = interpolate_2d(X, Y, y, method=second_interpol)
-    X, Y, r_sound = interpolate_2d(md, sin22th, r_sound, method=first_interpol)
-    _, _, r_sound = interpolate_2d(X, Y, r_sound, method=second_interpol)
-    X, Y, fs_length = interpolate_2d(md, sin22th, fs_length, method=first_interpol)
-    md, sin22th, fs_length = interpolate_2d(X, Y, fs_length, method=second_interpol)
+    X, Y, y = interpolate_2d(md, sin22th, y, nx=ipx, ny=ipy, method=first_interpol)
+    # _, _, y = interpolate_2d(X, Y, y, nx=ipx, ny=ipy, method=second_interpol)
+    X, Y, r_sound = interpolate_2d(md, sin22th, r_sound, nx=ipx, ny=ipy, method=first_interpol)
+    # _, _, r_sound = interpolate_2d(X, Y, r_sound, nx=ipx, ny=ipy, method=second_interpol)
+    md, sin22th, fs_length = interpolate_2d(md, sin22th, fs_length, nx=ipx, ny=ipy, method=first_interpol)
+    # md, sin22th, fs_length = interpolate_2d(X, Y, fs_length, nx=ipx, ny=ipy, method=second_interpol)
+    mX = rmXd*md
 
-# y *= 0.9
-mX = 2.5*md
 # mh = 3*md
+# print(y.shape)
 
-plt.contour(np.log10(1e6*md), np.log10(sin22th), np.log10(y), levels=[-6., -5., -4., -3., -2., -1.], colors='forestgreen', linewidths = 0.4, zorder=-1, linestyles='-')
+plt.contour(np.log10(1e6*md), np.log10(sin22th), np.log10(y), levels=[-6, -5, -4, -3, -2, -1], colors='forestgreen', linewidths = 0.4, zorder=-1, linestyles='-')
 
 # plt.contour(np.log10(1e6*md), np.log10(sin22th), np.abs(Odh2_no_spin_stat-Odh2)/Odh2, levels=[0.1])
 # plt.contour(np.log10(1e6*md), np.log10(sin22th), t_life, levels=[1.])
@@ -320,7 +361,7 @@ plt.plot(np.log10(1e6*extp_proj[:,0]), np.log10(extp_proj[:,1]), color='black', 
 self_int_const = cf.conv_cm2_g
 # sigma_self_int = (y**4.)*(np.cos(0.5*np.arcsin(np.sqrt(sin22th)))**8.)*md/(4.*np.pi*(mX**4.))
 # sigma_self_int = 3*sigma_self_int       # Vector mediator give 3x enhancement
-sigma_self_int = (y**4*md*(4*md**4-2*md**2*mX**2+mX**4))/(mX**4*np.pi*(mX**2-4*md**2)**2)
+sigma_self_int = y**4*md*(4*md**4-2*md**2*mX**2+mX**4)/(mX**4*np.pi*(mX**2-4*md**2)**2)
 plt.contour(np.log10(1e6*md), np.log10(sin22th), np.log10(sigma_self_int), levels=[np.log10(self_int_const)], colors='#A300CC', linewidths=1.3, zorder=-5)
 plt.contourf(np.log10(1e6*md), np.log10(sin22th), np.log10(sigma_self_int), levels=[np.log10(self_int_const), np.log10(1e6*self_int_const)], colors='#A300CC', alpha=0.25, zorder=-5)
 
@@ -429,5 +470,5 @@ ax.yaxis.set_major_formatter(yMajorFormatter)
 plt.tight_layout()
 savefig_str = './find_y_md_sin22th_' + f'mX_{(mX/md)[0,0]:.1f}md.pdf'
 print('saved', savefig_str)
-plt.savefig(savefig_str, dpi=300)
+# plt.savefig(savefig_str, dpi=300)
 plt.show()

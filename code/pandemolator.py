@@ -14,7 +14,7 @@ from scipy.special import kn
 t_max = 1e16 / cf.hbar
 
 rtol_ode = 1e-6
-rtol_ode_pan = 1e-5
+rtol_ode_pan = 1e-4
 rtol_int = 1e-4
 
 fac_abund_stop = 100.
@@ -113,8 +113,6 @@ class Pandemolator(object):
         self.m_X = m_X # in GeV
         self.k_X = k_X # +1 for fermion, -1 for boson, 0 for Maxwell-Boltzmann
         self.dof_X = dof_X
-
-        self.m_h = m_h
 
         # psi = e.g. SM neutrino
         self.m_psi = m_psi # in GeV
@@ -459,7 +457,7 @@ class Pandemolator(object):
                 # print('Start solve_ivp for Y, rho')
                 print('Start solve_ivp xi non-zero')
                 # print(self.log_x_pts[i_xi_nonzero], self.log_x_pts[-1])
-                sol = solve_ivp(self.der, [self.log_x_pts[i_xi_nonzero], self.log_x_pts[-1]], y0, t_eval=self.log_x_pts[i_xi_nonzero:], events=(event_xi, event_abund), rtol=rtol_ode_pan, atol=0., method='RK45', first_step=self.log_x_pts[i_xi_nonzero+1]-self.log_x_pts[i_xi_nonzero])
+                sol = solve_ivp(self.der, [self.log_x_pts[i_xi_nonzero], self.log_x_pts[-1]], y0, t_eval=self.log_x_pts[i_xi_nonzero:], events=(event_xi, event_abund), rtol=rtol_ode_pan, atol=0., method='RK45', first_step=self.log_x_pts[i_xi_nonzero+1]-self.log_x_pts[i_xi_nonzero], max_step=1.)
                 print('End solve_ivp xi non-zero')
                 i_max = i_xi_nonzero + sol.t.size - 1
 

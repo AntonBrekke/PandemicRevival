@@ -29,7 +29,7 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2
     # C_10 = m2/m0
     # Anton: C_1nu = sin(2*theta)
     if sin2_2th is None:
-        sin_2th = m2/m0 * ma/m12
+        sin_2th = m2*ma/(2*m0*m12)
         sin2_2th = sin_2th**2
     th = 1/2*asin(sqrt(sin2_2th))
     sin_th = np.sin(th)
@@ -595,16 +595,16 @@ if __name__ == '__main__':
     m2 = m0*10**(-15./2)
     ma = m12
 
-    sin2_2th = (m2*ma/(m0*m12))**2
+    sin2_2th = (m2*ma/(2*m0*m12))**2
     th = 1/2 * asin(sqrt(sin2_2th))
 
     # Anton: remember to run sterile_caller on this combination
-    m_d = 8.80e-05
+    m_d = 1e-5
     m_N1 = m_d
     m_N2 = m_d
     m_X = 2.5*m_d
-    y = 2.44e-04
-    sin2_2th = 3.59e-13 
+    y = 8e-3
+    sin2_2th = 5e-17
 
     print('mi/m0 << 1 :', f'{ma/m0:.3e}, {m2/m0:.3e}, {m12/m0:.3e}')
     print('mi^2/m0 << m12 :', f'{ma**2/m12:.3e}, {m2**2/m12:.3e}')

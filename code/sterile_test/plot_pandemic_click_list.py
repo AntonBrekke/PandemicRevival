@@ -90,14 +90,16 @@ def plot_pandemic(load_str):
     x1_tr = md/T_nu
     y1_tr = md*2*nd/ent
 
-    x1_dw0, x1_tr0 = x1_dw[x1_dw < 1e-3], x1_tr[x1_tr > 1e-3]
-    y1_dw0, y1_tr0 = y1_dw[x1_dw < 1e-3], y1_tr[x1_tr > 1e-3]
+    eq = 1e-3
+    x1_dw0, x1_tr0 = x1_dw[x1_dw < eq], x1_tr[x1_tr > eq]
+    y1_dw0, y1_tr0 = y1_dw[x1_dw < eq], y1_tr[x1_tr > eq]
 
     x1, y1 = np.array([*x1_dw0[::-1], *x1_tr0, 1e3]), np.array([*y1_dw0[::-1], *y1_tr0, y1_tr0[-1]])
 
     # ax1.loglog(x1, y1, color='#7bc043', zorder=-1)
     ax1.loglog(x1_tr, y1_tr, color='r', zorder=-1)
     ax1.loglog(x1_dw, y1_dw, color='#7bc043', zorder=-1)
+    # ax1.loglog(x1, y1, color='#7bc043', zorder=-1)
     # ax1.loglog(x1_dw[x1_dw < 1e-3], y1_dw[x1_dw < 1e-3], color='r', zorder=-1)
 
     # ax1.fill_betweenx([1e-23, 1e5], 1e-5, 1e-3, color='white', alpha=1, zorder=-3)
@@ -120,7 +122,7 @@ def plot_pandemic(load_str):
     ax1.loglog(md/T_nu, mX*nX/ent, color='#f37736', ls='-', zorder=-4)
 
     # 1.1*mY_relic just for the eye, some sort of rendering bug, but data is exactly mY_relic in plot_pandemic.py
-    ax1.loglog([1e-8, 1e3], [1.1*mY_relic, 1.1*mY_relic], color='0.65', ls='-.', zorder=-2)
+    ax1.loglog([1e-8, 1e3], [mY_relic, mY_relic], color='0.65', ls='-.', zorder=-2)
     ax1.text(3e-5, 1e-11, r'$\Omega_s h^2 = 0.12$', fontsize=11, color='0.65')
 
     ax1.text(2.5, 1e-11, r'$\nu_s$', color='#7bc043', fontsize=11)

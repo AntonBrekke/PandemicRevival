@@ -4,6 +4,7 @@ from math import cos, sin, asin, sqrt, exp
 from scipy.special import kn
 from matplotlib.ticker import FixedLocator, NullLocator, FixedFormatter
 import time
+import scipy.interpolate as sci
 
 import matplotlib
 matplotlib.rcParams['hatch.linewidth'] = 8.0
@@ -53,7 +54,7 @@ params = {'axes.labelsize': 10,
 plt.rcParams.update(params)
 
 x_therm = 1e-3
-save_fig = True
+save_fig = False
 data_skip_pan = 2
 data_skip_rate = 100
 plot_data_skip = 1
@@ -93,7 +94,9 @@ else:
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.3e-03;full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.4e-03full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.8e-03;full_new.dat' 
-load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.55e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.55e-03;full_new.dat' 
+load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat'
 data = np.loadtxt(load_str)
 T_SM = data[::data_skip_pan, 1]
 T_nu = data[::data_skip_pan, 2]
@@ -153,11 +156,12 @@ yMajorLocator = FixedLocator(ytMajor)
 yMinorLocator = FixedLocator(ytMinor)
 yMajorFormatter = FixedFormatter(ylMajor)
 
+# Factor 2, since we have 2 species of neutrino constituting DM
 x1_dw = md/T_grid_dw
-y1_dw = mYd_dw
+y1_dw = 2*mYd_dw
 
 x1_tr = md/T_nu
-y1_tr = md*nd/ent
+y1_tr = md*2*nd/ent
 
 x1_dw0, x1_tr0 = x1_dw[x1_dw < x_therm*3e-1], x1_tr[x1_tr > x_therm*3e-1]
 y1_dw0, y1_tr0 = y1_dw[x1_dw < x_therm*3e-1], y1_tr[x1_tr > x_therm*3e-1]
@@ -271,8 +275,8 @@ m_N22 = m_N2*m_N2
 # M2_X_aa = 4.*y2*(s_th**4.)*m_X2
 
 M2_X_12 = 2.*y2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)/m_X2
+M2_X_1nu = 2.*y2*C_1nu**2 * (m_X-m_N1-m_nu)*(m_X+m_N1+m_nu)*(2*m_X2+(m_N1-m_nu)**2)/m_X2
 M2_X_10 = 2.*y2*C_10**2 * (m_X+m_N1-m0)*(m_X-m_N1+m0)*(2*m_X2 + (m_N1+m0)**2)/m_X2
-M2_X_1nu = 2.*y2*C_1nu**2 * (m_X2-m_N12)*(2*m_X2 + m_N12)/m_X2
 
 print(f'M2_X_dd: {M2_X_12:3e}, M2_X_da: {M2_X_1nu:3e}, M2_X_d0: {M2_X_10:3e}')
 
@@ -280,7 +284,7 @@ vert_fi = y2*y2*(c_th**4.)*(s_th**4.)
 vert_tr = y2*y2*(c_th**6.)*(s_th**2.)
 vert_el = y2*y2
 
-Gamma_X = vector_mediator.Gamma_X_new(y=y, m_X=m_X, m_N1=m_N1, m_N2=m_N2, m0=m0, m12=m12, m2=m2, ma=ma)
+Gamma_X = vector_mediator.Gamma_X_new(y=y, m_X=m_X, m_N1=m_N1, m_N2=m_N2, m_nu=m_nu, sin2_2th=sin2_2th)
 m_Gamma_X2 = m_X2*Gamma_X*Gamma_X
 
 data_evo = np.loadtxt(load_str)
@@ -317,6 +321,7 @@ sin22th_str = f'{sin2_2th:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'
 y_str = f'{y:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{y:.5e}'.split('e')[1].rstrip('0').rstrip('.')
 
 filename = f'rates_md_{md_str};mX_{mX_str};sin22th_{sin22th_str};y_{y_str};full.dat'
+
 # Anton: Check if file exists -- if not, create it 
 if not os.path.isfile('./' + filename) or force_write:
 # if True:
@@ -338,7 +343,9 @@ if not os.path.isfile('./' + filename) or force_write:
 
     print('Get C_11_22')
 
-    C_11_22_ut = np.array([C_res_vector.C_34_12(type=0, nFW=2, nBW=2, m1=m_N1, m2=m_N1, m3=m_N2, m4=m_N2, k1=k_d, k2=k_d, k3=k_d, k4=k_d, T1=T_d, T2=T_d, T3=T_d, T4=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_d, xi4=xi_d, vert=vert_el, m_d2=m_d2, m_X2=m_X2, m_h2=0, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=0, res_sub=False, thermal_width=True) / 4. for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
+    # C_11_22_ut = np.array([C_res_vector.C_34_12(type=0, nFW=2, nBW=2, m1=m_N1, m2=m_N1, m3=m_N2, m4=m_N2, k1=k_d, k2=k_d, k3=k_d, k4=k_d, T1=T_d, T2=T_d, T3=T_d, T4=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_d, xi4=xi_d, vert=vert_el, m_d2=m_d2, m_X2=m_X2, m_h2=0, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=0, res_sub=False, thermal_width=True) / 4. for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
+
+    C_11_22_ut = np.array([C_res_vector.C_n_11_22(m_d=m_d, m_X=m_X, k_d=k_d, T_d=T_d, xi_d=xi_d, vert=vert_el, th=th, type=-1) / 4.  for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
 
     # C_dd_dd = np.array([C_res_vector_no_spin_stat.C_12_34(m_d, m_d, m_d, m_d, k_d, k_d, T_d, T_d, xi_d, xi_d, vert_el, m_X2, m_Gamma_X2, type=0, res_sub=True) / 4. for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
     # C_da_dd = np.array([C_res_vector_no_spin_stat.C_12_34(m_d, m_a, m_d, m_d, k_d, k_a, T_d, T_a, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, type=0, res_sub=True) / 2. for T_d, T_a, xi_d in zip(T_d_grid, T_nu_grid, xi_d_grid)])
@@ -383,6 +390,44 @@ C_dd_da = data[::plot_data_skip, 10]
 C_aa_dd = data[::plot_data_skip, 11]
 C_dd_aa = data[::plot_data_skip, 12]
 C_11_22_ut = data[::plot_data_skip, 13]
+
+# help-function
+def smooth_loglog_pchip(x, y, npts=400):
+
+    mask = (x > 0) & (y > 0) & np.isfinite(x) & np.isfinite(y)
+    x = x[mask]
+    y = y[mask]
+
+    if x.size < 2 or y.size < 2:
+        return np.zeros(npts)
+
+    logx = np.log10(x)
+    logy = np.log10(y)
+
+    interp = sci.PchipInterpolator(logx, logy)
+
+    x_fine = np.logspace(np.log10(x.min()), np.log10(x.max()), npts)
+    y_fine = 10**(interp(np.log10(x_fine)))
+    return y_fine
+
+n_points = 800
+H = smooth_loglog_pchip(x_grid, H, n_points)
+C_X_dd  = smooth_loglog_pchip(x_grid, abs(C_X_dd), n_points)
+C_dd_X  = smooth_loglog_pchip(x_grid, abs(C_dd_X), n_points)
+C_X_da  = smooth_loglog_pchip(x_grid, abs(C_X_da), n_points)
+C_da_X  = smooth_loglog_pchip(x_grid, abs(C_da_X), n_points)
+C_XX_dd = smooth_loglog_pchip(x_grid, abs(C_XX_dd), n_points)
+C_dd_dd = smooth_loglog_pchip(x_grid, abs(C_dd_dd), n_points)
+C_da_dd = smooth_loglog_pchip(x_grid, abs(C_da_dd), n_points)
+C_dd_da = smooth_loglog_pchip(x_grid, abs(C_dd_da), n_points)
+C_aa_dd = smooth_loglog_pchip(x_grid, abs(C_aa_dd), n_points)
+C_dd_aa = smooth_loglog_pchip(x_grid, abs(C_dd_aa), n_points)
+skip = 2
+C_dd_XX = smooth_loglog_pchip(x_grid[::skip], abs(C_dd_XX[::skip]), n_points)
+skip = 3
+C_11_22_ut = smooth_loglog_pchip(x_grid[::skip], abs(C_11_22_ut[::skip]), n_points)
+x_grid = smooth_loglog_pchip(x_grid, x_grid, n_points)
+
 
 
 ax3.tick_params(axis='both', which='both', direction="in", width=0.5)
@@ -447,8 +492,9 @@ elif BP == 5:
     xpos_nus = 2e0
 else: 
     xpos_nus = 3e-1
-
 ax3.text(xpos_nus, ypos_nus, r"$N_1 N_2 \leftrightarrow X$", color=c1, rotation=0, ha='center', va='top')
+ax3.text(xpos_nus, np.max(np.abs(1e6*C_da_X)), r"$\nu N_1 \to X$", color=c2, rotation=0, ha='left', va='bottom')
+ax3.text(xpos_nus, np.max(np.abs(1e6*C_11_22_ut[x_therm_index[0][0]:]))**(1.2), r"$N_1 N_1 \to N_2 N_2$", color=c4, rotation=0, ha='left', va='bottom')
 
 x_mult = 1.3
 y_PP_ss = 2e-28
@@ -489,12 +535,13 @@ elif BP == 5:
     y_sa_P = 5e2
     y_PP_ss = 0
 else: 
-    x_ss_PP = 30.3
+    x_ss_PP = 2
     x_PP_ss = 30.3
     x_sa_P = 1.3
 
-    y_ss_PP = 1e-2
+    y_ss_PP = 5e-3
     y_sa_P = 0.9
+
 
 ax3.text(x_therm*x_ss_PP, y_ss_PP*np.abs(1e6*C_dd_XX[x_therm_index]), r"$NN \to XX$", color=c3, rotation=0, ha='left', va='bottom')
 ax3.text(x_therm*x_PP_ss, y_PP_ss, r"$XX \to NN$", color=c5, rotation=0, va='bottom')
@@ -528,6 +575,18 @@ ax3.yaxis.set_ticks_position('right')
 ax3.set_xlim(2e-5, 20)
 ymax = max(np.max(1e6*abs(C_X_dd)), np.max(1e6*abs(C_dd_X)))
 ax3.set_ylim(1e-28, max(np.max(1e6*H)*2e3, ymax*1e1))
+# md, mX, sin22th, y
+md_str = f'{md:.3e}'.split('e-')
+mX_str = f'{mX:.3e}'.split('e-')
+sin22th_str = f'{sin22th:.3e}'.split('e-')
+y_str = f'{y:.3e}'.split('e-')
+
+md_str = md_str[0] + '\cdot 10^{-' + md_str[1].lstrip('0') + '}'
+mX_str = f'{mX/md}m_N'
+y_str = y_str[0] + '\cdot 10^{-' + y_str[1].lstrip('0') + '}'
+sin22th_str = sin22th_str[0] + '\cdot 10^{-' + sin22th_str[1].lstrip('0') + '}'
+
+fig.suptitle(fr"$m_N={md_str}, m_A={mX_str}, y={y_str}, \sin^2(2\theta)={sin22th_str}$")
 fig.tight_layout()
 
 if BP is None:

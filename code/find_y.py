@@ -90,7 +90,7 @@ def find_y(params):
             # time1 = time.time()
             # print("Running sterile_caller.call ")
 
-            t_grid, T_SM_grid, T_nu_grid, ent_grid, hubble_grid, sf_grid, T_d_grid, xi_d_grid, xi_X_grid, n_d_grid, n_X_grid, C_therm_grid, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = sterile_caller.call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y_cur, spin_facs=True, off_shell=False)
+            t_grid, T_SM_grid, T_nu_grid, ent_grid, hubble_grid, sf_grid, T_d_grid, xi_d_grid, xi_X_grid, n_d_grid, n_X_grid, C_therm_grid, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = sterile_caller.call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y_cur, spin_facs=True, off_shell=False)
 
             # print(f"sterile_caller.call ran in {time.time()-time1}s")
 

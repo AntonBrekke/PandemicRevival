@@ -19,10 +19,9 @@ GF = 1.166378e-5
 mZ = 91.1876
 mW = 80.379
 
-def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th=None, spin_facs=True, off_shell=False):
+def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th=None, spin_facs=True, off_shell=False):
     m_N12 = m_N1*m_N1
     m_N22 = m_N2*m_N2
-    m_nu = 0 
     m_X2 = m_X*m_X
     m_h = 0
     m_h2 = m_h*m_h
@@ -31,7 +30,7 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2
     if sin2_2th is None:
         sin_2th = m2*ma/(2*m0*m12)
         sin2_2th = sin_2th**2
-    th = 1/2*asin(sqrt(sin2_2th))
+    th = 1/2*np.arcsin(sqrt(sin2_2th))
     sin_th = np.sin(th)
     sin2_th = sin_th**2
     y2 = y*y
@@ -42,14 +41,14 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2
     M2_X_12 = 2.*y2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)/m_X2
     # Anton: M2_X_10 IS NEVER USED 
     # M2_X_10 = 2.*y2*C_10**2 * (m_X+m_N1-m0)*(m_X-m_N1+m0)*(2*m_X2 + (m_N1+m0)**2)/m_X2
-    M2_X_1nu = 2.*y2*sin2_th * (m_X2-m_N12)*(2*m_X2 + m_N12)/m_X2
+    M2_X_1nu = 2.*y2*sin2_th * (m_X-m_N1-m_nu)*(m_X+m_N1+m_nu)*(2*m_X2+(m_N1-m_nu)**2)/m_X2
 
     vert_fi = y2*y2*sin2_th**2
     vert_tr = y2*y2*sin2_th
     vert_el = y2*y2
 
     # Anton: X --> 12, 1nu
-    Gamma_X = vector_mediator.Gamma_X_new(y=y, m_X=m_X, m_N1=m_N1, m_N2=m_N2, m0=m0, m12=m12, m2=m2, ma=ma)
+    Gamma_X = vector_mediator.Gamma_X_new(y=y, m_X=m_X, m_N1=m_N1, m_N2=m_N2, m_nu=m_nu, sin2_2th=sin2_2th)
     m_Gamma_X2 = m_X2*Gamma_X*Gamma_X
     # Anton: THERE IS NO h -> (..)
     # Gamma_h = scalar_mediator.Gamma_phi(y=y, th=th, m_phi=m_h, m_d=m_d, m_X=m_X)
@@ -357,7 +356,7 @@ def call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2
         rho_grid[:n_sol] = np.array([pan.rho(T_d, xi_d, xi_X) for T_d, xi_d, xi_X in zip(T_d_grid[:n_sol], xi_d_grid[:n_sol], xi_X_grid[:n_sol])])
 
         if n_sol < T_d_grid.size:
-            print('n_sol > T_d_grid.size')
+            print('n_sol < T_d_grid.size')
             H_interp = utils.LogInterp(Ttrel.t_grid, Ttrel.hubble_grid)
             sf_grid_tmp = (ent_grid[i_ic + n_sol - 1]/ent_grid)**(1./3.)
             sf_interp = utils.LogInterp(Ttrel.t_grid, sf_grid_tmp)
@@ -603,8 +602,21 @@ if __name__ == '__main__':
     m_N1 = m_d
     m_N2 = m_d
     m_X = 2.5*m_d
-    y = 2.55e-3
+    y = 2.521e-3
     sin2_2th = 5e-16
+    # BP1 
+    # m_d = 1e-5
+    # m_N1 = m_d
+    # m_N2 = m_d
+    # m_X = 2.5*m_d
+    # y = 1e-4
+    # sin2_2th = 4.85e-13
+    m_d = 1e-6
+    m_N1 = m_d
+    m_N2 = m_d
+    m_X = 2.5*m_d
+    y = 1.85e-2
+    sin2_2th = 1e-18
 
     print('mi/m0 << 1 :', f'{ma/m0:.3e}, {m2/m0:.3e}, {m12/m0:.3e}')
     print('mi^2/m0 << m12 :', f'{ma**2/m12:.3e}, {m2**2/m12:.3e}')
@@ -627,7 +639,7 @@ if __name__ == '__main__':
 
     print('Start sterile_caller')
     start = time.time()
-    t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(m_N1, m_N2, m_X, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th, spin_facs=True, off_shell=False)
+    t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th, spin_facs=True, off_shell=False)
     # print(fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3)
     end = time.time()
     print(f'sterile_caller ran in {end-start:.5f}s')

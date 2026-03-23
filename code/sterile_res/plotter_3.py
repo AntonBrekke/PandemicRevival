@@ -142,7 +142,9 @@ data3 = np.loadtxt('rmXd_2.50e+00_y_relic_test_10x10x60.dat')
 # nx, ny = 20, 20
 # data4 = np.loadtxt('rm_3.00e+00_y_relic_20x20x50_new.dat')
 
-datas = [data3, data1]
+data = np.loadtxt('rmXd_2.50e+00_y_relic_test_20x20x20.dat')
+
+datas = [data]
 data = np.concatenate(datas, axis=0)
 
 # Removed max_step=1. in pandemolator for this one -- terrible result...
@@ -239,6 +241,9 @@ def fill_nan(x, y, data, method='linear', fallback='nearest'):
     valid = ~np.isnan(data)
     missing = np.isnan(data)
 
+    # valid = np.ones_like(data)
+    # missing = np.zeros_like(data)
+
     if not np.any(valid):
         raise ValueError("No valid points available for interpolation.")
 
@@ -252,10 +257,10 @@ def fill_nan(x, y, data, method='linear', fallback='nearest'):
     points_missing = np.column_stack((x[missing], y[missing]))
 
     # Anton: Interpolate the missing data
-    filled = griddata(points_valid, data_valid, points_missing, method=method)
+    filled = griddata(points_valid, data_valid, points_missing, method=method, rescale=False)
 
     if fallback is not None and np.any(np.isnan(filled)):
-        filled_fb = griddata(points_valid, data_valid, points_missing, method=fallback)
+        filled_fb = griddata(points_valid, data_valid, points_missing, method=fallback, rescale=False)
         filled = np.where(np.isnan(filled), filled_fb, filled)
 
     data[missing] = filled
@@ -263,23 +268,24 @@ def fill_nan(x, y, data, method='linear', fallback='nearest'):
 
 # y = np.sqrt(2)*md/mX*y
 
-def interpolate_2d(x, y, z, nx=100, ny=100, method='cubic', fill_edges=True):
+def interpolate_2d(x, y, z, nx=100, ny=100, method='cubic', fill_edges=True, in_log=False):
     points = np.array( (x.flatten(), y.flatten()) ).T
     log_points = np.column_stack([np.log10(points[:,0]), np.log10(points[:,1])])
-    values = z.flatten()
+    values = np.log10(z).flatten() if in_log else z.flatten()
 
     grid_logx = np.linspace(np.log10(x.min()), np.log10(x.max()), nx)
     grid_logy = np.linspace(np.log10(y.min()), np.log10(y.max()), ny)
     grid_lx, grid_ly = np.meshgrid(grid_logx, grid_logy)
-    grid_lz = griddata(log_points, values, (grid_lx, grid_ly), method=method)
+    grid_lz = griddata(log_points, values, (grid_lx, grid_ly), method=method, rescale=False)
 
     if fill_edges and method != 'nearest':
-        grid_lz_near = griddata(points, values, (grid_lx, grid_ly), method='nearest')
+        grid_lz_near = griddata(log_points, values, (grid_lx, grid_ly), method='nearest', rescale=False)
         grid_lz = np.where(np.isnan(grid_lz), grid_lz_near, grid_lz)
 
     grid_x = 10**grid_lx
     grid_y = 10**grid_ly
-    grid_z = grid_lz  # values are already in linear space
+    grid_z = 10**grid_lz if in_log else grid_lz  # values are already in linear space
+    
     return grid_x, grid_y, grid_z
 
 
@@ -288,18 +294,18 @@ make_interpolate = True
 # method = ['linear', 'cubic', 'nearest']
 if make_interpolate is True:
     first_nan = 'nearest'
-    second_nan = 'linear'
+    second_nan = 'nearest'
     first_interpol = 'linear'
     second_interpol = 'nearest'
 
-    ipx = 10
-    ipy = 10
+    ipx = 50
+    ipy = 50
     y = fill_nan(md, sin22th, y, method=first_nan)
-    y = fill_nan(md, sin22th, y, method=second_nan)
+    # y = fill_nan(md, sin22th, y, method=second_nan)
     r_sound = fill_nan(md, sin22th, r_sound, method=first_nan)
-    r_sound = fill_nan(md, sin22th, r_sound, method=second_nan)
+    # r_sound = fill_nan(md, sin22th, r_sound, method=second_nan)
     fs_length = fill_nan(md, sin22th, fs_length, method=first_nan)
-    fs_length = fill_nan(md, sin22th, fs_length, method=second_nan)
+    # fs_length = fill_nan(md, sin22th, fs_length, method=second_nan)
 
     X, Y, y = interpolate_2d(md, sin22th, y, nx=ipx, ny=ipy, method=first_interpol)
     # _, _, y = interpolate_2d(X, Y, y, nx=ipx, ny=ipy, method=second_interpol)
@@ -312,7 +318,7 @@ if make_interpolate is True:
 # mh = 3*md
 # print(y.shape)
 
-plt.contour(np.log10(1e6*md), np.log10(sin22th), np.log10(y), levels=[-6, -5, -4, -3, -2, -1], colors='forestgreen', linewidths = 0.4, zorder=-1, linestyles='-')
+plt.contour(np.log10(1e6*md), np.log10(sin22th), np.log10(y), levels=[-6, -5, -4, -3, np.log10(2.522e-03),-2, -1], colors='forestgreen', linewidths = 0.4, zorder=-1, linestyles='-')
 
 # plt.contour(np.log10(1e6*md), np.log10(sin22th), np.abs(Odh2_no_spin_stat-Odh2)/Odh2, levels=[0.1])
 # plt.contour(np.log10(1e6*md), np.log10(sin22th), t_life, levels=[1.])
@@ -405,14 +411,15 @@ load_str_1 = './md_1.12884e-05;mX_5.64419e-05;mh_3.38651e-05;sin22th_1.83298e-13
 load_str_2 = './md_2.1e-05;mX_1.05e-04;mh_6.3e-05;sin22th_1.5e-15;y_1.282e-03;full_new.dat'       
 load_str_3 = './md_4e-06;mX_2e-05;mh_1.2e-05;sin22th_3e-15;y_8.36e-04;full_new.dat'    
 load_str_4 = './md_5e-05;mX_1.5e-04;mh_9e-05;sin22th_5e-16;y_1.24e-03;full_new.dat'    
-load_str_4 = './md_5.13483e-05;mX_2.56742e-04;mh_1.54045e-04;sin22th_3.66524e-16;y_3.36087e-03;full_new.dat' 
-load_str_4 = './md_4e-05;mX_2.56742e-04;mh_1.54045e-04;sin22th_3e-12;y_3.36087e-03;full_new.dat' 
+
+load_str_1 = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
+load_str_2 = './md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat'
 
 # load_str_3 = './md_1e-05;mX_5e-04;mh_3e-04;sin22th_5e-16;y_3.5e-03;full_new.dat'       
 
 # BENCHMARK POINTS
-md_B1, sin22th_B1 = load_str_1.replace('./', '').split(';')[0], load_str_1.replace('./', '').split(';')[3]
-md_B2, sin22th_B2 = load_str_2.replace('./', '').split(';')[0], load_str_2.replace('./', '').split(';')[3]
+md_B1, sin22th_B1 = load_str_1.replace('./', '').split(';')[0], load_str_1.replace('./', '').split(';')[2]
+md_B2, sin22th_B2 = load_str_2.replace('./', '').split(';')[0], load_str_2.replace('./', '').split(';')[2]
 md_B3, sin22th_B3 = load_str_3.replace('./', '').split(';')[0], load_str_3.replace('./', '').split(';')[3]
 md_B4, sin22th_B4 = load_str_4.replace('./', '').split(';')[0], load_str_4.replace('./', '').split(';')[3]
 
@@ -421,8 +428,8 @@ md_B2, sin22th_B2 = float(md_B2.replace('md_', '')), float(sin22th_B2.replace('s
 md_B3, sin22th_B3 = float(md_B3.replace('md_', '')), float(sin22th_B3.replace('sin22th_', ''))
 md_B4, sin22th_B4 = float(md_B4.replace('md_', '')), float(sin22th_B4.replace('sin22th_', ''))
 
-# plt.plot(np.log10(1e6*md_B1), np.log10(sin22th_B1), marker='*', color='tomato')
-# plt.plot(np.log10(1e6*md_B2), np.log10(sin22th_B2), marker='*', color='tomato')
+plt.plot(np.log10(1e6*md_B1), np.log10(sin22th_B1), marker='*', color='tomato')
+plt.plot(np.log10(1e6*md_B2), np.log10(sin22th_B2), marker='*', color='tomato')
 # plt.plot(np.log10(1e6*md_B3), np.log10(sin22th_B3), marker='*', color='tomato')
 # plt.plot(np.log10(1e6*md_B4), np.log10(sin22th_B4), marker='*', color='tomato')
 
@@ -433,6 +440,7 @@ ax.text(0.08, -9.4, r"$g_X = 10^{-6}$", color='forestgreen', zorder=-1)
 ax.text(0.201, -11.0, r"$10^{-5}$", color='forestgreen', zorder=-1)
 ax.text(0.201, -12.83, r"$10^{-4}$", color='forestgreen', zorder=-1)
 ax.text(0.201, -14.72, r"$10^{-3}$", color='forestgreen', zorder=-1)
+ax.text(0.201, -16.50, r"$2.522\cdot 10^{-3}$", color='forestgreen', zorder=-1)
 ax.text(0.201, -17.30, r"$10^{-2}$", color='forestgreen', zorder=-1)
 ax.text(2, -17.80, r"$10^{-1}$", color='forestgreen', zorder=-1)
 

@@ -39,17 +39,17 @@ Implemented real intermediate state (RIS) subtraction
 
 # Total decay-rate
 @nb.jit(nopython=True, cache=True)
-def Gamma_X_new(y, m_X, m_N1, m_N2, m0, m12, m2, ma):
+def Gamma_X_new(y, m_X, m_N1, m_N2, m_nu, sin2_2th):
 
+    th = 1/2*np.arcsin(sqrt(sin2_2th))
+    sin_th = np.sin(th)
     g12 = y
-    sin_2th = m2*ma/(m0*m12) 
-    th = 0.5*asin(sin_2th)
-    sin_th = sin(th)
     g1nu = y * sin_th
 
     m_X2 = m_X*m_X
     m_N12 = m_N1*m_N1
     m_N22 = m_N2*m_N2
+    m_nu2 = m_nu*m_nu
     """
     Anton: 
     Gamma_X_23 = |p_f|/(2^M*8*pi*m_X2)*|M_X->23| * H(m_X - (m2 + m3))
@@ -57,15 +57,15 @@ def Gamma_X_new(y, m_X, m_N1, m_N2, m0, m12, m2, ma):
     |p_f| = 1/(2*m1)*sqrt((m1^2 - m2^2 - m3^2)^2 - 4*m2^2*m3^2)
     """
     
-    M2_12 = 2.*g12**2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)
-    M2_1nu = 2.*g1nu**2 * (m_X - m_N1)*(m_X + m_N1)*(2*m_X2 + m_N12)
+    M2_12 = 2.*g12**2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)/m_X2
+    M2_1nu = 2.*g1nu**2 * (m_X-m_N1-m_nu)*(m_X+m_N1+m_nu)*(2*m_X2+(m_N1-m_nu)**2)/m_X2
 
-    pf_12 = 1/(2*m_X)*sqrt((m_X2 - m_N12 - m_N22)**2 - 4*m_N12*m_N22)
-    pf_1nu = 1/(2*m_X)*(m_X2 - m_N12)
+    pf_12 = 1/(2*m_X)*np.sqrt((m_X2 - m_N12 - m_N22)**2 - 4*m_N12*m_N22)
+    pf_1nu = 1/(2*m_X)*np.sqrt((m_X2 - m_N12 - m_nu2)**2 - 4*m_N12*m_nu2)
 
     # Anton: Decay to aa, ad, and dd. Have used m_a = 0.
     Gamma_X_12 = pf_12/(16*np.pi*m_X2) * M2_12 * (m_X > m_N1 + m_N2)
-    Gamma_X_1nu = pf_1nu/(16*np.pi*m_X2) * M2_1nu * (m_X > m_N1)
+    Gamma_X_1nu = pf_1nu/(16*np.pi*m_X2) * M2_1nu * (m_X > m_N1 + m_nu)
     # Gamma_X_10 is not here as m_X > m0 + m_N1 will not happen. 
 
     return Gamma_X_12 + Gamma_X_1nu

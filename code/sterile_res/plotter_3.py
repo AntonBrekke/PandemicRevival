@@ -143,6 +143,7 @@ data3 = np.loadtxt('rmXd_2.50e+00_y_relic_test_10x10x60.dat')
 # data4 = np.loadtxt('rm_3.00e+00_y_relic_20x20x50_new.dat')
 
 data = np.loadtxt('rmXd_2.50e+00_y_relic_test_20x20x20.dat')
+data = np.loadtxt('rmXd_2.50e+00_y_relic_test_20x40x60.dat')
 
 datas = [data]
 data = np.concatenate(datas, axis=0)
@@ -298,8 +299,8 @@ if make_interpolate is True:
     first_interpol = 'linear'
     second_interpol = 'nearest'
 
-    ipx = 50
-    ipy = 50
+    ipx = 20
+    ipy = 40
     y = fill_nan(md, sin22th, y, method=first_nan)
     # y = fill_nan(md, sin22th, y, method=second_nan)
     r_sound = fill_nan(md, sin22th, r_sound, method=first_nan)

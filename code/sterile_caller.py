@@ -632,31 +632,109 @@ if __name__ == '__main__':
     dof_d = 2.
     dof_X = 3.
 
-
     # Anton: If spin-statistics (1+k*f) matters, if the mediator is off-shell or not 
     spin_facs = True
     off_shell = False
+    run_sim = False
 
-    print('Start sterile_caller')
-    start = time.time()
-    t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th, spin_facs=True, off_shell=False)
-    # print(fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3)
-    end = time.time()
-    print(f'sterile_caller ran in {end-start:.5f}s')
+    if run_sim is True: 
+        print('Start sterile_caller')
+        start = time.time()
+        t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th, spin_facs=True, off_shell=False)
+        print(fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3)
+        end = time.time()
+        print(f'sterile_caller ran in {end-start:.5f}s')
 
-    print(r_sound)
-    print(fs_length)
+        print(r_sound)
+        print(fs_length)
 
 
-    # Anton: Save data to file 
-    md_str = f'{m_d:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{m_d:.5e}'.split('e')[1].rstrip('0').rstrip('.')
-    mX_str = f'{m_X:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{m_X:.5e}'.split('e')[1].rstrip('0').rstrip('.')
-    mh_str = f'{m_h:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{m_h:.5e}'.split('e')[1].rstrip('0').rstrip('.')
-    sin22th_str = f'{sin2_2th:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{sin2_2th:.5e}'.split('e')[1].rstrip('0').rstrip('.')
-    y_str = f'{y:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{y:.5e}'.split('e')[1].rstrip('0').rstrip('.')
+        # Anton: Save data to file 
+        md_str = f'{m_d:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{m_d:.5e}'.split('e')[1].rstrip('0').rstrip('.')
+        mX_str = f'{m_X:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{m_X:.5e}'.split('e')[1].rstrip('0').rstrip('.')
+        mh_str = f'{m_h:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{m_h:.5e}'.split('e')[1].rstrip('0').rstrip('.')
+        sin22th_str = f'{sin2_2th:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{sin2_2th:.5e}'.split('e')[1].rstrip('0').rstrip('.')
+        y_str = f'{y:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{y:.5e}'.split('e')[1].rstrip('0').rstrip('.')
 
-    # file_str = f'sterile_test/md_{md_str};mX_{mX_str};mh_{mh_str};sin22th_{sin22th_str};y_{y_str};full_new.dat'
-    file_str = f'sterile_test/md_{md_str};mX_{mX_str};sin22th_{sin22th_str};y_{y_str};full_new.dat'
-    np.savetxt(file_str, np.column_stack((t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X)))
+        # file_str = f'sterile_test/md_{md_str};mX_{mX_str};mh_{mh_str};sin22th_{sin22th_str};y_{y_str};full_new.dat'
+        file_str = f'sterile_test/md_{md_str};mX_{mX_str};sin22th_{sin22th_str};y_{y_str};full_new.dat'
+        np.savetxt(file_str, np.column_stack((t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X)))
 
-    print(f'Saved data to {file_str}')
+        print(f'Saved data to {file_str}')
+
+    # Extract value for "A" numerically 
+    import matplotlib.pyplot as plt 
+    th = 1e-8
+    m_d = 1e-6      # GeV 
+    g = 1e-3
+    mds = np.linspace(m_d, 1e2*m_d, 100)
+
+    # Choose m/T ~ 10^-4 for end of DW. m ~ 1 keV => T ~ 10 MeV 
+    T_DW_end = 10*1e-3       # GeV, 10 MeV = 10*10^-3 GeV = 1e-2 GeV 
+    sf_ic_norm_0 = (cf.s0/(cf.s_SM_no_nu(T_DW_end) + cf.s_nu(T_DW_end)))**(1./3.)
+    n_ic = cf.n_0_dw(m_d, th) / (sf_ic_norm_0**3.)      # 2* due to 2 species of neutrinos
+
+    """
+    Estimate: n_2 ~ a^-3, T ~ a^-1. So n_2 ~ A * (T/100 MeV)^3.
+    rho_2 ~ a^-4, H ~ n_2 * <sigma v>_22->11, H 
+    A = (100 MeV / T)^3 * n_2/sin^2(theta)
+    A = (100 MeV / T_end_DW)^3 * n_2(T_end_DW)/theta^2
+    n = C * a^-3 = D * s
+    n_2(T_end_DW) = a^-3(T_end_DW)/a^-3(t0) * n_2(T_0) = s_end_DW / s_0 * n_0_DW = n_0_DW / s_ic_norm_0**3
+    A = (100 MeV / T_end_DW)^3 * n_0_DW / (s_ic_norm**3 * th**2)
+    BUT since everything is in GeV, use T in GeV. Then 100 MeV = 0.1 GeV so
+    A = (0.1 GeV / T_end_DW)^3 * n_0_DW / (s_ic_norm**3 * th**2)    # GeV^3 = 10^9 MeV^3
+    """
+
+    A = lambda md, th: (0.1/T_DW_end)**3. * cf.n_0_dw(md, th) / (sf_ic_norm_0**3. * th**2.)       # GeV^3
+    plt.loglog(mds, A(mds, th))
+
+    a = np.log10(A(mds[0], th)/A(mds[-1], th)) / np.log10(mds[0]/mds[-1])
+    b = np.log10(mds[0]**(-a)*A(mds[0], th))
+    # plt.loglog(mds, 10**b*mds**a)
+    print("endpoint line A:", a, f'{10**b:.3e}', 10**b*m_d**a)
+
+    from scipy.stats import linregress
+    reg = linregress(np.log10(mds/m_d), np.log10(A(mds, th)/A(m_d, th)))
+    a, b = reg.slope, reg.intercept 
+    C = A(m_d, th)/m_d**(0.79)
+    print(f'{C:.3e}', C*m_d**(0.79), 8.12e6*m_d**0.79)
+    print("regression A:", a, f'{10**b:.3e}', a)
+    print(f'{10**b:.3e}')
+    plt.loglog(mds, 8.12e6*mds**0.79)
+    print(10**b*m_d**a, 8.91e6*(1e-6)**(0.79))
+    # plt.loglog(mds, 10**b*mds**a, label=f"{a:.2f}log(md)+{b:.2f}")
+
+    # plt.loglog(mds, A(m_d, th)*(mds/m_d)**a)
+    print(f'{A(m_d, th)/m_d**a:.3e}', a, A(m_d, th))
+    plt.loglog(mds, 8.11e6*mds**(0.79))
+
+    # plt.loglog(mds, cf.C_e_dw(mds))
+    reg = linregress(np.log10(mds), np.log10(cf.C_e_dw(mds)))
+    a, b = reg.slope, reg.intercept 
+    print(a, 10**b)
+    # plt.loglog(mds, 10**b*mds**a, label=f"{a:.2f}log(md)+{b:.2f}")
+    print('C_e_dw:', cf.C_e_dw(m_d), 10**b*(m_d)**a)
+
+    a = np.log10(cf.C_e_dw(mds[0])/cf.C_e_dw(mds[-1])) / np.log10(mds[0]/mds[-1])
+    b = np.log10(mds[0]**(-a)*cf.C_e_dw(mds[0]))
+    print(a, f'{10**b:.3e}', 10**b*m_d**a)
+    print(f'{10**b*0.11/sf_ic_norm_0**3. * (0.1/T_DW_end)**3 * cf.rho_crit0_h2 * 1e20:.3e}')
+    C = 10**b*0.11/sf_ic_norm_0**3. * (0.1/T_DW_end)**3 * cf.rho_crit0_h2 * 1e20
+    print(C*m_d**(0.797))
+
+    plt.xlabel(r'$m_{N_2} \, [GeV]$', fontsize=16)
+    plt.ylabel(r'$A(m_{N2}) \, [GeV^3]$', fontsize=16)
+    plt.legend()
+    plt.show()
+    C = 4.526e-2*0.11*1e20*(0.1/T_DW_end)**3/sf_ic_norm_0**3 * cf.rho_crit0_h2 * 1.0945
+    print(f'{C:.3e}')
+    # C = cf.C_e_dw(m_d)*(m_d)**(0.2)*0.11*1e20*(0.1/T_DW_end)**3/sf_ic_norm_0**3 * cf.rho_crit0_h2
+    print(f'A(md=1 keV): {A(m_d, th):.5e} GeV^3')
+    print(f'A(md=1 keV): {9.33e6*(m_d)**(0.8):.5e} GeV^3')
+
+    # A [GeV^3] = A * 1e9 MeV^3
+    # T = keV (A / MeV^3) * (g/0.1)^4 * (sin^2 theta / 1e-15)
+    # Note: extreme dependence on coupling g! 
+    T = (A(m_d, th)*1e9) * (g/0.1)**4 * (th**2/1e-15)       # keV
+    print(f'T: {T} keV, m/T: {m_d*1e6/T:.5e}')

@@ -72,7 +72,7 @@ rho_m = lambda T_SM, T_nu: rho_m0 * (s_SM_no_nu(T_SM) + s_nu(T_nu)) / s0
 data_n_dw = np.loadtxt(data_dir + 'dw/0612182_dw_fig_4.dat', skiprows=2)
 log_C_e_dw_interp = interp1d(np.log(data_n_dw[:,0]), np.log(data_n_dw[:,1]), bounds_error=False, fill_value=(np.log(data_n_dw[0,1]), np.log(data_n_dw[-1,1])))
 C_e_dw = lambda md: np.exp(log_C_e_dw_interp(np.log(md)))
-O_h2_dw = lambda md, th: 0.11*C_e_dw(md)*((0.5*np.sin(2.*th)*md*1e10)**2.) # abundance produced by DW mechanism
+O_h2_dw = lambda md, th: 0.11*C_e_dw(md)*((0.5*np.sin(2.*th)*md*1e10)**2.) # abundance produced by DW mechanism, eq.4.10 "Lightest sterile neutrino abundance within the νMSM"
 n_0_dw = lambda md, th: O_h2_dw(md, th)*rho_crit0_h2/md
 
 sf_nu_dec_sm = (s0/s_SM_before_nu_dec(temp_nu_dec_sm))**(1./3.)
@@ -88,7 +88,7 @@ Tevo_dw_interp = interp1d(np.log10(data_Tevo_dw[:,0]), data_Tevo_dw[:,1], bounds
 def O_h2_dw_Tevo(T, md, th):
     O_h2 = O_h2_dw(md, th)
     T_max_prod = T_d_dw(md)
-    T_ref = T_d_dw(1e-5)
+    T_ref = T_d_dw(1e-5)    # md=1e-5
     T_rescaled = T * T_ref / T_max_prod
     return Tevo_dw_interp(np.log10(T_rescaled)) * O_h2
 

@@ -25,6 +25,7 @@ import C_res_scalar
 import C_res_vector_no_spin_stat
 import vector_mediator
 import scalar_mediator
+import pandemolator as pandemolator
 
 def get_figsize(columnwidth, wf=1.0, hf=(5.**0.5-1.0)/2.0):
     """Parameters:
@@ -96,6 +97,7 @@ else:
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.8e-03;full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.55e-03;full_new.dat' 
 load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
+load_str = './md_1e-05;mX_2.5e-05;sin22th_2e-14;y_5.57e-04;full_new.dat'
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat'
 data = np.loadtxt(load_str)
 T_SM = data[::data_skip_pan, 1]
@@ -113,6 +115,7 @@ c2 = '#f37736'      # orange
 # Mass: 1e-6 * X GeV = X keV
 var_list = load_str.split(';')[:-1]
 md, mX, sin22th, y = [eval(s.split('_')[-1]) for s in var_list]
+th = np.sqrt(sin22th)/2
 print(f'md: {md:.2e}, mX: {mX:.2e}, sin22th: {sin22th:.2e}, y: {y:.2e}')
 mY_relic = cf.omega_d0 * cf.rho_crit0_h2 / cf.s0        # m*Y = m*n/s = Omega * rho_c0 / s0
 
@@ -172,7 +175,7 @@ ax1.loglog(x1, y1, color=c1, zorder=-1)
 # import pandemolator
 # Ttrel = pandemolator.TimeTempRelation()
 # T_nu_dec = 1.4e-3
-ax1.fill_betweenx([1e-28, 1e5], x1[0], x_therm, color='white', alpha=1, zorder=-3)
+# ax1.fill_betweenx([1e-28, 1e5], x1[0], x_therm, color='white', alpha=1, zorder=-3)
 
 ax1.axvline([x_therm], ls=':', color='0', zorder=-2)
 ax2.axvline([x_therm], ls=':', color='0', zorder=-2)
@@ -209,7 +212,7 @@ if BP != 5:
 
 ax2.loglog(md/T_nu, Td/T_nu, color='0.4', ls='-', zorder=-4)
 
-ax2.fill_betweenx([1e-1, 1.5e0], x1[0], x_therm, color='white', alpha=1, zorder=-3)
+# ax2.fill_betweenx([1e-1, 1.5e0], x1[0], x_therm, color='white', alpha=1, zorder=-3)
 
 props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")
 
@@ -315,6 +318,11 @@ n_d_grid = data_evo[::data_skip_rate,9]
 n_X_grid = data_evo[::data_skip_rate,10]
 n_nu_grid = 2.*0.75*(cf.zeta3/cf.pi2)*(T_nu_grid**3.)
 
+T_d_dw = cf.T_d_dw(m_d) # temperature of maximal d production by Dodelson-Widrow mechanism
+i_ic = np.argmax(T_nu_grid < T_d_dw)      # Anton: Start when T_nu < T_dw
+sf_ic_norm_0 = (cf.s0/(cf.s_SM_no_nu(T_SM_grid[i_ic]) + cf.s_nu(T_nu_grid[i_ic])))**(1./3.)
+n_ic = cf.n_0_dw(m_d, th) / (sf_ic_norm_0**3.)      # 2* due to 2 species of neutrinos
+
 md_str = f'{m_d:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{m_d:.5e}'.split('e')[1].rstrip('0').rstrip('.')
 mX_str = f'{m_X:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{m_X:.5e}'.split('e')[1].rstrip('0').rstrip('.')
 sin22th_str = f'{sin2_2th:.5e}'.split('e')[0].rstrip('0').rstrip('.') + 'e' + f'{sin2_2th:.5e}'.split('e')[1].rstrip('0').rstrip('.')
@@ -347,6 +355,9 @@ if not os.path.isfile('./' + filename) or force_write:
 
     C_11_22_ut = np.array([C_res_vector.C_n_11_22(m_d=m_d, m_X=m_X, k_d=k_d, T_d=T_d, xi_d=xi_d, vert=vert_el, th=th, type=-1) / 4.  for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
 
+    print('Get C_22_11_DW')
+    th_avg_22_11_ut_DW = np.array([C_res_vector.th_avg_sigma_v_22_11(m_N1, m_N2, T, vert_el, m_X, m_Gamma_X2) for T in T_nu_grid])
+
     # C_dd_dd = np.array([C_res_vector_no_spin_stat.C_12_34(m_d, m_d, m_d, m_d, k_d, k_d, T_d, T_d, xi_d, xi_d, vert_el, m_X2, m_Gamma_X2, type=0, res_sub=True) / 4. for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
     # C_da_dd = np.array([C_res_vector_no_spin_stat.C_12_34(m_d, m_a, m_d, m_d, k_d, k_a, T_d, T_a, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, type=0, res_sub=True) / 2. for T_d, T_a, xi_d in zip(T_d_grid, T_nu_grid, xi_d_grid)])
     C_dd_dd = np.zeros(T_d_grid.size)#np.array([C_res_vector.C_34_12(0, 1., 0., m_d, m_d, m_d, m_d, k_d, k_d, k_d, k_d, T_d, T_d, T_d, T_d, xi_d, xi_d, xi_d, xi_d, vert_el, m_X2, m_Gamma_X2, res_sub=False) / 4. for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
@@ -358,7 +369,8 @@ if not os.path.isfile('./' + filename) or force_write:
     C_dd_XX = C_XX_dd_both[:,1]
 
     np.savetxt(filename, np.column_stack((
-        m_d/T_nu_grid, 
+        m_d/T_nu_grid,
+        m_d/T_SM_grid, 
         H_grid, 
         C_X_dd/n_d_grid, 
         C_dd_X/n_d_grid,  
@@ -371,25 +383,28 @@ if not os.path.isfile('./' + filename) or force_write:
         C_dd_da/n_d_grid, 
         C_aa_dd/n_d_grid, 
         C_dd_aa/n_d_grid,
-        C_11_22_ut/n_d_grid)))
+        C_11_22_ut/n_d_grid,
+        th_avg_22_11_ut_DW)))
     print(f'Saved file in {time.time()-time_start}s')
 
 data = np.loadtxt(filename)
 
-x_grid  = data[::plot_data_skip, 0]
-H       = data[::plot_data_skip, 1]
-C_X_dd  = data[::plot_data_skip, 2]
-C_dd_X  = data[::plot_data_skip, 3]
-C_X_da  = data[::plot_data_skip, 4]
-C_da_X  = data[::plot_data_skip, 5]
-C_XX_dd = data[::plot_data_skip, 6]
-C_dd_XX = data[::plot_data_skip, 7]
-C_dd_dd = data[::plot_data_skip, 8]
-C_da_dd = data[::plot_data_skip, 9]
-C_dd_da = data[::plot_data_skip, 10]
-C_aa_dd = data[::plot_data_skip, 11]
-C_dd_aa = data[::plot_data_skip, 12]
-C_11_22_ut = data[::plot_data_skip, 13]
+x_grid    = data[::plot_data_skip, 0]
+x_SM_grid = data[::plot_data_skip, 1]
+H         = data[::plot_data_skip, 2]
+C_X_dd    = data[::plot_data_skip, 3]
+C_dd_X    = data[::plot_data_skip, 4]
+C_X_da    = data[::plot_data_skip, 5]
+C_da_X    = data[::plot_data_skip, 6]
+C_XX_dd   = data[::plot_data_skip, 7]
+C_dd_XX   = data[::plot_data_skip, 8]
+C_dd_dd   = data[::plot_data_skip, 9]
+C_da_dd   = data[::plot_data_skip, 10]
+C_dd_da   = data[::plot_data_skip, 11]
+C_aa_dd   = data[::plot_data_skip, 12]
+C_dd_aa   = data[::plot_data_skip, 13]
+C_11_22_ut = data[::plot_data_skip, 14]
+th_avg_22_11_ut_DW = data[::plot_data_skip, 15]
 
 # help-function
 def smooth_loglog_pchip(x, y, npts=400):
@@ -399,7 +414,7 @@ def smooth_loglog_pchip(x, y, npts=400):
     y = y[mask]
 
     if x.size < 2 or y.size < 2:
-        return np.zeros(npts)
+        return np.zeros(npts), np.zeros(npts)
 
     logx = np.log10(x)
     logy = np.log10(y)
@@ -408,25 +423,29 @@ def smooth_loglog_pchip(x, y, npts=400):
 
     x_fine = np.logspace(np.log10(x.min()), np.log10(x.max()), npts)
     y_fine = 10**(interp(np.log10(x_fine)))
-    return y_fine
+    return x_fine, y_fine
 
 n_points = 800
-H = smooth_loglog_pchip(x_grid, H, n_points)
-C_X_dd  = smooth_loglog_pchip(x_grid, abs(C_X_dd), n_points)
-C_dd_X  = smooth_loglog_pchip(x_grid, abs(C_dd_X), n_points)
-C_X_da  = smooth_loglog_pchip(x_grid, abs(C_X_da), n_points)
-C_da_X  = smooth_loglog_pchip(x_grid, abs(C_da_X), n_points)
-C_XX_dd = smooth_loglog_pchip(x_grid, abs(C_XX_dd), n_points)
-C_dd_dd = smooth_loglog_pchip(x_grid, abs(C_dd_dd), n_points)
-C_da_dd = smooth_loglog_pchip(x_grid, abs(C_da_dd), n_points)
-C_dd_da = smooth_loglog_pchip(x_grid, abs(C_dd_da), n_points)
-C_aa_dd = smooth_loglog_pchip(x_grid, abs(C_aa_dd), n_points)
-C_dd_aa = smooth_loglog_pchip(x_grid, abs(C_dd_aa), n_points)
+_, H = smooth_loglog_pchip(x_grid, H, n_points)
+_, C_X_dd  = smooth_loglog_pchip(x_grid, abs(C_X_dd), n_points)
+_, C_dd_X  = smooth_loglog_pchip(x_grid, abs(C_dd_X), n_points)
+_, C_X_da  = smooth_loglog_pchip(x_grid, abs(C_X_da), n_points)
+_, C_da_X  = smooth_loglog_pchip(x_grid, abs(C_da_X), n_points)
+_, C_XX_dd = smooth_loglog_pchip(x_grid, abs(C_XX_dd), n_points)
+_, C_dd_dd = smooth_loglog_pchip(x_grid, abs(C_dd_dd), n_points)
+_, C_da_dd = smooth_loglog_pchip(x_grid, abs(C_da_dd), n_points)
+_, C_dd_da = smooth_loglog_pchip(x_grid, abs(C_dd_da), n_points)
+_, C_aa_dd = smooth_loglog_pchip(x_grid, abs(C_aa_dd), n_points)
+_, C_dd_aa = smooth_loglog_pchip(x_grid, abs(C_dd_aa), n_points)
+_, th_avg_22_11_ut_DW = smooth_loglog_pchip(x_grid, abs(th_avg_22_11_ut_DW), n_points)
 skip = 2
-C_dd_XX = smooth_loglog_pchip(x_grid[::skip], abs(C_dd_XX[::skip]), n_points)
+_, C_dd_XX = smooth_loglog_pchip(x_grid[::skip], abs(C_dd_XX[::skip]), n_points)
 skip = 3
-C_11_22_ut = smooth_loglog_pchip(x_grid[::skip], abs(C_11_22_ut[::skip]), n_points)
-x_grid = smooth_loglog_pchip(x_grid, x_grid, n_points)
+_, C_11_22_ut = smooth_loglog_pchip(x_grid[::skip], abs(C_11_22_ut[::skip]), n_points)
+x_grid = np.logspace(np.log10(x_grid.min()), np.log10(x_grid.max()), n_points)
+x_SM_grid = np.logspace(np.log10(x_SM_grid.min()), np.log10(x_SM_grid.max()), n_points)
+T_nu_grid = m_d/x_grid      # GeV 
+T_SM_grid = m_d/x_SM_grid
 
 
 
@@ -461,6 +480,27 @@ ax3.loglog(x_grid, 1e6*abs(C_da_X), color=c2, ls='-', zorder=-4) #458751
 ax3.loglog(x_grid, 1e6*abs(C_dd_XX), color=c3, ls='-', zorder=-4) #95190C
 ax3.loglog(x_grid, 1e6*abs(C_XX_dd), color=c5, ls='-', zorder=-4) #D02411
 ax3.loglog(x_grid, 1e6*abs(C_11_22_ut), color=c4, ls='-', zorder=-4) #D02411
+
+T_eq = (147.8e9)*(y/0.1)**4*(th**2/1e-15) * 1e-6    # GeV 
+
+n2 = lambda T: n_ic * (T / T_nu_grid[i_ic])**3 * ((21/4 + np.vectorize(cf.g_s_before_nu_dec)(T))/(21/4+cf.g_s_before_nu_dec(T_nu_grid[i_ic])))
+
+s = lambda T, TSM: np.vectorize(cf.s_SM_no_nu)(TSM) + np.vectorize(cf.s_nu)(T)
+nd_dw = lambda T, TSM: cf.O_h2_dw_Tevo(T, m_d, th)*cf.rho_crit0_h2/m_d * s(T, TSM)/cf.s0  
+
+# Ttrel = pandemolator.TimeTempRelation()
+# s = np.vectorize(cf.s_SM_no_nu)(Ttrel.T_SM_grid) + np.vectorize(cf.s_nu)(Ttrel.T_nu_grid)
+# nd_dw = cf.O_h2_dw_Tevo(Ttrel.T_nu_grid, m_d, th)*cf.rho_crit0_h2/m_d * s/cf.s0  
+# x_dw, nd_dw_grid = smooth_loglog_pchip(m_d/Ttrel.T_nu_grid, nd_dw, n_points)'
+
+# plt.loglog(x_dw, nd_dw_grid, 'b')
+# plt.loglog(x_grid, n2(m_d/x_grid), 'k')
+
+# C_22_11_ut_DW = n2(T_nu_grid)*th_avg_22_11_ut_DWq
+C_22_11_ut_DW = nd_dw(T_nu_grid, T_SM_grid)*th_avg_22_11_ut_DW/2
+ax3.loglog(x_grid, 1e6*abs(C_22_11_ut_DW), color='r') #D02411
+ax3.text(6e-3, 1e-14, r"$n_2\langle \sigma v\rangle_{22\to 11}$", color='r', rotation=0, ha='left', va='bottom')
+# ax3.loglog(x_grid, 1e6*abs(n2(T_nu_grid)*th_avg_22_11_ut_DW), color='b') #D02411
 
 x_therm_index = np.where(np.min(np.abs(x_grid-x_therm)) == np.abs(x_grid-x_therm))
 dark_therm_x = 10**((np.log10(x_therm) + np.log10(x_grid)[0]) / 2)
@@ -555,7 +595,7 @@ for item in legend_BP.legend_handles:
     item.set_visible(False)
 # plt.gca().add_artist(legend_BP)
 
-ax3.fill_betweenx([1e-28, 1e0], 1e-5, x_therm, color='white', alpha=1, zorder=-3)
+# ax3.fill_betweenx([1e-28, 1e0], 1e-5, x_therm, color='white', alpha=1, zorder=-3)
 ax3.axvline(x_therm, ls=':', color='0', zorder=-2)
 
 props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")

@@ -734,6 +734,84 @@ def sigma_el(s, m_d2, vert, m_X2, m_Gamma_X2):
     # factor 0.5 due to identical particles in final state
     return 1e3*M2_t_integrate / 2
 
+def sigma_22_11(s, m1, m2, m_X, vert):
+    if s < 4*m1**2. or s < 4*m2**2.:
+        return 0.
+    
+    m12 = m1*m1
+    m13 = m12*m1
+    m14 = m13*m1
+    m15 = m14*m1
+    m16 = m15*m1
+    m17 = m16*m1
+    m18 = m17*m1
+
+    m22 = m2*m2
+    m23 = m22*m2
+    m24 = m23*m2
+    m25 = m24*m2
+    m26 = m25*m2
+    m27 = m26*m2
+    m28 = m27*m2
+
+    m_X2 = m_X*m_X
+    m_X4 = m_X2*m_X2
+    m_X6 = m_X4*m_X2
+    m_X8 = m_X6*m_X2
+
+    s2 = s*s
+
+    # Anton: Make upper and lower integration bounds 
+    E1cm = np.sqrt(s) / 2
+    E3cm = np.sqrt(s) / 2
+    p1cm = np.sqrt((E1cm - m1)*(E1cm + m1))
+    p3cm = np.sqrt((E3cm - m2)*(E3cm + m2))
+
+    # Anton: Forward scattering gets divergence at t->0, u->0. 
+    # If all masses are equal, and in CM frame,
+    # t = 2pcm^2 (cos(th)-1), u = 2pcm^2(-cos(th)-1), s = 4(m^2-pcm^2)
+    # => divergence at theta = 0, pi. Introduce cut-off.
+    th_cut = 0
+    th_max = np.pi - th_cut
+    th_min = 0 + th_cut
+    # Sign change in th -> t integration variable -> flip min/max
+    # t = m1^2 + m3^2 - 2(E1 E3 - p1 p3 cos(th))
+    c_th_max = np.cos(th_min)
+    c_th_min = np.cos(th_max)
+    t_upper = m1**2 + m2**2 - 2*(E1cm*E3cm - p1cm*p3cm*c_th_max)
+    t_lower = m1**2 + m2**2 - 2*(E1cm*E3cm - p1cm*p3cm*c_th_min)
+
+    M2_t_integral_upper = 1/m_X4*4*vert*(
+        -((4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(-2*m12-2*m22+m_X2+s+t_upper))
+        -1/(2*(m12+m22-m_X2)-s)*(5*m18-12*m17*m2+4*m16*m22-6*m16*m_X2+12*m15*m23+8*m15*m2*m_X2-18*m14*m24+38*m14*m22*m_X2+5*m14*m_X4+12*m13*m25-80*m13*m23*m_X2-4*m13*m2*m_X4+4*m12*m26+38*m12*m24*m_X2-50*m12*m22*m_X4+s*(-m_X2*(m1-m2)**2*(5*m12-6*m1*m2+5*m22)+4*m_X4*(m1+m2)**2-(m1-m2)**4*(m1+m2)**2+12*m_X6)-12*m12*m_X6-12*m1*m27+8*m1*m25*m_X2-4*m1*m23*m_X4+8*m1*m2*m_X6+2*m_X2*s2*(m1-m2)**2+5*m28-6*m26*m_X2+5*m24*m_X4-12*m22*m_X6+8*m_X8)*(np.log(t_upper-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_upper)+0j)
+        +(4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(m_X2-t_upper)
+        +t_upper*(4*m_X2*(m1-m2)**2+3*(m1-m2)**4+4*m_X4)
+    )
+
+    M2_t_integral_lower = 1/m_X4*4*vert*(
+        -((4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(-2*m12-2*m22+m_X2+s+t_lower))
+        -1/(2*(m12+m22-m_X2)-s)*(5*m18-12*m17*m2+4*m16*m22-6*m16*m_X2+12*m15*m23+8*m15*m2*m_X2-18*m14*m24+38*m14*m22*m_X2+5*m14*m_X4+12*m13*m25-80*m13*m23*m_X2-4*m13*m2*m_X4+4*m12*m26+38*m12*m24*m_X2-50*m12*m22*m_X4+s*(-m_X2*(m1-m2)**2*(5*m12-6*m1*m2+5*m22)+4*m_X4*(m1+m2)**2-(m1-m2)**4*(m1+m2)**2+12*m_X6)-12*m12*m_X6-12*m1*m27+8*m1*m25*m_X2-4*m1*m23*m_X4+8*m1*m2*m_X6+2*m_X2*s2*(m1-m2)**2+5*m28-6*m26*m_X2+5*m24*m_X4-12*m22*m_X6+8*m_X8)*(np.log(t_lower-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_lower)+0j)
+        +(4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(m_X2-t_lower)
+        +t_lower*(4*m_X2*(m1-m2)**2+3*(m1-m2)**4+4*m_X4)
+    )
+
+    # Anton: QED version -- Møller scattering. 
+    # M2_t_integral_upper = 8*vert*(-((4*(m14-2*m13*m2-4*m12*m22+2*m1*m2*(s-m22)+m24)*(np.log(t_upper+0j)-np.log(-2*m12-2*m22+s+t_upper+0j)))/(2*(m12+m22)-s))-(m14-4*m13*m2-4*s*(m12+m22)+14*m12*m22-4*m1*m23+m24+2*s2)/t_upper-(m14-4*m13*m2-4*s*(m12+m22)+14*m12*m22-4*m1*m23+m24+2*s2)/(-2*m12-2*m22+s+t_upper)+2*t_upper)
+    
+    # M2_t_integral_lower = 8*vert*(-((4*(m14-2*m13*m2-4*m12*m22+2*m1*m2*(s-m22)+m24)*(np.log(t_lower+0j)-np.log(-2*m12-2*m22+s+t_lower+0j)))/(2*(m12+m22)-s))-(m14-4*m13*m2-4*s*(m12+m22)+14*m12*m22-4*m1*m23+m24+2*s2)/t_lower-(m14-4*m13*m2-4*s*(m12+m22)+14*m12*m22-4*m1*m23+m24+2*s2)/(-2*m12-2*m22+s+t_lower)+2*t_lower)
+
+    # Anton: QED with added boson mass
+    # M2_t_integral_upper = 8*vert*(-((2*(2*m14-4*m13*m2-4*m12*(2*m22+m_X2)+4*m1*m2*(-m22+m_X2+s)+2*(m22-m_X2)**2+3*m_X2*s)*(np.log(t_upper-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_upper+0j)))/(2*(m12+m22-m_X2)-s))-((m14-4*m13*m2+2*m12*(7*m22-m_X2-2*s)+4*m1*m2*(m_X2-m22)+m24-2*m22*(m_X2+2*s)+m_X4+2*m_X2*s+2*s2)*(2*m12+2*m22-s-2*t_upper))/((m_X2-t_upper)*(-2*m12-2*m22+m_X2+s+t_upper))+2*t_upper)
+
+    # M2_t_integral_lower = 8*vert*(-((2*(2*m14-4*m13*m2-4*m12*(2*m22+m_X2)+4*m1*m2*(-m22+m_X2+s)+2*(m22-m_X2)**2+3*m_X2*s)*(np.log(t_lower-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_lower+0j)))/(2*(m12+m22-m_X2)-s))-((m14-4*m13*m2+2*m12*(7*m22-m_X2-2*s)+4*m1*m2*(m_X2-m22)+m24-2*m22*(m_X2+2*s)+m_X4+2*m_X2*s+2*s2)*(2*m12+2*m22-s-2*t_lower))/((m_X2-t_lower)*(-2*m12-2*m22+m_X2+s+t_lower))+2*t_lower)
+
+    M2_t_integral = (M2_t_integral_upper - M2_t_integral_lower).real
+
+    # Fully evaluated integral -- only valid for m1 = m2. 
+    # M2_t_integral = 8*vert*((4*(12*m14+4*m12*(m_X2-s)-2*m_X4-3*m_X2*s)*(2*np.log(m_X)-np.log(-4*m12+m_X2+s)))/(4*m12-2*m_X2-s)-(2*(4*m12-s)*(8*m14-4*m12*(m_X2+2*s)+2*m_X4+3*m_X2*s+2*s2))/(m_X2*(-4*m12+m_X2+s)))
+
+    return M2_t_integral/(64.*np.pi*s*p1cm*p1cm) / 2.
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt 
 
@@ -741,8 +819,7 @@ if __name__ == '__main__':
 
     m_d = 1e-5      # GeV. 1e-5 GeV = 10 keV
     m_a = 0.
-    m_X = 5*m_d
-    m_h = 3*m_d
+    m_X = 2.5*m_d
     sin2_2th = 1e-12
     th = 0.5*np.arcsin(np.sqrt(sin2_2th))
     y = 2e-4
@@ -757,36 +834,41 @@ if __name__ == '__main__':
 
     m_d2 = m_d*m_d
     m_X2 = m_X*m_X
-    m_h2 = m_h*m_h
 
-    th_arr = np.linspace(0, 2*np.pi, 1000)
-    GammaX = Gamma_X(y=y, th=th_arr, m_X=m_X, m_d=m_d)
-    GammaX_new = Gamma_X_new(y=y, th=th_arr, m_X=m_X, m_d=m_d)
-    GammaPhi = Gamma_phi(y=y, th=th_arr, m_phi=m_h, m_d=m_d, m_X=m_X)
-    plt.plot(th_arr, GammaX, 'r')
-    plt.plot(th_arr, GammaX_new, 'tab:green')
-    plt.plot(th_arr, GammaPhi, 'tab:blue')
-    plt.xticks([0, np.pi/2, np.pi, 3*np.pi/2, 2*np.pi], labels=[r'$0$',r'$\pi/2$',r'$\pi$',r'$3\pi/2$', r'$2\pi$'])
+    # th_arr = np.linspace(0, 2*np.pi, 1000)
+    # GammaX = Gamma_X(y=y, th=th_arr, m_X=m_X, m_d=m_d)
+    # GammaX_new = Gamma_X_new(y=y, th=th_arr, m_X=m_X, m_d=m_d)
+    # GammaPhi = Gamma_phi(y=y, th=th_arr, m_phi=m_h, m_d=m_d, m_X=m_X)
+    # plt.plot(th_arr, GammaX, 'r')
+    # plt.plot(th_arr, GammaX_new, 'tab:green')
+    # plt.plot(th_arr, GammaPhi, 'tab:blue')
+    # plt.xticks([0, np.pi/2, np.pi, 3*np.pi/2, 2*np.pi], labels=[r'$0$',r'$\pi/2$',r'$\pi$',r'$3\pi/2$', r'$2\pi$'])
+    # plt.show()
+
+    # m1 = m_a
+    # m2 = m_d
+    # s_min = (m1 + m2)**2
+    # # S = np.linspace(s_min, 1e2, int(1e3))
+    # S = 10**(np.linspace(np.log10(s_min), 2, int(1e3)))
+    # T = np.linspace(-1, 1, int(1e3))
+    # # T = np.concatenate((-10**(np.linspace(1, 0, int(1e3/2))), 10**(np.linspace(0, 1, int(1e3/2)))))
+    # s, t = np.meshgrid(S, T, indexing='ij')
+
+    # GammaX = Gamma_X(y=y, th=th, m_X=m_X, m_d=m_d)
+    # GammaX_new = Gamma_X_new(y=y, th=th, m_X=m_X, m_d=m_d)
+    # GammaPhi = Gamma_phi(y=y, th=th, m_phi=m_h, m_d=m_d, m_X=m_X)
+    # m_Gamma_X2 = (m_X*GammaX)**2
+    # m_Gamma_X2_new = (m_X*GammaX_new)**2
+    # m_Gamma_h2 = (m_h*GammaPhi)**2
+    # print(GammaX, GammaX_new)
+
+    s_sigma = 10**(np.linspace(np.log10(3*m_d2), 6, int(1e3)))
+
+    sigma = np.vectorize(sigma_22_11)(s_sigma, m_d, m_d, m_X, y**4)
+    plt.loglog(s_sigma, (sigma), label='sigma_22_11')
+    plt.legend()
     plt.show()
 
-    m1 = m_a
-    m2 = m_d
-    s_min = (m1 + m2)**2
-    # S = np.linspace(s_min, 1e2, int(1e3))
-    S = 10**(np.linspace(np.log10(s_min), 2, int(1e3)))
-    T = np.linspace(-1, 1, int(1e3))
-    # T = np.concatenate((-10**(np.linspace(1, 0, int(1e3/2))), 10**(np.linspace(0, 1, int(1e3/2)))))
-    s, t = np.meshgrid(S, T, indexing='ij')
-
-    GammaX = Gamma_X(y=y, th=th, m_X=m_X, m_d=m_d)
-    GammaX_new = Gamma_X_new(y=y, th=th, m_X=m_X, m_d=m_d)
-    GammaPhi = Gamma_phi(y=y, th=th, m_phi=m_h, m_d=m_d, m_X=m_X)
-    m_Gamma_X2 = (m_X*GammaX)**2
-    m_Gamma_X2_new = (m_X*GammaX_new)**2
-    m_Gamma_h2 = (m_h*GammaPhi)**2
-    print(GammaX, GammaX_new)
-
-    s_sigma = 10**(np.linspace(np.log10(3*m_d2), 2, int(1e3)))
     # Transmission ad --> dd
     time1 = time.time()
     sigma_gen_tr = np.vectorize(sigma_gen)(s=s_sigma, m1=m_a, m2=m_d, m3=m_d, m4=m_d, vert=vert_tr, m_X2=m_X2, m_Gamma_X2=m_Gamma_X2, sub=True)

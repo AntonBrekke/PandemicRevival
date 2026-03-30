@@ -415,13 +415,14 @@ load_str_4 = './md_5e-05;mX_1.5e-04;mh_9e-05;sin22th_5e-16;y_1.24e-03;full_new.d
 
 load_str_1 = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
 load_str_2 = './md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat'
+load_str_3 = './md_1e-05;mX_2.5e-05;sin22th_2e-14;y_5.57e-04;full_new.dat'
 
 # load_str_3 = './md_1e-05;mX_5e-04;mh_3e-04;sin22th_5e-16;y_3.5e-03;full_new.dat'       
 
 # BENCHMARK POINTS
 md_B1, sin22th_B1 = load_str_1.replace('./', '').split(';')[0], load_str_1.replace('./', '').split(';')[2]
 md_B2, sin22th_B2 = load_str_2.replace('./', '').split(';')[0], load_str_2.replace('./', '').split(';')[2]
-md_B3, sin22th_B3 = load_str_3.replace('./', '').split(';')[0], load_str_3.replace('./', '').split(';')[3]
+md_B3, sin22th_B3 = load_str_3.replace('./', '').split(';')[0], load_str_3.replace('./', '').split(';')[2]
 md_B4, sin22th_B4 = load_str_4.replace('./', '').split(';')[0], load_str_4.replace('./', '').split(';')[3]
 
 md_B1, sin22th_B1 = float(md_B1.replace('md_', '')), float(sin22th_B1.replace('sin22th_', ''))
@@ -431,7 +432,7 @@ md_B4, sin22th_B4 = float(md_B4.replace('md_', '')), float(sin22th_B4.replace('s
 
 plt.plot(np.log10(1e6*md_B1), np.log10(sin22th_B1), marker='*', color='tomato')
 plt.plot(np.log10(1e6*md_B2), np.log10(sin22th_B2), marker='*', color='tomato')
-# plt.plot(np.log10(1e6*md_B3), np.log10(sin22th_B3), marker='*', color='tomato')
+plt.plot(np.log10(1e6*md_B3), np.log10(sin22th_B3), marker='*', color='tomato')
 # plt.plot(np.log10(1e6*md_B4), np.log10(sin22th_B4), marker='*', color='tomato')
 
 #plt.plot(np.log10(10), np.log10(3.5e-13), marker='*', color='tomato')

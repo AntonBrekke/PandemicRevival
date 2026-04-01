@@ -734,7 +734,7 @@ def sigma_el(s, m_d2, vert, m_X2, m_Gamma_X2):
     # factor 0.5 due to identical particles in final state
     return 1e3*M2_t_integrate / 2
 
-def sigma_22_11(s, m1, m2, m_X, vert):
+def sigma_22_11(s, m1, m2, m_X, vert, by_hand=False):
     if s < 4*m1**2. or s < 4*m2**2.:
         return 0.
     
@@ -771,6 +771,7 @@ def sigma_22_11(s, m1, m2, m_X, vert):
     # If all masses are equal, and in CM frame,
     # t = 2pcm^2 (cos(th)-1), u = 2pcm^2(-cos(th)-1), s = 4(m^2-pcm^2)
     # => divergence at theta = 0, pi. Introduce cut-off.
+    # th_cut = np.pi*1e-3
     th_cut = 0
     th_max = np.pi - th_cut
     th_min = 0 + th_cut
@@ -778,39 +779,43 @@ def sigma_22_11(s, m1, m2, m_X, vert):
     # t = m1^2 + m3^2 - 2(E1 E3 - p1 p3 cos(th))
     c_th_max = np.cos(th_min)
     c_th_min = np.cos(th_max)
-    t_upper = m1**2 + m2**2 - 2*(E1cm*E3cm - p1cm*p3cm*c_th_max)
-    t_lower = m1**2 + m2**2 - 2*(E1cm*E3cm - p1cm*p3cm*c_th_min)
+    t_upper = m12 + m22 - 2*(E1cm*E3cm - p1cm*p3cm*c_th_max)
+    t_lower = m12 + m22 - 2*(E1cm*E3cm - p1cm*p3cm*c_th_min)
 
-    M2_t_integral_upper = 1/m_X4*4*vert*(
-        -((4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(-2*m12-2*m22+m_X2+s+t_upper))
-        -1/(2*(m12+m22-m_X2)-s)*(5*m18-12*m17*m2+4*m16*m22-6*m16*m_X2+12*m15*m23+8*m15*m2*m_X2-18*m14*m24+38*m14*m22*m_X2+5*m14*m_X4+12*m13*m25-80*m13*m23*m_X2-4*m13*m2*m_X4+4*m12*m26+38*m12*m24*m_X2-50*m12*m22*m_X4+s*(-m_X2*(m1-m2)**2*(5*m12-6*m1*m2+5*m22)+4*m_X4*(m1+m2)**2-(m1-m2)**4*(m1+m2)**2+12*m_X6)-12*m12*m_X6-12*m1*m27+8*m1*m25*m_X2-4*m1*m23*m_X4+8*m1*m2*m_X6+2*m_X2*s2*(m1-m2)**2+5*m28-6*m26*m_X2+5*m24*m_X4-12*m22*m_X6+8*m_X8)*(np.log(t_upper-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_upper)+0j)
-        +(4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(m_X2-t_upper)
-        +t_upper*(4*m_X2*(m1-m2)**2+3*(m1-m2)**4+4*m_X4)
-    )
+    # M2_t_integral_upper = 1/m_X4*4*(
+    #     -((4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(-2*m12-2*m22+m_X2+s+t_upper))
+    #     -1/(2*(m12+m22-m_X2)-s)*(5*m18-12*m17*m2+4*m16*m22-6*m16*m_X2+12*m15*m23+8*m15*m2*m_X2-18*m14*m24+38*m14*m22*m_X2+5*m14*m_X4+12*m13*m25-80*m13*m23*m_X2-4*m13*m2*m_X4+4*m12*m26+38*m12*m24*m_X2-50*m12*m22*m_X4+s*(-m_X2*(m1-m2)**2*(5*m12-6*m1*m2+5*m22)+4*m_X4*(m1+m2)**2-(m1-m2)**4*(m1+m2)**2+12*m_X6)-12*m12*m_X6-12*m1*m27+8*m1*m25*m_X2-4*m1*m23*m_X4+8*m1*m2*m_X6+2*m_X2*s2*(m1-m2)**2+5*m28-6*m26*m_X2+5*m24*m_X4-12*m22*m_X6+8*m_X8)*(np.log(t_upper-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_upper)+0j)
+    #     +(4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(m_X2-t_upper)
+    #     +t_upper*(4*m_X2*(m1-m2)**2+3*(m1-m2)**4+4*m_X4)
+    # )
 
-    M2_t_integral_lower = 1/m_X4*4*vert*(
-        -((4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(-2*m12-2*m22+m_X2+s+t_lower))
-        -1/(2*(m12+m22-m_X2)-s)*(5*m18-12*m17*m2+4*m16*m22-6*m16*m_X2+12*m15*m23+8*m15*m2*m_X2-18*m14*m24+38*m14*m22*m_X2+5*m14*m_X4+12*m13*m25-80*m13*m23*m_X2-4*m13*m2*m_X4+4*m12*m26+38*m12*m24*m_X2-50*m12*m22*m_X4+s*(-m_X2*(m1-m2)**2*(5*m12-6*m1*m2+5*m22)+4*m_X4*(m1+m2)**2-(m1-m2)**4*(m1+m2)**2+12*m_X6)-12*m12*m_X6-12*m1*m27+8*m1*m25*m_X2-4*m1*m23*m_X4+8*m1*m2*m_X6+2*m_X2*s2*(m1-m2)**2+5*m28-6*m26*m_X2+5*m24*m_X4-12*m22*m_X6+8*m_X8)*(np.log(t_lower-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_lower)+0j)
-        +(4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(m_X2-t_lower)
-        +t_lower*(4*m_X2*(m1-m2)**2+3*(m1-m2)**4+4*m_X4)
-    )
-
-    # Anton: QED version -- Møller scattering. 
-    # M2_t_integral_upper = 8*vert*(-((4*(m14-2*m13*m2-4*m12*m22+2*m1*m2*(s-m22)+m24)*(np.log(t_upper+0j)-np.log(-2*m12-2*m22+s+t_upper+0j)))/(2*(m12+m22)-s))-(m14-4*m13*m2-4*s*(m12+m22)+14*m12*m22-4*m1*m23+m24+2*s2)/t_upper-(m14-4*m13*m2-4*s*(m12+m22)+14*m12*m22-4*m1*m23+m24+2*s2)/(-2*m12-2*m22+s+t_upper)+2*t_upper)
-    
-    # M2_t_integral_lower = 8*vert*(-((4*(m14-2*m13*m2-4*m12*m22+2*m1*m2*(s-m22)+m24)*(np.log(t_lower+0j)-np.log(-2*m12-2*m22+s+t_lower+0j)))/(2*(m12+m22)-s))-(m14-4*m13*m2-4*s*(m12+m22)+14*m12*m22-4*m1*m23+m24+2*s2)/t_lower-(m14-4*m13*m2-4*s*(m12+m22)+14*m12*m22-4*m1*m23+m24+2*s2)/(-2*m12-2*m22+s+t_lower)+2*t_lower)
-
-    # Anton: QED with added boson mass
-    # M2_t_integral_upper = 8*vert*(-((2*(2*m14-4*m13*m2-4*m12*(2*m22+m_X2)+4*m1*m2*(-m22+m_X2+s)+2*(m22-m_X2)**2+3*m_X2*s)*(np.log(t_upper-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_upper+0j)))/(2*(m12+m22-m_X2)-s))-((m14-4*m13*m2+2*m12*(7*m22-m_X2-2*s)+4*m1*m2*(m_X2-m22)+m24-2*m22*(m_X2+2*s)+m_X4+2*m_X2*s+2*s2)*(2*m12+2*m22-s-2*t_upper))/((m_X2-t_upper)*(-2*m12-2*m22+m_X2+s+t_upper))+2*t_upper)
-
-    # M2_t_integral_lower = 8*vert*(-((2*(2*m14-4*m13*m2-4*m12*(2*m22+m_X2)+4*m1*m2*(-m22+m_X2+s)+2*(m22-m_X2)**2+3*m_X2*s)*(np.log(t_lower-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_lower+0j)))/(2*(m12+m22-m_X2)-s))-((m14-4*m13*m2+2*m12*(7*m22-m_X2-2*s)+4*m1*m2*(m_X2-m22)+m24-2*m22*(m_X2+2*s)+m_X4+2*m_X2*s+2*s2)*(2*m12+2*m22-s-2*t_lower))/((m_X2-t_lower)*(-2*m12-2*m22+m_X2+s+t_lower))+2*t_lower)
-
-    M2_t_integral = (M2_t_integral_upper - M2_t_integral_lower).real
+    # M2_t_integral_lower = 1/m_X4*4*(
+    #     -((4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(-2*m12-2*m22+m_X2+s+t_lower))
+    #     -1/(2*(m12+m22-m_X2)-s)*(5*m18-12*m17*m2+4*m16*m22-6*m16*m_X2+12*m15*m23+8*m15*m2*m_X2-18*m14*m24+38*m14*m22*m_X2+5*m14*m_X4+12*m13*m25-80*m13*m23*m_X2-4*m13*m2*m_X4+4*m12*m26+38*m12*m24*m_X2-50*m12*m22*m_X4+s*(-m_X2*(m1-m2)**2*(5*m12-6*m1*m2+5*m22)+4*m_X4*(m1+m2)**2-(m1-m2)**4*(m1+m2)**2+12*m_X6)-12*m12*m_X6-12*m1*m27+8*m1*m25*m_X2-4*m1*m23*m_X4+8*m1*m2*m_X6+2*m_X2*s2*(m1-m2)**2+5*m28-6*m26*m_X2+5*m24*m_X4-12*m22*m_X6+8*m_X8)*(np.log(t_lower-m_X2+0j)-np.log(-2*m12-2*m22+m_X2+s+t_lower)+0j)
+    #     +(4*m_X2*s*(m1-m2-m_X)*(m1+m2-m_X)*(m1-m2+m_X)*(m1+m2+m_X)+((m1-m2)**2-m_X2)**2*((m1+m2)**4+2*m_X4)+4*m_X4*s2)/(m_X2-t_lower)
+    #     +t_lower*(4*m_X2*(m1-m2)**2+3*(m1-m2)**4+4*m_X4)
+    # )
 
     # Fully evaluated integral -- only valid for m1 = m2. 
-    # M2_t_integral = 8*vert*((4*(12*m14+4*m12*(m_X2-s)-2*m_X4-3*m_X2*s)*(2*np.log(m_X)-np.log(-4*m12+m_X2+s)))/(4*m12-2*m_X2-s)-(2*(4*m12-s)*(8*m14-4*m12*(m_X2+2*s)+2*m_X4+3*m_X2*s+2*s2))/(m_X2*(-4*m12+m_X2+s)))
+    M2_t_integral = 8*(
+        (4*(12*m14+4*m12*(m_X2-s)-2*m_X4-3*m_X2*s)*(2*np.log(m_X)-np.log(-4*m12+m_X2+s)))/(4*m12-2*m_X2-s)
+        -(2*(4*m12-s)*(8*m14-4*m12*(m_X2+2*s)+2*m_X4+3*m_X2*s+2*s2))/(m_X2*(-4*m12+m_X2+s))
+        )
 
-    return M2_t_integral/(64.*np.pi*s*p1cm*p1cm) / 2.
+
+    # Anton: Calculate |M|^2 by hand and integrate in mathematica
+    # if by_hand is True: 
+    #     M2_t_integral = 8*((4*(12*m14+4*m12*(m_X2-s)-2*m_X4-3*m_X2*s)*np.log(m_X2/(-4*m12+m_X2+s)))/(4*m12-2*m_X2-s)-(2*(4*m12-s)*(8*m14-4*m12*(m_X2+2*s)+2*m_X4+3*m_X2*s+2*s2))/(m_X2*(-4*m12+m_X2+s)))
+
+
+    # What one could expect: => naive guess
+    # n = 1
+    # return vert / (s**n * m_X**(2*(1-n)))*4
+    # return vert/s
+    # Closer to what we have: 
+    # return vert / m_X2
+    # Anton: fac. 1/2 for identical particles in final state, fac. 4 for spin sum
+    return vert*M2_t_integral/(64.*np.pi*s*p1cm*p1cm) / 2.
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt 
@@ -862,10 +867,13 @@ if __name__ == '__main__':
     # m_Gamma_h2 = (m_h*GammaPhi)**2
     # print(GammaX, GammaX_new)
 
-    s_sigma = 10**(np.linspace(np.log10(3*m_d2), 6, int(1e3)))
+    s_sigma = 10**(np.linspace(np.log10(3*m_d2), 6, int(1e4)))
 
+    # m_d = 0
     sigma = np.vectorize(sigma_22_11)(s_sigma, m_d, m_d, m_X, y**4)
+    sigma2 = np.vectorize(sigma_22_11)(s_sigma, m_d, m_d, m_X, y**4, by_hand=True)
     plt.loglog(s_sigma, (sigma), label='sigma_22_11')
+    plt.loglog(s_sigma, (sigma2), label='sigma_22_11_hand')
     plt.legend()
     plt.show()
 

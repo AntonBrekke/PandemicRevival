@@ -97,7 +97,7 @@ else:
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.8e-03;full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.55e-03;full_new.dat' 
 load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
-load_str = './md_1e-05;mX_2.5e-05;sin22th_2e-14;y_5.57e-04;full_new.dat'
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_2e-14;y_5.57e-04;full_new.dat'
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat'
 data = np.loadtxt(load_str)
 T_SM = data[::data_skip_pan, 1]
@@ -175,7 +175,7 @@ ax1.loglog(x1, y1, color=c1, zorder=-1)
 # import pandemolator
 # Ttrel = pandemolator.TimeTempRelation()
 # T_nu_dec = 1.4e-3
-# ax1.fill_betweenx([1e-28, 1e5], x1[0], x_therm, color='white', alpha=1, zorder=-3)
+ax1.fill_betweenx([1e-28, 1e5], x1[0], x_therm, color='white', alpha=1, zorder=-3)
 
 ax1.axvline([x_therm], ls=':', color='0', zorder=-2)
 ax2.axvline([x_therm], ls=':', color='0', zorder=-2)
@@ -197,10 +197,10 @@ YX_max = np.max(mX*nX/ent)
 Ys_max = np.max(y1)
 if BP != 5:
     ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)], Ys_max*1e-1, r'$\nu_s$', color=c1, ha='center', va='top')
-    ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)], YX_max*1e-1, r'$X_\mu$', color=c2, ha='center', va='top')
+    ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)], YX_max*1e-1, r'$A_\mu^\prime$', color=c2, ha='center', va='top')
 else: 
     ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)]*20, Ys_max*1e-1, r'$\nu_s$', color=c1, ha='center', va='top')
-    ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)]*6, YX_max*1e-1, r'$X_\mu$', color=c2, ha='center', va='top')
+    ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)]*6, YX_max*1e-1, r'$A_\mu^\prime$', color=c2, ha='center', va='top')
 
 if BP != 5:
     BP_str = r'$\textit{BP' + f'{BP}' + r'}$'
@@ -212,7 +212,7 @@ if BP != 5:
 
 ax2.loglog(md/T_nu, Td/T_nu, color='0.4', ls='-', zorder=-4)
 
-# ax2.fill_betweenx([1e-1, 1.5e0], x1[0], x_therm, color='white', alpha=1, zorder=-3)
+ax2.fill_betweenx([1e-1, 1.5e0], x1[0], x_therm, color='white', alpha=1, zorder=-3)
 
 props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")
 
@@ -353,7 +353,7 @@ if not os.path.isfile('./' + filename) or force_write:
 
     # C_11_22_ut = np.array([C_res_vector.C_34_12(type=0, nFW=2, nBW=2, m1=m_N1, m2=m_N1, m3=m_N2, m4=m_N2, k1=k_d, k2=k_d, k3=k_d, k4=k_d, T1=T_d, T2=T_d, T3=T_d, T4=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_d, xi4=xi_d, vert=vert_el, m_d2=m_d2, m_X2=m_X2, m_h2=0, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=0, res_sub=False, thermal_width=True) / 4. for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
 
-    C_11_22_ut = np.array([C_res_vector.C_n_11_22(m_d=m_d, m_X=m_X, k_d=k_d, T_d=T_d, xi_d=xi_d, vert=vert_el, th=th, type=-1) / 4.  for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
+    C_22_11_ut = np.array([C_res_vector.C_n_11_22(m_d=m_d, m_X=m_X, k_d=k_d, T_d=T_d, xi_d=xi_d, vert=vert_el, th=th, type=-1) / 4.  for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
 
     print('Get C_22_11_DW')
     th_avg_22_11_ut_DW = np.array([C_res_vector.th_avg_sigma_v_22_11(m_N1, m_N2, T, vert_el, m_X, m_Gamma_X2) for T in T_nu_grid])
@@ -383,7 +383,7 @@ if not os.path.isfile('./' + filename) or force_write:
         C_dd_da/n_d_grid, 
         C_aa_dd/n_d_grid, 
         C_dd_aa/n_d_grid,
-        C_11_22_ut/n_d_grid,
+        C_22_11_ut/n_d_grid,
         th_avg_22_11_ut_DW)))
     print(f'Saved file in {time.time()-time_start}s')
 
@@ -403,7 +403,7 @@ C_da_dd   = data[::plot_data_skip, 10]
 C_dd_da   = data[::plot_data_skip, 11]
 C_aa_dd   = data[::plot_data_skip, 12]
 C_dd_aa   = data[::plot_data_skip, 13]
-C_11_22_ut = data[::plot_data_skip, 14]
+C_22_11_ut = data[::plot_data_skip, 14]
 th_avg_22_11_ut_DW = data[::plot_data_skip, 15]
 
 # help-function
@@ -441,7 +441,7 @@ _, th_avg_22_11_ut_DW = smooth_loglog_pchip(x_grid, abs(th_avg_22_11_ut_DW), n_p
 skip = 2
 _, C_dd_XX = smooth_loglog_pchip(x_grid[::skip], abs(C_dd_XX[::skip]), n_points)
 skip = 3
-_, C_11_22_ut = smooth_loglog_pchip(x_grid[::skip], abs(C_11_22_ut[::skip]), n_points)
+_, C_22_11_ut = smooth_loglog_pchip(x_grid[::skip], abs(C_22_11_ut[::skip]), n_points)
 x_grid = np.logspace(np.log10(x_grid.min()), np.log10(x_grid.max()), n_points)
 x_SM_grid = np.logspace(np.log10(x_SM_grid.min()), np.log10(x_SM_grid.max()), n_points)
 T_nu_grid = m_d/x_grid      # GeV 
@@ -479,7 +479,7 @@ ax3.loglog(x_grid, 1e6*abs(C_dd_X), color=c1, ls='-', zorder=-4) #114B5F
 ax3.loglog(x_grid, 1e6*abs(C_da_X), color=c2, ls='-', zorder=-4) #458751
 ax3.loglog(x_grid, 1e6*abs(C_dd_XX), color=c3, ls='-', zorder=-4) #95190C
 ax3.loglog(x_grid, 1e6*abs(C_XX_dd), color=c5, ls='-', zorder=-4) #D02411
-ax3.loglog(x_grid, 1e6*abs(C_11_22_ut), color=c4, ls='-', zorder=-4) #D02411
+ax3.loglog(x_grid, 1e6*abs(C_22_11_ut), color=c4, ls='-', zorder=-4) #D02411
 
 T_eq = (147.8e9)*(y/0.1)**4*(th**2/1e-15) * 1e-6    # GeV 
 
@@ -518,7 +518,7 @@ else:
 
 max_nus_nus = 1e6*abs(np.max(C_X_dd))
 max_nus_nus_index = np.where(np.min(np.abs(1e6*abs(C_X_dd)-max_nus_nus)) == np.abs(1e6*abs(C_X_dd)-max_nus_nus))
-ypos_nus = 10**((np.log10(max_nus_nus) + np.log10(1e6*abs(C_X_dd[x_therm_index])))/2 - 2)
+ypos_nus = 10**((np.log10(max_nus_nus) + np.log10(1e6*abs(C_X_dd[x_therm_index])))/2 - 1)
 
 if BP == 1: 
     xpos_nus = 6e-1*x_grid[max_nus_nus_index]
@@ -532,9 +532,9 @@ elif BP == 5:
     xpos_nus = 2e0
 else: 
     xpos_nus = 3e-1
-ax3.text(xpos_nus, ypos_nus, r"$N_1 N_2 \leftrightarrow X$", color=c1, rotation=0, ha='center', va='top')
-ax3.text(xpos_nus, np.max(np.abs(1e6*C_da_X)), r"$\nu N_1 \to X$", color=c2, rotation=0, ha='left', va='bottom')
-ax3.text(xpos_nus, np.max(np.abs(1e6*C_11_22_ut[x_therm_index[0][0]:]))**(1.2), r"$N_1 N_1 \to N_2 N_2$", color=c4, rotation=0, ha='left', va='bottom')
+ax3.text(xpos_nus, ypos_nus, r"$N_1 N_2 \leftrightarrow A^\prime$", color=c1, rotation=0, ha='center', va='top')
+ax3.text(xpos_nus, np.max(np.abs(1e6*C_da_X)), r"$\nu N_1 \to A^\prime$", color=c2, rotation=0, ha='left', va='bottom')
+ax3.text(xpos_nus, np.max(np.abs(1e6*C_22_11_ut[x_therm_index[0][0]:]))**(1.3), r"$N_2 N_2 \to N_1 N_1$", color=c4, rotation=0, ha='left', va='bottom')
 
 x_mult = 1.3
 y_PP_ss = 2e-28
@@ -583,8 +583,8 @@ else:
     y_sa_P = 0.9
 
 
-ax3.text(x_therm*x_ss_PP, y_ss_PP*np.abs(1e6*C_dd_XX[x_therm_index]), r"$NN \to XX$", color=c3, rotation=0, ha='left', va='bottom')
-ax3.text(x_therm*x_PP_ss, y_PP_ss, r"$XX \to NN$", color=c5, rotation=0, va='bottom')
+ax3.text(x_therm*x_ss_PP, y_ss_PP*np.abs(1e6*C_dd_XX[x_therm_index]), r"$NN \to A^\prime A^\prime$", color=c3, rotation=0, ha='left', va='bottom')
+ax3.text(x_therm*x_PP_ss, y_PP_ss, r"$A'A' \to NN$", color=c5, rotation=0, va='bottom')
 
 # ax3.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='-', color='black', label=r'$\Phi=X_\mu$')
 BP_str = r'$\textit{BP' + f'{BP}' + r'}$'
@@ -595,7 +595,7 @@ for item in legend_BP.legend_handles:
     item.set_visible(False)
 # plt.gca().add_artist(legend_BP)
 
-# ax3.fill_betweenx([1e-28, 1e0], 1e-5, x_therm, color='white', alpha=1, zorder=-3)
+ax3.fill_betweenx([1e-28, 1e0], 1e-5, x_therm, color='white', alpha=1, zorder=-3)
 ax3.axvline(x_therm, ls=':', color='0', zorder=-2)
 
 props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")

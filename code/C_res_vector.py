@@ -468,7 +468,7 @@ def C_n_XX_dd(m_d, m_X, m_h, k_d, k_X, T_d, xi_d, xi_X, vert, th, m_Gamma_h2, ty
 
     # Anton: Monte-Carlo integration of the 4 integrals from 0 to 1 
     integ = vegas.Integrator(4 * [[0., 1.]])
-    result = integ(kernel, nitn=10, neval=2e4)
+    result = integ(kernel, nitn=10, neval=2e5)
     # print(result.summary())
     # if result.mean != 0.:
     #     print("Vegas error pp dd: ", result.sdev/fabs(result.mean), result.mean, result.Q)
@@ -968,7 +968,7 @@ def C_n_11_22(m_d, m_X, k_d, T_d, xi_d, vert, th, type=0):
 
     # Anton: Monte-Carlo integration of the 4 integrals from 0 to 1 
     integ = vegas.Integrator(4 * [[0., 1.]])
-    result = integ(kernel, nitn=10, neval=1e4)
+    result = integ(kernel, nitn=10, neval=3e5)
     # print(result.summary())
     # if result.mean != 0.:
     #     print("Vegas error pp dd: ", result.sdev/fabs(result.mean), result.mean, result.Q)
@@ -1389,7 +1389,7 @@ def th_avg_sigma_v_22_11(m1, m2, T, vert, m_X, m_Gamma_X2, naive=False):
     res, err = quad(ker_th_avg_sigma_v_22_11, log(s_min), log(s_max), args=(m1, m2, T, vert, m_X), epsabs=0., epsrel=rtol_int, limit=100)
     if naive: 
         return vert/T**2
-    return 1/(4*m1**2*m2**2*T*kn(2,m1/T)*kn(2,m2/T))*res
+    return 1/(8*m1**2*m2**2*T*kn(2,m1/T)*kn(2,m2/T))*res
 
 ########################################################
 if __name__ == '__main__':
@@ -1434,7 +1434,12 @@ if __name__ == '__main__':
     time2 = time.time()
     print(f'th_avg_22_11 ran in: {time2-time1:.3f} seconds')
 
+    T_DW_end = lambda md: md*1e4 
+    sf_ic_norm_0 = lambda md: (cf.s0/(np.vectorize(cf.s_SM_no_nu)(T_DW_end(md)) + np.vectorize(cf.s_nu)(T_DW_end(md))))**(1./3.)
+    A = lambda md, th: (0.1/T_DW_end(md))**3. * cf.n_0_dw(md, th) / (sf_ic_norm_0(md)**3. * th**2.) 
+
     T_eq = (147.8e9)*(y/0.1)**4*(th**2/1e-15) * 1e-6    # GeV 
+    T_eq = (A(m_d, th)*1e9)*(y/0.1)**4*(th**2/1e-15) * 1e-6    # GeV 
     T_eq2 = (0.1)**3*m_X**2/((y/0.1)**4*(th**2/1e-15)*147.8)
     skip = 100
     # n2 = a^-3 / a_ic^-3 * n_ic, s ~ a^-3 => n2 = s / s_ic * n_ic
@@ -1462,7 +1467,6 @@ if __name__ == '__main__':
     # plt.axvline(m_d/T_nu_ic, label='m_d/T_nu_ic')
     plt.loglog(x, 1e6*H, label='H')
     # plt.loglog(x[::skip], 1e6*abs(C_22_11), label='th_avg_22_11')
-    print(C_22_11)
     plt.loglog(x[::skip], 1e6*abs(nd_dw[::skip]*C_22_11), label='C_22_11')
     plt.loglog(x[::skip], 1e6*abs(nd_dw[::skip]*C_22_11_naive), label='C_22_11_naive')
     plt.xlabel('m/T')

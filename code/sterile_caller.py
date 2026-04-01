@@ -611,12 +611,13 @@ if __name__ == '__main__':
     # m_X = 2.5*m_d
     # y = 1e-4
     # sin2_2th = 4.85e-13
+    # BP2 
     m_d = 1e-5
     m_N1 = m_d
     m_N2 = m_d
     m_X = 2.5*m_d
-    y = 1e-4
-    sin2_2th = 4.85e-13
+    y = 2.522e-3
+    sin2_2th = 5e-16
 
     print('mi/m0 << 1 :', f'{ma/m0:.3e}, {m2/m0:.3e}, {m12/m0:.3e}')
     print('mi^2/m0 << m12 :', f'{ma**2/m12:.3e}, {m2**2/m12:.3e}')

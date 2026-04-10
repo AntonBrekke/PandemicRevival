@@ -35,8 +35,8 @@ ma = m12*1e-2
 
 # Anton: Fermion (Fermi) = 1, Boson = -1 (Bose)
 k_d = 1.
-k_X = -1.   
-k_nu= 1.        
+k_X = -1.
+k_nu= 1.
 
 dof_d = 2.      # Anton: Fermion 2 spin dof.
 dof_X = 3.      # Anton: Massive vector boson 3 polarization dof.

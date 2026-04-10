@@ -1,19 +1,17 @@
 #! /usr/bin/env python3
 
 import numpy as np
-from math import cos, sin, asin, sqrt, exp, log
+from math import asin, sqrt, exp, log
 from scipy.integrate import solve_ivp
 import time
 
 import constants_functions as cf
 import utils
-import densities as dens
 
-import scalar_mediator
 import vector_mediator
 import pandemolator as pandemolator
 
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 
 GF = 1.166378e-5
 mZ = 91.1876
@@ -37,7 +35,7 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
 
     print(f'y: {y:.3e}, sin^2(th): {sin2_2th:.3e}')
     print(f'y^4: {y**4:.3e}, y^2 sin^2(2th): {y**2*sin2_2th:.3e}')
-    
+
     M2_X_12 = 2.*y2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)/m_X2
     # Anton: M2_X_10 IS NEVER USED 
     # M2_X_10 = 2.*y2*C_10**2 * (m_X+m_N1-m0)*(m_X-m_N1+m0)*(2*m_X2 + (m_N1+m0)**2)/m_X2
@@ -95,7 +93,7 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
                 """
                 if T_a < m_X / 50:
                     return 0.
-                
+
                 # th, m_Gamma_h2 do not matter anymore
                 # as long as mN1 = mN2, xiN1 = xiN2, TN1 = TN2, do not need CX_XX_22 separately -- just add factor 2 
                 CX_XX_11 = C_res_vector.C_n_XX_dd(m_d=m_N1, m_X=m_X, m_h=m_h, k_d=k_d, k_X=k_X, T_d=T_d, xi_d=xi_d, xi_X=xi_X, vert=vert_el, th=0, m_Gamma_h2=0, type=0) / 4.
@@ -104,11 +102,8 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
                     CX_X_1nu = C_res_vector.C_n_3_12(m1=m_N1, m2=m_nu, m3=m_X, k1=k_d, k2=k_nu, k3=k_X, T1=T_d, T2=T_a, T3=T_d, xi1=xi_d, xi2=0., xi3=xi_X, M2=M2_X_1nu, type=0)
                 else:
                     # Anton: NOT UPDATED 
-                    C_da = 0.
-                    C_aa = 0.
-                    C_da_dd = C_res_vector.C_34_12(type=0, nFW=1., nBW=-1., m1=m_d, m2=m_d, m3=m_d, m4=m_nu, k1=k_d, k2=k_d, k3=k_d, k4=k_nu, T1=T_d, T2=T_d, T3=T_d, T4=T_a, xi1=xi_d, xi2=xi_d, xi3=xi_d, xi4=0., vert=vert_tr, m_d2=m_d**2, m_X2=m_X2, m_h2=m_h2, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=m_Gamma_h2, res_sub=False, thermal_width=True) / 2.
-                    
-                    C_aa_dd = C_res_vector.C_34_12(type=0, nFW=2., nBW=-2., m1=m_d, m2=m_d, m3=m_nu, m4=m_nu, k1=k_d, k2=k_d, k3=k_nu, k4=k_nu, T1=T_d, T2=T_d, T3=T_a, T4=T_a, xi1=xi_d, xi2=xi_d, xi3=0., xi4=0., vert=vert_fi, m_d2=m_d**2, m_X2=m_X2, m_h2=m_h2, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=m_Gamma_h2, res_sub=False, thermal_width=True) / 4.
+                    print("off_shell=True is not implemented in minimal version.")
+                    exit(1)
 
                 x = m_d / T_a
                 if call.count % 10 == 0:
@@ -125,7 +120,7 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
 
                 print("C_ns:", f'{CX_XX_11:.5e}', f'{CX_X_1nu:.5e}')
                 return CX_X_1nu + 4*CX_XX_11
-            
+
             # rho = rho_N1 + rho_N2 + rho_X
             def C_rho(T_a, T_d, xi_d, xi_X):
                 """
@@ -151,148 +146,52 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
 
                 else:
                     # Anton: NOT UPDATED
-                    C_da = 0.
-                    C_aa = 0.
-                    # C_da_X_dd = C_res_vector.C_34_12(type=4, nFW=1., nBW=-1., m1=m_d, m2=m_d, m3=m_d, m4=m_nu, k1=k_d, k2=k_d, k3=k_d, k4=k_nu, T1=T_d, T2=T_d, T3=T_d, T4=T_a, xi1=xi_d, xi2=xi_d, xi3=xi_d, xi4=0., vert=vert_tr, m_d2=m_d2, m_X2=m_X2, m_h2=m_h2, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=m_Gamma_h2, res_sub=False, thermal_width=True) / 2.
-                    # C_da_h_dd = C_res_scalar.C_34_12(type=4, nFW=1, nBW=-1, m1=m_d, m2=m_d, m3=m_d, m4=m_nu, k1=k_d, k2=k_d, k3=k_d, k4=k_nu, T1=T_d, T2=T_d, T3=T_d, T4=T_a, xi1=xi_d, xi2=xi_d, xi3=xi_d, xi4=xi_d, vert=vert_tr*(4*m_d2/m_X2)**2, m_phi2=m_h2, m_Gamma_phi2=m_Gamma_h2, res_sub=False, thermal_width=True) / 2.
-                    # C_da_dd = C_da_X_dd + C_da_h_dd
-                    C_aa_dd = 0. #C_res_vector.C_34_12(12, 1., -1., m_d, m_d, m_nu, m_nu, k_d, k_d, k_nu, k_nu, T_d, T_d, T_a, T_a, xi_d, xi_d, 0., 0., vert_fi, m_X2, m_Gamma_X2, res_sub=False, thermal_width=True) / 4.
-                # print("C_rhos:", f'{C_X_da:.5e}', f'{C_h_da:.5e}', f'{2.*C_X_aa:.5e}', f'{C_h_aa:.5e}')
+                    print("off_shell=True is not implemented in minimal version.")
+                    exit(1)
                 return C_X_1nu
-            
+
             def C_xi0(T_a, T_d, xi_d, xi_X):
                 # Anton: C_n with xi=0
                 if T_a < m_X / 50.:
                     return 0.
                 C_XX_dd = np.abs(C_res_vector.C_n_XX_dd(m_d=m_N1, m_X=m_X, m_h=m_h, k_d=k_d, k_X=k_X, T_d=T_d, xi_d=xi_d, xi_X=xi_X, vert=vert_el, th=th, m_Gamma_h2=m_Gamma_h2, type=1) / 4.)
 
-                C_dd_XX = np.abs(C_res_vector.C_n_XX_dd(m_d=m_N1, m_X=m_X, m_h=m_h, k_d=k_d, k_X=k_X, T_d=T_d, xi_d=xi_d, xi_X=xi_X, vert=vert_el, th=th, m_Gamma_h2=m_Gamma_h2, type=-1) / 4.)                
-                
+                C_dd_XX = np.abs(C_res_vector.C_n_XX_dd(m_d=m_N1, m_X=m_X, m_h=m_h, k_d=k_d, k_X=k_X, T_d=T_d, xi_d=xi_d, xi_X=xi_X, vert=vert_el, th=th, m_Gamma_h2=m_Gamma_h2, type=-1) / 4.)
+
                 # Anton: Decay-rates will always be larger than 2-to-2
                 return min(4.*C_XX_dd, 4.*C_dd_XX)
-            
+
             def C_therm(T_d, xi_d, xi_X):
 
                 C_dd_X = C_res_vector.C_n_3_12(m1=m_N1, m2=m_N2, m3=m_X, k1=k_d, k2=k_d, k3=k_X, T1=T_d, T2=T_d, T3=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_X, M2=M2_X_12, type=1) / 2.
 
                 return 4.*(C_dd_X)
-            
+
             def C_therm_kd(T_d, xi_d, xi_X):
                 if T_d > m_X:
                     C_X_12 = C_res_vector.C_n_3_12(m1=m_N1, m2=m_N2, m3=m_X, k1=k_d, k2=k_d, k3=k_X, T1=T_d, T2=T_d, T3=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_X, M2=M2_X_12, type=1)
 
                     return 2*C_X_12
-                
+
                 elif m_d / T_d - xi_d < 4.:
-                    
                     C_12_12 = C_res_vector.C_34_12(type=0, nFW=1., nBW=0., m1=m_N1, m2=m_N2, m3=m_N1, m4=m_N2, k1=k_d, k2=k_d, k3=k_d, k4=k_d, T1=T_d, T2=T_d, T3=T_d, T4=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_d, xi4=xi_d, vert=vert_el, m_d2=m_N12, m_X2=m_X2, m_h2=m_h2, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=m_Gamma_h2, res_sub=False, thermal_width=True)
-                
+
                     return 2*C_12_12
-                
+
                 C_dd_X_dd_gon_gel = C_res_vector_no_spin_stat.C_dd_dd_gon_gel(m_d=m_d, k_d=k_d, T_d=T_d, xi_d=xi_d, vert_el=vert_el, m_X2=m_X2, m_h2=m_h2, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=m_Gamma_h2, res_sub=False) / 4.
-                # C_dd_h_dd_gon_gel = C_res_scalar_no_spin_stat.C_dd_dd_gon_gel(m_d=m_d, k_d=k_d, T_d=T_d, xi_d=xi_d, vert_el=vert_el*(4*m_d2/m_X2)**2, m_phi2=m_h2, m_Gamma_phi2=m_Gamma_h2, res_sub=False) / 4.
 
                 # Anton: Lacks the cross-term 
                 # return 2.*(C_dd_X_dd_gon_gel + C_dd_h_dd_gon_gel)
                 return 2.*(C_dd_X_dd_gon_gel)
         else:
             # Anton: THIS IS NOT UPDATEED/IMPLEMENTED
-            print("Implementation needs to be updated...")
+            print("This mass relation is not implemented in minimal version.")
             exit(1)
-            import C_res_vector_no_spin_stat as C_res_vector_no_spin_stat
-            # n = n_d + n_X
-            def C_n(T_a, T_d, xi_d, xi_X):
-                C_da = 0.# vanishes since net number change is zero
-                C_aa = 0.#C_res_vector.C_n_3_12(m_nu, m_nu, m_X, k_nu, k_nu, k_X, T_a, T_a, T_d,   0.,   0., xi_X, M2_aa) / 2.
-                C_da_dd = C_res_vector.C_34_12(0, 1., -1., m_d, m_d, m_d, m_nu, k_d, k_d, k_d, k_nu, T_d, T_d, T_d, T_a, xi_d, xi_d, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, res_sub=False) / 2.
-                C_aa_da = 0.#C_res_vector.C_34_12(0, 1., -1., m_d, m_nu, m_nu, m_nu, k_d, k_nu, k_nu, k_nu, T_d, T_a, T_a, T_a, xi_d, 0., 0., 0., vert_fi_1, m_X2, m_Gamma_X2, res_sub=False) / 2.
-                C_aa_dd = 0.#C_res_vector.C_34_12(0, 2., -2., m_d, m_d, m_nu, m_nu, k_d, k_d, k_nu, k_nu, T_d, T_d, T_a, T_a, xi_d, xi_d, 0., 0., vert_fi_2, m_X2, m_Gamma_X2, res_sub=False) / 4.
-                return C_da + C_aa + C_da_dd + C_aa_da + C_aa_dd
-            # rho = rho_d + rho_X
-            def C_rho(T_a, T_d, xi_d, xi_X):
-                C_da = C_res_vector.C_rho_3_12(2, m_d, m_nu, m_X, k_d, k_nu, k_X, T_d, T_a, T_d, xi_d, 0., xi_X, M2_X_da)
-                C_aa = 0.#C_res_vector.C_rho_3_12(3, m_nu, m_nu, m_X, k_d, k_nu, k_X, T_a, T_a, T_d,   0., 0., xi_X, M2_aa) / 2. # symmetry factor 1/2
-                C_da_dd = C_res_vector.C_34_12(4, 1., -1., m_d, m_d, m_d, m_nu, k_d, k_d, k_d, k_nu, T_d, T_d, T_d, T_a, xi_d, xi_d, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, res_sub=False) / 2.
-                C_aa_da = 0.#C_res_vector.C_34_12(1, 1., -1., m_d, m_nu, m_nu, m_nu, k_d, k_nu, k_nu, k_nu, T_d, T_a, T_a, T_a, xi_d, 0., 0., 0., vert_fi_1, m_X2, m_Gamma_X2, res_sub=False) / 2.
-                C_aa_dd = 0.#C_res_vector.C_34_12(12, 1., -1., m_d, m_d, m_nu, m_nu, k_d, k_d, k_nu, k_nu, T_d, T_d, T_a, T_a, xi_d, xi_d, 0., 0., vert_fi_2, m_X2, m_Gamma_X2, res_sub=False) / 4.
-                return C_da + C_aa + C_da_dd + C_aa_da + C_aa_dd
-            def C_xi0(T_a, T_d, xi_d, xi_X):
-                return 0.
-            def C_therm(T_d, xi_d, xi_X): # use collision operators without spin-stat. factors, only proxy here
-                return 0.
-                C_dd_XX = C_res_vector_no_spin_stat.C_12_34(m_d, m_d, m_d, m_d, k_d, k_d, T_d, T_d, xi_d, xi_d, vert_el, m_X2, m_Gamma_X2, type=0, res_sub=False) / 4.
-                C_pp_dd = C_res_vector_no_spin_stat.C_pp_dd(m_d, m_X, k_X, T_d, xi_X, vert_el, type=0) / 4.
-                return min(2.*C_dd_dd, 2.*C_pp_dd)
-            def C_therm_kd(T_d, xi_d, xi_X):
-                # C_dd_dd = C_res_vector_no_spin_stat.C_12_34(m_d, m_d, m_d, m_d, k_d, k_d, T_d, T_d, xi_d, xi_d, vert_el, m_X2, m_Gamma_X2, type=0, res_sub=False) / 4.
-                C_dd_dd = C_res_vector_no_spin_stat.C_dd_dd_gon_gel(m_d, k_d, T_d, xi_d, vert_el, m_X2, m_Gamma_X2, res_sub=False) / 4.
-                return 2.*C_dd_dd
-        # def G_d(T_d, xi_d, xi_X):
-        #     return C_res_vector.Gamma_scat(T_d, m_d, m_d, m_X, k_d, k_X, T_d, T_d, xi_d, xi_X, M2_dd)
     else:
         # Anton: THIS IS NEVER CALLED AS LONG AS spin_fac=True
-        import C_res_vector_no_spin_stat as C_res_vector
-        if m_X > 2.*m_d:
-            # n = n_d + 2.*n_X
-            def C_n(T_a, T_d, xi_d, xi_X):
-                if T_a < m_X / 50.:
-                    return 0.
-                C_XX_dd = (-C_res_vector.C_XX_dd(m_d, m_X, k_X, T_d, xi_X, vert_el, type=0) + C_res_vector.C_dd_XX(m_d, m_X, k_d, T_d, xi_d, vert_el, type=0)) / 4. # symmetry factor 1/4
-                if not off_shell:
-                    C_da = C_res_vector.C_12_3(m_d, m_nu, m_X, k_d, k_nu, T_d, T_a, xi_d, 0., M2_X_da, type=0)
-                    C_da_dd = 0.
-                else:
-                    C_da = 0.
-                    C_da_dd = C_res_vector.C_12_34(m_d, m_nu, m_d, m_d, k_d, k_nu, T_d, T_a, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, type=0, res_sub=False) / 2.
-                return C_da + C_da_dd + 2.*C_XX_dd
-            # rho = rho_d + rho_X
-            def C_rho(T_a, T_d, xi_d, xi_X):
-                if T_a < m_X / 50.:
-                    return 0.
-                if not off_shell:
-                    C_da = C_res_vector.C_12_3(m_d, m_nu, m_X, k_d, k_nu, T_d, T_a, xi_d, 0., M2_X_da, type=1)
-                    C_da_dd = 0.
-                else:
-                    C_da = 0.
-                    C_da_dd = C_res_vector.C_12_34(m_d, m_nu, m_d, m_d, k_d, k_nu, T_d, T_a, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, type=1, res_sub=False) / 2.
-                return C_da + C_da_dd
-            def C_xi0(T_a, T_d, xi_d, xi_X):
-                if T_a < m_X / 50.:
-                    return 0.
-                C_XX_dd = C_res_vector.C_XX_dd(m_d, m_X, k_X, T_d, xi_X, vert_el, type=0) / 4.
-                return 2.*C_XX_dd
-            def C_therm(T_d, xi_d, xi_X):
-                C_dd_X = C_res_vector.C_12_3(m_d, m_d, m_X, k_d, k_d, T_d, T_d, xi_d, xi_d, M2_X_dd, type = 0) / 2.
-                return 2. * C_dd_X
-            def C_therm_kd(T_d, xi_d, xi_X):
-                C_dd_dd = C_res_vector.C_dd_dd_gon_gel(m_d, k_d, T_d, xi_d, vert_el, m_X2, m_Gamma_X2, res_sub=False) / 4.
-                return 2.*C_dd_dd
-        else:
-            print("Implementation needs to be updated...")
-            exit(1)
-            # n = n_d + n_X
-            def C_n(T_a, T_d, xi_d, xi_X):
-                C_da = 0.# vanishes since net number change is zero
-                C_da_dd = C_res_vector.C_12_34(m_d, m_nu, m_d, m_d, k_d, k_nu, T_d, T_a, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, type=0, res_sub=False) / 2.
-                return C_da_dd
-            # rho = rho_d + rho_X
-            def C_rho(T_a, T_d, xi_d, xi_X):
-                C_da = C_res_vector.C_12_3(m_d, m_nu, m_X, k_d, k_nu, T_d, T_a, xi_d, 0., M2_X_da, type=1)
-                C_da_dd = C_res_vector.C_12_34(m_d, m_nu, m_d, m_d, k_d, k_nu, T_d, T_a, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, type=1, res_sub=False) / 2.
-                return C_da + C_da_dd
-            def C_xi0(T_a, T_d, xi_d, xi_X):
-                return 0.
-            def C_therm(T_d, xi_d, xi_X):
-                return 0.
-                # return C_res_vector.C_12_3(m_d, m_nu, m_X, k_d, k_nu, T_d, T_a, xi_d, 0., M2_da, type=0)
-                C_dd_dd = C_res_vector.C_12_34(m_d, m_d, m_d, m_d, k_d, k_d, T_d, T_d, xi_d, xi_d, vert_el, m_X2, m_Gamma_X2, type=0, res_sub=False) / 4.
-                C_pp_dd = C_res_vector.C_pp_dd(m_d, m_X, k_X, T_d, xi_X, vert_el, type=0) / 4.
-                return [2.*C_dd_dd, 2.*C_pp_dd]
-            def C_therm_kd(T_d, xi_d, xi_X):
-                C_dd_dd = C_res_vector.C_dd_dd_gon_gel(m_d, k_d, T_d, xi_d, vert_el, m_X2, m_Gamma_X2, res_sub=False) / 4.
-                return 2.*C_dd_dd
-        # def G_d(T_d, xi_d, xi_X):
-        #     return C_res_vector.Gamma_scat(T_d, m_d, m_d, m_X, k_d, T_d, xi_X, M2_dd)
+        print("spin_fac=false is not implemented in minimal version.")
+        exit(1)
+
 
     # Anton: Calculate SM neutrino temperature
     Ttrel = pandemolator.TimeTempRelation()
@@ -307,16 +206,16 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
 
     # Anton: Run main computation 
     pan = pandemolator.Pandemolator(
-        m_N1, m_N2, m_X, m_h, m_nu, 
+        m_N1, m_N2, m_X, m_h, m_nu,
         k_d, k_X, k_nu,
-        dof_d, dof_X, 
-        C_n, C_rho, C_xi0, 
-        Ttrel.t_grid, 
-        Ttrel.T_nu_grid, 
-        Ttrel.dTnu_dt_grid, 
-        ent_grid, 
-        Ttrel.hubble_grid, 
-        Ttrel.sf_grid, 
+        dof_d, dof_X,
+        C_n, C_rho, C_xi0,
+        Ttrel.t_grid,
+        Ttrel.T_nu_grid,
+        Ttrel.dTnu_dt_grid,
+        ent_grid,
+        Ttrel.hubble_grid,
+        Ttrel.sf_grid,
         i_ic, n_ic, rho_ic, i_end)
 
     # time1 = time.time()
@@ -536,50 +435,12 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
         print('Error: return nan')
         return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, True
 
-    # print(m_d/T_d_kd, lo_v_kd + nlo_v_kd +nnlo_v_kd)
-    # fs_length_cum_int = utils.cumsimp(Ttrel.t_grid[pan.i_ic+i_kd:i_fs_max], integrand_fs_length[:i_fs_max])
-    # print(fs_length_cum_int[-1])
-    # utils.simp(Ttrel.t_grid[pan.i_ic+i_kd:], sf_kd_norm_today*nlo_v_kd/(sf_norm_kd**4.)), utils.simp(Ttrel.t_grid[pan.i_ic+i_kd:], sf_kd_norm_today*nnlo_v_kd/(sf_norm_kd**6.)))
 
-    # np.savetxt('tmp.dat', np.column_stack((Ttrel.t_grid[i_ic:], Ttrel.T_SM_grid[i_ic:], Ttrel.T_nu_grid[i_ic:], Ttrel.sf_grid[i_ic:], ent_grid[i_ic:], T_d_grid, xi_d_grid, n_d_grid)))
-    # np.savetxt('tmp_2.dat', np.array([i_kd, lo_v_kd, nlo_v_kd, nnlo_v_kd]))
-
-    # plt.loglog(Ttrel.T_SM_grid[i_ic+i_kd:]/cf.T0, fs_length_cum_int/cf.Mpc)
-    # plt.show()
-    # plt.loglog(m_d/Ttrel.T_nu_grid[i_ic:], T_d_grid*(Ttrel.sf_grid[i_ic:]**2.))
-    # plt.show()
-    # plt.semilogx(m_d/Ttrel.T_nu_grid[i_ic:], xi_d_grid - m_d/T_d_grid)
-    # plt.show()
-    # plt.loglog(m_d/Ttrel.T_nu_grid[i_ic:], 3.*Ttrel.hubble_grid[i_ic:]*n_d_grid, color='dodgerblue')
-    # plt.loglog(m_d/Ttrel.T_nu_grid[i_ic:], C_therm_grid, color='#458751')
-    # plt.show()
-    # def V_SM(T_SM, T_nu):
-    #     rho_nu = 2.*(7./8.)*(cf.pi2/30.)*(T_nu**4.)
-    #     rho_a = cf.rho_fermion(T_SM, 0.511e-3, 2.)
-    #     return -(8.*sqrt(2)*GF*T_nu/3.)*(rho_nu/(mZ**2.) + rho_a/(mW**2.))
-    #
-    # def V_d(T_d):
-    #     return y2*T_d*T_d/(16.*np.sqrt(T_d*T_d+m_d*m_d)) if T_d > m_X else -y2*np.sqrt(T_d*T_d+m_d*m_d)*0.75*2.*m_d*m_d*T_d*T_d*np.exp(-m_d/T_d)/(cf.pi2*m_X2*m_X2)#-7.*cf.pi2*y2*np.sqrt(T_d*T_d+m_d*m_d)*(T_d**4.)/(90.*m_X2*m_X2)
-    #
-    # def G_a(T_nu):
-    #     return 1.27*(GF**2.)*(T_nu**5.)
-    #
-    # V_SM_grid = np.array([V_SM(T_SM, T_nu) for T_SM, T_nu in zip(Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1])])
-    # V_d_grid = np.array([V_d(T_d) for T_d in pan.T_chi_grid_sol])
-    # G_a_grid = np.array([G_a(T_nu) for T_nu in Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1]])
-    # G_d_grid = np.array([G_d(T_d, xi_d, xi_X) for T_d, xi_d, xi_X in zip(pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol)])
-    
 if __name__ == '__main__':
-
-
-
-    # load_str = './md_2.1e-05;mX_1.05e-04;mh_6.3e-05;sin22th_1.5e-15;y_1.4e-03;full_new.dat'    
-    # var_list = load_str.split(';')[:-1]
-    # m_d, m_X, m_h, sin2_2th, y = [eval(s.split('_')[-1]) for s in var_list]
     # Anton: Ignore these masses 
     m_h = 0
     m_nu = 0
-    
+
     # Anton: Actual masses - assume m_N1 = m_N2
     m_d = 1e-5
     m_N1 = m_d
@@ -634,6 +495,7 @@ if __name__ == '__main__':
     dof_X = 3.
 
     # Anton: If spin-statistics (1+k*f) matters, if the mediator is off-shell or not 
+    # HM: spin_facs and off_shell are only implemented for these values.
     spin_facs = True
     off_shell = False
     run_sim = True

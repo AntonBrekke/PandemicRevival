@@ -33,7 +33,7 @@ m2 = 1e-2
 ma = m12*1e-2
 # sin2_2th = (m2*ma/(m0*m12))**2
 
-# Anton: Fermion (Fermi) = 1, Boson = 1 (Bose)
+# Anton: Fermion (Fermi) = 1, Boson = -1 (Bose)
 k_d = 1.
 k_X = -1.   
 k_nu= 1.        

@@ -980,6 +980,233 @@ def C_n_11_22(m_d, m_X, k_d, T_d, xi_d, vert, th, type=0):
     return result.mean*chem_eq_fac/(256.*(pi**6.))
 
 
+# @nb.jit(nopython=True, cache=True)
+def ker_C_n_XX_pp_s_t(ct_min, ct_max, ct_p, ct_m, a, s, E1, E3, p1, p3, m_d, m_X, vert):
+
+    """
+    Solved for matrix-element and integrated over variable t in collision
+    operator using Mathematica, int_Rt |M|^2/sqrt((t-tm)*(t-tp)). 
+    These expressions can be found in nu_s_nu_s_to_XX.nb
+    """
+    n = s.size
+    s2 = s*s
+    m_d2 = m_d*m_d
+    m_d4 = m_d2*m_d2
+    m_d6 = m_d2*m_d4
+    m_d8 = m_d4*m_d4
+    m_X2 = m_X*m_X
+    m_X4 = m_X2*m_X2
+    m_X6 = m_X2*m_X4
+    m_X8 = m_X4*m_X4
+
+    # t_max,min - t_m,p = 2p1*p3*(ct_max - ct_m)
+    t_add = m_d2 + m_X2
+    t_min = t_add - 2.*E1*(E3 - p1*p3/E1*ct_min)
+    t_max = t_add - 2.*E1*(E3 - p1*p3/E1*ct_max)
+    t_m = t_add - 2.*E1*(E3 - p1*p3/E1*ct_m)
+    t_p = t_add - 2.*E1*(E3 - p1*p3/E1*ct_p)
+    
+    """
+    Anton: 
+    x = t - tm, y = t - tp 
+    sqrt(x)*sqrt(y) / sqrt(x*y) appears in expressions, makes trouble. 
+    This is either 1 for (x>0 or y>0) and -1 for (x<0 and y<0).
+    ill-defined for x->0, y->0 wrt. limit to 0+ or 0-.
+    x>=0 & y>=0 -> 1
+    x>=0 & y<=0 -> 1
+    x<=0 & y>=0 -> 1
+    x<=0 & y<=0 -> -1
+    t_m > t_p always. 
+    t_m >= t_max > t_min >= t_p 
+    X_max = t_max - t_m, Y_max = t_max - t_p
+    X_min = t_min - t_m, Y_min = t_min - t_p
+    For all non-zero integration regions of ct_max, ct_min
+    Y_max > 0 always => sqrt_fac_tmax = 1.
+    Always have X_min < 0, and Y_min >= 0. For = case, 
+    as ct_min --> c_p from above, Y_min --> 0+.
+    Therefore, sqrt_fac_tmin = 1 as well.
+    """    
+    
+    M2 = vert*(8 + (s-2*m_X2)**2/m_X4)
+    # integral 1/sqrt(c*(x-a)*(x-b)) given c < 0 and a < x < b is 
+    # = 1/sqrt(-a) * arcsinh((2x-a-b) / (b-a)) 
+    # c = a, a = t_p, b = t_m
+
+    int_max = M2 * 1/np.sqrt(-a) * np.arcsinh((2*t_max-t_p-t_m)/(t_m-t_p))
+    int_min = M2 * 1/np.sqrt(-a) * np.arcsinh((2*t_min-t_p-t_m)/(t_m-t_p))
+
+    return (int_max - int_min).real
+
+# @nb.jit(nopython=True, cache=True)
+def ker_C_n_XX_pp_s(s, E1, E2, E3, p1, p3, m_phi, m_X, m_h, s12_min, s12_max, s34_min, s34_max, vert, th, m_Gamma_h2):
+    p12 = p1*p1
+    p32 = p3*p3
+    # Anton: a,b,c definition in a*cos^2 + b*cos + c = 0 in integrand
+    a = np.fmin(-4.*p32*((E1+E2)*(E1+E2) - s), -1e-200)
+    b = 2.*(p3/p1)*(s-2.*E1*(E1+E2))*(s-2.*E3*(E1+E2))
+    sqrt_arg = 4.*(p32/p12)*(s-s12_min)*(s-s12_max)*(s-s34_min)*(s-s34_max)
+    sqrt_fac = np.sqrt(np.fmax(sqrt_arg, 0.))
+
+    # Anton: ct_p, ct_m solutions of a*cos^2 + b*cos + c = 0 for cos. ct_m > ct_p
+    ct_p = (-b + sqrt_fac)/(2.*a)
+    ct_m = (-b - sqrt_fac)/(2.*a)
+    # Anton: R_theta integration region {-1 <= cos <= 1 | ct_p <= cos <= ct_m}
+    ct_min = np.fmin(np.fmax(-1., ct_p), 1.)
+    ct_max = np.fmax(np.fmin(1., ct_m), ct_min)
+    in_res = (ct_max > ct_min)
+
+    # Anton: return zero for integral if it is not inside defined region.
+    # x = [0,0,0], x[[True,False,True]] = [1,2,3] => x = [1,0,3]
+    t_int = np.zeros(s.size)
+    # print(in_res.size)
+    # if np.count_nonzero(in_res) == 0: 
+    #     return t_int
+    # t_int[in_res] = ker_C_n_XX_dd_s_t_integral_new_3(ct_min[in_res], ct_max[in_res], ct_p[in_res], ct_m[in_res], a[in_res], s[in_res], E1[in_res], E3[in_res], p1[in_res], p3[in_res], m_phi, m_X, vert)
+    # t_int[in_res] = ker_C_n_XX_dd_s_t_integral_Higgs_new(ct_min[in_res], ct_max[in_res], ct_p[in_res], ct_m[in_res], a[in_res], s[in_res], E1[in_res], E3[in_res], p1[in_res], p3[in_res], m_phi, m_X, m_h, vert, th, m_Gamma_h2)
+
+    t_int[in_res] = ker_C_n_XX_pp_s_t(ct_min[in_res], ct_max[in_res], ct_p[in_res], ct_m[in_res], a[in_res], s[in_res], E1[in_res], E3[in_res], p1[in_res], p3[in_res], m_phi, m_X, vert)
+
+    return t_int
+
+# 3 4 -> 1 2 <=> X X -> d d
+# @nb.jit(nopython=True, cache=True)
+def ker_C_n_XX_pp(x, m_phi, m_X, m_h, k_phi, k_X, T_d, xi_phi, xi_X, vert, th, m_Gamma_h2):
+    """
+    Anton: Seems like E1 <--> E3, E2 <--> E4 compared to article.
+    Set up for production of X. 
+    """
+    log_E3_min = log(m_X*offset)
+    log_E3_max = log(max((max_exp_arg + xi_X)*T_d, 1e1*m_X))
+    E3 = np.exp(np.fmin(log_E3_min * (1.-x[:,0]) + log_E3_max * x[:,0], 6e2))
+
+    E4_min = np.fmax(2.*m_phi-E3, m_X*offset)
+    log_E4_min = np.log(E4_min)
+    log_E4_max = np.log(np.fmax(1e1*E4_min, (max_exp_arg + xi_X)*T_d))
+    E4 = np.exp(np.fmin(log_E4_min * (1.-x[:,1]) + log_E4_max * x[:,1], 6e2))
+
+    log_E1_min = np.log(m_phi*offset)
+    log_E1_max = np.log(np.fmax(E3+E4-m_phi, m_phi*offset))
+    E1 = np.exp(np.fmin(log_E1_min * (1.-x[:,2]) + log_E1_max * x[:,2], 6e2))
+    E2 = E3 + E4 - E1
+
+    exp_arg_1 = E1/T_d - xi_phi
+    exp_arg_2 = E2/T_d - xi_phi
+    exp_arg_3 = E3/T_d - xi_X
+    exp_arg_4 = E4/T_d - xi_X
+    exp_1 = np.exp(np.fmin(-exp_arg_1, max_exp_arg))
+    exp_2 = np.exp(np.fmin(-exp_arg_2, max_exp_arg))
+    exp_3 = np.exp(np.fmin(-exp_arg_3, max_exp_arg))
+    exp_4 = np.exp(np.fmin(-exp_arg_4, max_exp_arg))
+    f1 = exp_1/(1. + k_phi*exp_1)
+    f2 = exp_2/(1. + k_phi*exp_2)
+    f3 = exp_3/(1. + k_X*exp_3)
+    f4 = exp_4/(1. + k_X*exp_4)
+    # Anton: Assumed 1,2 in final state
+    dist = f3*f4*(1.-k_phi*f1)*(1.-k_phi*f2)
+    # dist = f1*f2*(1.-k_phi*f3)*(1.-k_phi*f4)
+
+    # Anton: Three-momentum p^2 = E^2 - m^2 = (E - m)*(E + m)
+    p1 = np.sqrt(np.fmax((E1-m_phi)*(E1+m_phi), 1e-200))
+    p2 = np.sqrt(np.fmax((E2-m_phi)*(E2+m_phi), 1e-200))
+    p3 = np.sqrt(np.fmax((E3-m_X)*(E3+m_X), 1e-200))
+    p4 = np.sqrt(np.fmax((E4-m_X)*(E4+m_X), 1e-200))
+
+    s12_min = np.fmax(2.*m_phi*m_phi+2.*E1*(E2-p1*p2/E1), 4.*m_phi*m_phi)
+    s12_max = 2.*m_phi*m_phi+2.*E1*E2+2.*p1*p2
+    s34_min = np.fmax(2.*m_X*m_X+2.*E3*(E4-p3*p4/E3), 4.*m_X*m_X)
+    s34_max = 2.*m_X*m_X+2.*E3*E4+2.*p3*p4
+    log_s_min = np.log(np.fmax(np.fmax(s12_min, s34_min), 1e-200))
+    log_s_max = np.log(np.fmax(np.fmin(s12_max, s34_max), 1e-200))
+    s = np.exp(np.fmin(log_s_min * (1.-x[:,3]) + log_s_max * x[:,3], 6e2))
+
+    ker_s = ker_C_n_XX_pp_s(s, E1, E2, E3, p1, p3, m_phi, m_X, m_h, s12_min, s12_max, s34_min, s34_max, vert, th, m_Gamma_h2)
+    ker_s[~np.isfinite(ker_s)] = 0.0
+
+    jac = E3*(log_E3_max-log_E3_min)*E4*(log_E4_max-log_E4_min)*E1*(log_E1_max-log_E1_min)*s*(log_s_max-log_s_min)
+    res = jac*p3*dist*ker_s
+    res[np.logical_not(np.isfinite(res))] = 0.
+    return res
+
+# type == -1: only X X -> d d, type == 0: both reactions, type == 1: only d d -> X X, type == 2: (X X -> d d, d d -> X X)
+def C_n_XX_pp(m_phi, m_X, m_h, k_phi, k_X, T_d, xi_phi, xi_X, vert, th, m_Gamma_h2, type=0):
+    """
+    Anton: 
+    Collision operator C[X]_XX_pp for X, C[X]_XX_pp = -C[phi]_XX_pp.
+    1,2 = phi,phi, 3,4 = X,X
+    
+    dist = f3*f4*f1t*f2t
+    type = -1, XX --> pp
+    -f3*f4*f1t*f2t = -1*dist
+    --> chem_eq_fac = -1
+
+    type = 0, XX <--> dd
+    f1*f2*f3t*f4t - f1t*f2t*f3*f4 = (exp(xi1 + xi2 - xi3 - x4) - 1)*dist
+    --> chem_eq_fac = (exp(2*(xi_d - xi_X)) - 1)
+
+    type = 1, dd --> XX
+    f1*f2*f3t*f4t = exp(xi1 + xi - xi3 - xi4)*dist
+    --> chem_eq_fac = exp(2*(xi_p - xi_X))
+
+    and same procedure in the spin_stat_irr case. 
+    """
+    if m_X/T_d - xi_X > spin_stat_irr: # spin-statistics irrelevant here
+        th_avg_s_v = th_avg_sigma_v_XX_dd(T_d, m_d, m_X, vert)
+        if th_avg_s_v <= 0.:
+            if type == 2:
+                return np.array([0., 0.])
+            return 0.
+        if type == 0:
+            chem_eq_fac = exp(2.*xi_d) - exp(2.*xi_X)
+        elif type == -1:
+            chem_eq_fac = -exp(2.*xi_X)
+        elif type == 1:
+            chem_eq_fac = exp(2.*xi_d)
+        elif type == 2:
+            return np.array([-exp(2.*xi_X), exp(2.*xi_d)])*th_avg_s_v
+        return chem_eq_fac*th_avg_s_v
+
+    # Anton: Factors to get correct 'dist' in ker_C_n_XX_dd for different types
+    if type == 0:
+        # (e^(2*xi_d-2*xi_X)-1)*fX*fX*fdt*fdt = fd*fd*fXt*fXt - fX*fX*fdt*fdt)
+        # Gives C[X]_XX_dd for dd <--> XX
+        chem_eq_fac = exp(2.*(xi_phi-xi_X)) - 1.
+    elif type == -1:
+        chem_eq_fac = -1.       # Anton: -1 since C_n_XX_pp describes X, and X is in initial state 
+    elif type == 1:
+        chem_eq_fac = exp(2.*(xi_phi-xi_X))
+
+    # Send arrays in batches
+    @vegas.batchintegrand
+    def kernel(x):
+        return ker_C_n_XX_pp(x, m_d, m_X, m_h, k_phi, k_X, T_d, xi_phi, xi_X, vert, th, m_Gamma_h2)
+
+    """
+    Anton: Order of integration in analytic expression: E1, E2, E3, s. 
+    Implementation reads the order: E3, E4, E1, where E2 has been eliminated instead of E4.  
+    Seems like a change of variables has been done, see inside ker_C_n_XX_dd function. 
+    Seemingly, 
+
+    x_i = ln(E_i / E_i_min) / ln(E_i_max / E_i_min) where E_i_min/max is lower/upper integration bound of E_i. 
+    s' = ln(s / s_min) / ln(s_max / s_min) where s_min/max is lower/upper integration bound of s.
+
+    Then {x_i, s' in [0, 1]}, and 
+    jacobian = E1*(log_E1_max - log_E1_min)*E2*(log_E2_max - log_E2_min)*E3*(log_E3_max - log_E3_min)*s*(log_s_max - log_s_min)
+    """
+
+    # Anton: Monte-Carlo integration of the 4 integrals from 0 to 1 
+    integ = vegas.Integrator(4 * [[0., 1.]])
+    result = integ(kernel, nitn=10, neval=1e4)
+    # print(result.summary())
+    # if result.mean != 0.:
+    #     print("Vegas error pp dd: ", result.sdev/fabs(result.mean), result.mean, result.Q)
+    # print("pp dd", result.mean*chem_eq_fac/(256.*(pi**6.)), (exp(2.*xi_d)-exp(2.*xi_X))*th_avg_sigma_v_XX_dd(T_d, m_d, m_phi, vert))
+
+    if type == 2:
+        return np.array([-1., exp(2.*(xi_phi-xi_X))])*result.mean/(256.*(pi**6.))
+    
+    return result.mean*chem_eq_fac/(256.*(pi**6.))
+
+
 #############################################################################
 ###############    CROSS-SECTIONS + THERMAL AVERAGES   ######################
 #############################################################################
@@ -1428,6 +1655,7 @@ if __name__ == '__main__':
 
     np.seterr(all=None, divide=None, over=None, under=None, invalid=None)
 
+    """
     time1 = time.time()
     print('Timing function')
     th_avg_sigma_v_22_11(m_N1, m_N2, Ttrel.T_nu_grid[100], vert, m_X, m_Gamma_X2)
@@ -1473,4 +1701,91 @@ if __name__ == '__main__':
     plt.xlim(1e-5, 2e1)
     plt.ylim(1e-28, 1e-8)
     plt.legend()
+    plt.show()
+    """
+
+    # load_str = './sterile_test/md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
+    # load_str = './sterile_test/md_1e-05;mX_2.5e-05;sin22th_2e-14;y_5.57e-04;full_new.dat'
+    load_str = './sterile_test/md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat'
+
+    var_list = load_str.split(';')[:-1]
+    m_d, m_X, sin22th, y = [eval(s.split('_')[-1]) for s in var_list]
+    th = 0.5*np.arcsin(np.sqrt(sin22th))
+    vert = y**4 
+
+    data_evo = np.loadtxt(load_str)
+    data_skip_rate = 100
+
+    t_grid = data_evo[::data_skip_rate,0]
+    T_SM_grid = data_evo[::data_skip_rate,1]
+    T_nu_grid = data_evo[::data_skip_rate,2]
+    ent_grid = data_evo[::data_skip_rate, 3]
+    H_grid = data_evo[::data_skip_rate,4]
+    sf_grid = data_evo[::data_skip_rate,5]
+    T_d_grid = data_evo[::data_skip_rate,6]
+    xi_d_grid = data_evo[::data_skip_rate,7]
+    xi_X_grid = data_evo[::data_skip_rate,8]
+    n_d_grid = data_evo[::data_skip_rate,9]
+    n_X_grid = data_evo[::data_skip_rate,10]
+    n_nu_grid = 2.*0.75*(cf.zeta3/cf.pi2)*(T_nu_grid**3.)
+
+    m_phi = 1.5*m_d
+    k_phi = -1
+    k_X = -1
+    C_XX_pp_both = np.array([2.*C_n_XX_pp(m_phi, m_X, 0, k_phi, k_X, T_d, 0, xi_X, vert, th, 0, type=2) / 4. for T_d, xi_X in zip(T_d_grid, xi_X_grid)])
+
+    C_XX_pp = -C_XX_pp_both[:,0]
+    C_pp_XX = C_XX_pp_both[:,1]
+    
+    Gamma_XX_pp = C_XX_pp / n_d_grid
+    Gamma_pp_XX = C_pp_XX / n_d_grid
+
+    x_grid = m_d/T_nu_grid
+
+    fig = plt.figure()
+    ax = fig.add_subplot()
+
+    ch = 'crimson' # crimson
+    c1 = '#797ef6' # orchid
+    c2 = '#1aa7ec' # sky blue
+    c3 = '#4adede' # turquoise
+    c4 = '#ffa62b' # gold
+    c5 = '#1e2f97' # dark blue
+
+    ax.loglog(x_grid, 1e6*H_grid, color=ch, ls='-', zorder=0) #83781B
+
+    ax.loglog(x_grid, 1e6*abs(Gamma_XX_pp), color=c1, ls='-', zorder=-4) #114B5F
+    # ax.loglog(x_grid, 1e6*abs(Gamma_pp_XX), color=c2, ls='-', zorder=-4) #458751
+
+    ax.set_xlim(2e-5, 20)
+    ax.set_ylim(1e-28, 1e-10)
+
+    x_therm = 1e-3
+    ax.fill_betweenx([1e-28, 1e0], 1e-5, x_therm, color='white', alpha=1, zorder=-3)
+    ax.axvline(x_therm, ls=':', color='0', zorder=-2)
+
+    dark_therm_x = 10**((np.log10(x_therm) + np.log10(x_grid)[0]) / 2)
+    ax.text(dark_therm_x, 8e-21, r'$\mathrm{Dark}$', color='0', horizontalalignment='center')
+    ax.text(dark_therm_x, 8e-22, r'$\mathrm{Thermalization}$', color='0', horizontalalignment='center')
+    ax.text(dark_therm_x, 8e-23, r'$\rightarrow$', color='0', horizontalalignment='center')
+
+    Hubble_x = 10**((np.log10(x_therm) + np.log10(x_grid)[0]) / 2)
+    ax.text(Hubble_x, 1e-15, r"$H$", color=ch, rotation=0, va='top')
+    ax.text(1, 1e-15, r"$A^\prime A^\prime \to \phi \phi$", color=c1, rotation=0, ha='left', va='bottom')
+
+    # ax.text(1, 1e-18, r"$\phi \phi \to A^\prime A^\prime$", color=c2, rotation=0, ha='left', va='bottom')
+
+    md_str = f'{m_d:.3e}'.split('e-')
+    mX_str = f'{m_X:.3e}'.split('e-')
+    mphi_str = f'{m_phi:.3e}'.split('e-')
+    sin22th_str = f'{sin22th:.3e}'.split('e-')
+    y_str = f'{y:.3e}'.split('e-')
+    md_str = md_str[0] + '\cdot 10^{-' + md_str[1].lstrip('0') + '}'
+    mX_str = f'{m_X/m_d}m_N'
+    mphi_str = f'{m_phi/m_d}m_N'
+    y_str = y_str[0] + '\cdot 10^{-' + y_str[1].lstrip('0') + '}'
+    sin22th_str = sin22th_str[0] + '\cdot 10^{-' + sin22th_str[1].lstrip('0') + '}'
+
+    fig.suptitle(fr"$m_N={md_str}, m_A={mX_str}, m_\phi={mphi_str}, y={y_str}, \sin^2(2\theta)={sin22th_str}$", fontsize=10)
+
     plt.show()

@@ -17,40 +17,40 @@ GF = 1.166378e-5
 mZ = 91.1876
 mW = 80.379
 
-def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th=None, spin_facs=True, off_shell=False):
+def call(
+        m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma,
+        k_d, k_X, k_nu,
+        dof_d, dof_X,
+        y,
+        sin2_2th=None,
+        spin_facs=True,
+        off_shell=False
+    ):
     m_N12 = m_N1*m_N1
-    m_N22 = m_N2*m_N2
     m_X2 = m_X*m_X
-    m_h = 0
+    m_h = 0.
     m_h2 = m_h*m_h
-    # C_10 = m2/m0
-    # Anton: C_1nu = sin(2*theta)
     if sin2_2th is None:
-        sin_2th = m2*ma/(2*m0*m12)
-        sin2_2th = sin_2th**2
+        sin2_2th = (m2*ma/(2*m0*m12))**2
     th = 1/2*np.arcsin(sqrt(sin2_2th))
-    sin_th = np.sin(th)
-    sin2_th = sin_th**2
+    sin2_th = np.sin(th)**2
     y2 = y*y
 
     print(f'y: {y:.3e}, sin^2(th): {sin2_2th:.3e}')
     print(f'y^4: {y**4:.3e}, y^2 sin^2(2th): {y**2*sin2_2th:.3e}')
 
     M2_X_12 = 2.*y2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)/m_X2
-    # Anton: M2_X_10 IS NEVER USED 
-    # M2_X_10 = 2.*y2*C_10**2 * (m_X+m_N1-m0)*(m_X-m_N1+m0)*(2*m_X2 + (m_N1+m0)**2)/m_X2
     M2_X_1nu = 2.*y2*sin2_th * (m_X-m_N1-m_nu)*(m_X+m_N1+m_nu)*(2*m_X2+(m_N1-m_nu)**2)/m_X2
 
-    vert_fi = y2*y2*sin2_th**2
-    vert_tr = y2*y2*sin2_th
     vert_el = y2*y2
 
     # Anton: X --> 12, 1nu
-    Gamma_X = vector_mediator.Gamma_X_new(y=y, m_X=m_X, m_N1=m_N1, m_N2=m_N2, m_nu=m_nu, sin2_2th=sin2_2th)
+    Gamma_X = vector_mediator.Gamma_X_new(
+        y=y,
+        m_X=m_X, m_N1=m_N1, m_N2=m_N2, m_nu=m_nu,
+        sin2_2th=sin2_2th
+    )
     m_Gamma_X2 = m_X2*Gamma_X*Gamma_X
-    # Anton: THERE IS NO h -> (..)
-    # Gamma_h = scalar_mediator.Gamma_phi(y=y, th=th, m_phi=m_h, m_d=m_d, m_X=m_X)
-    # m_Gamma_h2 = m_h2*Gamma_h*Gamma_h
     m_Gamma_h2 = 0
 
     if spin_facs:       # Anton: If spin statistics is important
@@ -74,7 +74,7 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
 
                 From this, have Cn[alpha in I_r] = -Cn[beta in F_r], so 
                 Cn[alpha in I_r] + Cn[beta in F_r] = 0
-                
+
                 Code: C_n_3_12(type=0) = C[3]_{3<->12} = int dPI |M|^2 * [f1*f2*(1+f3) - f3*(1+k1*f1)*(1+k2*f2)]
 
                 n = n1 + n2 + 2*nX
@@ -96,7 +96,15 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
 
                 # th, m_Gamma_h2 do not matter anymore
                 # as long as mN1 = mN2, xiN1 = xiN2, TN1 = TN2, do not need CX_XX_22 separately -- just add factor 2 
-                CX_XX_11 = C_res_vector.C_n_XX_dd(m_d=m_N1, m_X=m_X, m_h=m_h, k_d=k_d, k_X=k_X, T_d=T_d, xi_d=xi_d, xi_X=xi_X, vert=vert_el, th=0, m_Gamma_h2=0, type=0) / 4.
+                # TODO: Why divide by 4 and multiply by 4 in return statement? Symmetry factor (2*2)
+                CX_XX_11 = C_res_vector.C_n_XX_dd(
+                    m_d=m_N1, m_X=m_X,
+                    k_d=k_d, k_X=k_X,
+                    T_d=T_d,
+                    xi_d=xi_d, xi_X=xi_X,
+                    vert=vert_el,
+                    type=0
+                ) / 4.
 
                 if not off_shell:
                     CX_X_1nu = C_res_vector.C_n_3_12(m1=m_N1, m2=m_nu, m3=m_X, k1=k_d, k2=k_nu, k3=k_X, T1=T_d, T2=T_a, T3=T_d, xi1=xi_d, xi2=0., xi3=xi_X, M2=M2_X_1nu, type=0)
@@ -112,13 +120,14 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
                     call.C_list.append([CX_X_1nu, CX_XX_11])
                     i = call.count // 10
                     if i > 0: 
-                        plt.loglog([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][0]), abs(call.C_list[i][0])], color='r', marker='o', markersize=3)
-                        plt.loglog([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][1]), abs(call.C_list[i][1])], color='tab:blue', marker='o', markersize=3)
+                        plt.semilogy([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][0]), abs(call.C_list[i][0])], color='r', marker='o', markersize=3)
+                        plt.semilogy([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][1]), abs(call.C_list[i][1])], color='tab:blue', marker='o', markersize=3)
                         # plt.loglog([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][2]), abs(call.C_list[i][2])], color='tab:green', marker='o', markersize=3)
                         plt.pause(0.05)
                 call.count += 1
 
                 print("C_ns:", f'{CX_XX_11:.5e}', f'{CX_X_1nu:.5e}')
+                # Factor 2 as N_1 and N_2 both contribute. Second factor of two from number change in n_d = n_N + 2*n_X
                 return CX_X_1nu + 4*CX_XX_11
 
             # rho = rho_N1 + rho_N2 + rho_X
@@ -154,9 +163,27 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
                 # Anton: C_n with xi=0
                 if T_a < m_X / 50.:
                     return 0.
-                C_XX_dd = np.abs(C_res_vector.C_n_XX_dd(m_d=m_N1, m_X=m_X, m_h=m_h, k_d=k_d, k_X=k_X, T_d=T_d, xi_d=xi_d, xi_X=xi_X, vert=vert_el, th=th, m_Gamma_h2=m_Gamma_h2, type=1) / 4.)
+                C_XX_dd = np.abs(C_res_vector.C_n_XX_dd(
+                    m_d=m_N1, m_X=m_X,
+                    k_d=k_d, k_X=k_X,
+                    T_d=T_d,
+                    xi_d=xi_d, xi_X=xi_X,
+                    vert=vert_el,
+                    th=th,
+                    m_Gamma_h2=m_Gamma_h2,
+                    type=1
+                ) / 4.)
 
-                C_dd_XX = np.abs(C_res_vector.C_n_XX_dd(m_d=m_N1, m_X=m_X, m_h=m_h, k_d=k_d, k_X=k_X, T_d=T_d, xi_d=xi_d, xi_X=xi_X, vert=vert_el, th=th, m_Gamma_h2=m_Gamma_h2, type=-1) / 4.)
+                C_dd_XX = np.abs(C_res_vector.C_n_XX_dd(
+                    m_d=m_N1, m_X=m_X,
+                    k_d=k_d, k_X=k_X,
+                    T_d=T_d,
+                    xi_d=xi_d, xi_X=xi_X,
+                    vert=vert_el,
+                    th=th,
+                    m_Gamma_h2=m_Gamma_h2,
+                    type=-1
+                ) / 4.)
 
                 # Anton: Decay-rates will always be larger than 2-to-2
                 return min(4.*C_XX_dd, 4.*C_dd_XX)
@@ -199,12 +226,32 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
     sf_norm_today = (cf.s0/ent_grid)**(1./3.)
     T_d_dw = cf.T_d_dw(m_d) # temperature of maximal d production by Dodelson-Widrow mechanism
     i_ic = np.argmax(Ttrel.T_nu_grid < T_d_dw)      # Anton: Start when T_nu < T_dw
-    i_end = np.argmax(Ttrel.T_nu_grid < m_d/2e1)    # Anton: End when T_nu < 20/m_d <--> 20 < m_d/T_nu
+    i_end = np.argmax(Ttrel.T_nu_grid < m_d/2e1)    # Anton: End when T_nu < m_d/20 <--> 20 < m_d/T_nu
     sf_ic_norm_0 = (cf.s0/(cf.s_SM_no_nu(Ttrel.T_SM_grid[i_ic]) + cf.s_nu(Ttrel.T_nu_grid[i_ic])))**(1./3.)
+    # TODO: Halvor: The factor of 2 should probably be removed.
     n_ic = 2 * cf.n_0_dw(m_d, th) / (sf_ic_norm_0**3.)      # 2* due to 2 species of neutrinos
     rho_ic = n_ic * cf.avg_mom_0_dw(m_d) / sf_ic_norm_0
 
-    # Anton: Run main computation 
+    print("i_ic = ", i_ic)
+    print("i_end = ", i_end)
+
+    # fig1, ax1 = plt.subplots()
+    # ax1.set_xscale("log")
+    # ax1.set_yscale("log")
+    # ax1.scatter(Ttrel.t_grid, Ttrel.T_SM_grid)
+    # ax1.scatter(Ttrel.t_grid, Ttrel.T_nu_grid)
+    # fig1.savefig("test_timetemp.pdf")
+
+    # fig2, ax2 = plt.subplots()
+    # ax2.set_xscale("log")
+    # ax2.set_yscale("log")
+    # ax2.scatter(Ttrel.t_grid, - Ttrel.dTSM_dt_grid)
+    # ax2.scatter(Ttrel.t_grid, - Ttrel.dTnu_dt_grid)
+    # fig2.savefig("test_timetemp2.pdf")
+
+
+
+    # Anton: Run main computation
     pan = pandemolator.Pandemolator(
         m_N1, m_N2, m_X, m_h, m_nu,
         k_d, k_X, k_nu,
@@ -219,9 +266,10 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
         i_ic, n_ic, rho_ic, i_end)
 
     # time1 = time.time()
-    # print("Running Pandemolator.pandemolate ")
+    print("Running Pandemolator.pandemolate")
     pan.pandemolate()
     plt.close()
+    print("Done with Pandemolator.pandemolate")
     # print(f"Pandemolator.pandemolate ran in {time.time() - time1}s ")
 
     try:
@@ -229,6 +277,7 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
     except:
         C_therm_grid = np.zeros(pan.T_chi_grid_sol.size)
 
+    # TODO: Remove factor of 2? Not sure. Probably not.
     O_d_h2 = 2*pan.n_chi_grid_sol[-1]*m_d*cf.s0/(ent_grid[pan.i_end]*cf.rho_crit0_h2)
 
     if pan.T_chi_grid_sol.size < i_end - i_ic + 1: # integration of ode was stopped (abundance too large); issues calculating fs_length
@@ -276,7 +325,16 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
                 xi_diff_der = t*H*(-x*15./4.+x2*135./8.-x3*4005./64.+x4*28035./128.-x5*378675./512.+x6*2463075./1024.)
 
                 return [T_der, xi_diff_der]
-            sol = solve_ivp(der, [log(Ttrel.t_grid[n_sol+i_ic-1]), log(Ttrel.t_grid[-1])], [T_d_grid[n_sol-1], xi_d_grid[n_sol-1]-m_d/T_d_grid[n_sol-1]], t_eval=np.log(Ttrel.t_grid[n_sol+i_ic:]), rtol=1e-6, atol=0., method='RK45', max_step=1.)
+            sol = solve_ivp(
+                der,
+                [log(Ttrel.t_grid[n_sol+i_ic-1]), log(Ttrel.t_grid[-1])],
+                [T_d_grid[n_sol-1], xi_d_grid[n_sol-1]-m_d/T_d_grid[n_sol-1]],
+                t_eval=np.log(Ttrel.t_grid[n_sol+i_ic:]),
+                rtol=1e-6,
+                atol=0.,
+                method='RK45',
+                max_step=1.
+            )
             T_d_grid[n_sol:] = sol.y[0, :] / (sf_grid_tmp[n_sol+i_ic:]**2.)
             xi_d_grid[n_sol:] = sol.y[1, :] + m_d / T_d_grid[n_sol:]
             xi_X_grid[n_sol:] = 2.*xi_d_grid[n_sol:]
@@ -302,6 +360,7 @@ def call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y
         # plt.xlabel('1e-16')
         # plt.show()
 
+        # TODO: HM: Check logic
         i_kd = np.argmax(Ttrel.T_nu_grid[i_ic:] < 0.1*m_X)
         found_kd_coarse = False
         i_kd_start = i_kd
@@ -442,48 +501,41 @@ if __name__ == '__main__':
     m_nu = 0
 
     # Anton: Actual masses - assume m_N1 = m_N2
-    m_d = 1e-5
-    m_N1 = m_d
-    m_N2 = m_d
-    m_X = 2.5*m_d
-
-    # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12), m1 = 0
-    y = 1.8e-3
-    # y = 3e-3
-    m0 = 1e3
-    m12 = m_d
-    m2 = m0*10**(-15./2)
-    ma = m12
-
-    sin2_2th = (m2*ma/(2*m0*m12))**2
-    th = 1/2 * asin(sqrt(sin2_2th))
-
     # Anton: remember to run sterile_caller on this combination
-    m_d = 1e-5
-    m_N1 = m_d
-    m_N2 = m_d
-    m_X = 2.5*m_d
-    y = 2.521e-3
-    sin2_2th = 5e-16
-    # BP1 
+
+    # BP2
     # m_d = 1e-5
     # m_N1 = m_d
     # m_N2 = m_d
     # m_X = 2.5*m_d
-    # y = 1e-4
-    # sin2_2th = 4.85e-13
-    # BP2 
+    # y = 2.522e-3
+    # sin2_2th = 1e-11
+
     m_d = 1e-5
     m_N1 = m_d
     m_N2 = m_d
     m_X = 2.5*m_d
-    y = 2.522e-3
-    sin2_2th = 5e-16
+    y = 1e-5
+    sin2_2th = 2e-11
+
+    # m_d = 1e-5
+    # m_N1 = m_d
+    # m_N2 = m_d
+    # m_X = 2.5*m_d
+    # y = 1e-3
+    # sin2_2th = 1e-14
+    
+    m12 = m_d
+    # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12), m1 = 0
+    # y = 3e-3
+    m0 = 1e3
+    m2 = m0*10**(-15./2)
+    ma = m12
+
+    # sin2_2th = (m2*ma/(2*m0*m12))**2
 
     print('mi/m0 << 1 :', f'{ma/m0:.3e}, {m2/m0:.3e}, {m12/m0:.3e}')
     print('mi^2/m0 << m12 :', f'{ma**2/m12:.3e}, {m2**2/m12:.3e}')
-    # ma = m12*1e-3
-
 
     # Anton: fermion = 1, boson = -1 (I did not choose this convention..)
     k_d = 1.
@@ -495,7 +547,7 @@ if __name__ == '__main__':
     dof_X = 3.
 
     # Anton: If spin-statistics (1+k*f) matters, if the mediator is off-shell or not 
-    # HM: spin_facs and off_shell are only implemented for these values.
+    # HM: spin_facs=True and off_shell=False are the only implemented options.
     spin_facs = True
     off_shell = False
     run_sim = True
@@ -504,7 +556,15 @@ if __name__ == '__main__':
     if run_sim is True: 
         print('Start sterile_caller')
         start = time.time()
-        t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma, k_d, k_X, k_nu, dof_d, dof_X, y, sin2_2th, spin_facs=True, off_shell=False)
+        t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(
+            m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma,
+            k_d, k_X, k_nu,
+            dof_d, dof_X,
+            y,
+            sin2_2th,
+            spin_facs=True,
+            off_shell=False
+        )
         print(fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3)
         end = time.time()
         print(f'sterile_caller ran in {end-start:.5f}s')

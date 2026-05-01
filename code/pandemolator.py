@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import time
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
@@ -21,8 +22,16 @@ fac_abund_stop = 100.
 xi_ratio_stop = 100.
 
 class TimeTempRelation(object):
-    def __init__(self, T_start=1e8, t_end=t_max, t_gp_pd=1e3, m_psi=None, dof_psi=None, k_psi=None):
-        # print('Initializing TimeTempRelation')
+    def __init__(
+            self,
+            T_start=1e8,
+            t_end=t_max,
+            t_gp_pd=1e3,        # TODO: Halvor: 1e3 originally
+            m_psi=None,
+            dof_psi=None,
+            k_psi=None
+        ):
+        print('Initializing TimeTempRelation')
         if m_psi is None:
             self.psi_in_SM = True
         else:
@@ -32,12 +41,20 @@ class TimeTempRelation(object):
             self.k_psi   = k_psi   # +1 if psi is fermion, -1 for boson
 
         t_start = 1./(2.*self.hubble_of_temps(T_start, T_start))
-        grid_size_time = int( log10(t_end/t_start) * t_gp_pd )
+        grid_size_time = int(log10(t_end/t_start) * t_gp_pd)
+        print("Grid size: ", grid_size_time)
         # print(f'Time grid size: {grid_size_time}')
         self.t_grid = np.logspace(log10(t_start), log10(t_end), num=grid_size_time)
         self.sqrt_t_grid = np.sqrt(self.t_grid)
 
-        sol = solve_ivp(self.der, [self.t_grid[0], self.t_grid[-1]], [T_start*self.sqrt_t_grid[0], T_start*self.sqrt_t_grid[0]], t_eval=self.t_grid, rtol=rtol_ode, atol=0.)
+        sol = solve_ivp(
+            self.der,
+            [self.t_grid[0], self.t_grid[-1]],
+            [T_start*self.sqrt_t_grid[0], T_start*self.sqrt_t_grid[0]],
+            t_eval=self.t_grid,
+            rtol=rtol_ode,
+            atol=0.
+        )
         self.T_SM_grid = sol.y[0]/self.sqrt_t_grid
         self.T_nu_grid = sol.y[1]/self.sqrt_t_grid
         self.hubble_grid = np.array([self.hubble_of_temps(T_SM, T_nu) for T_SM, T_nu in zip(self.T_SM_grid, self.T_nu_grid)])
@@ -50,17 +67,29 @@ class TimeTempRelation(object):
     def rho_psi(self, T_SM):
         if self.psi_in_SM:
             return 0.
-        return cf.rho_boson(T_SM, self.m_psi, self.dof_psi) if self.k_psi == -1 else cf.rho_fermion(T_SM, self.m_psi, self.dof_psi)
+
+        if self.k_psi == -1:
+            return cf.rho_boson(T_SM, self.m_psi, self.dof_psi)
+        else:
+            return cf.rho_fermion(T_SM, self.m_psi, self.dof_psi)
 
     def P_psi(self, T_SM):
         if self.psi_in_SM:
             return 0.
-        return cf.P_boson(T_SM, self.m_psi, self.dof_psi) if self.k_psi == -1 else cf.P_fermion(T_SM, self.m_psi, self.dof_psi)
+
+        if self.k_psi == -1:
+            return cf.P_boson(T_SM, self.m_psi, self.dof_psi)
+        else:
+            return cf.P_fermion(T_SM, self.m_psi, self.dof_psi)
 
     def rho_der_psi(self, T_SM):
         if self.psi_in_SM:
             return 0.
-        return cf.rho_der_boson(T_SM, self.m_psi, self.dof_psi) if self.k_psi == -1 else cf.rho_der_fermion(T_SM, self.m_psi, self.dof_psi)
+
+        if self.k_psi == -1:
+            return cf.rho_der_boson(T_SM, self.m_psi, self.dof_psi)
+        else:
+            return cf.rho_der_fermion(T_SM, self.m_psi, self.dof_psi)
 
     def rho(self, T_SM, T_nu):
         return cf.rho_SM_no_nu(T_SM) + cf.rho_nu(T_nu) + cf.rho_m(T_SM, T_nu) + self.rho_psi(T_SM)
@@ -71,12 +100,14 @@ class TimeTempRelation(object):
     def dTSM_dt(self, T_SM, hubble, nu_dec):
         if not nu_dec:
             return -3.*hubble*(cf.rho_SM_before_nu_dec(T_SM)+self.rho_psi(T_SM)+cf.P_SM_before_nu_dec(T_SM)+self.P_psi(T_SM))/(cf.rho_der_SM_before_nu_dec(T_SM)+self.rho_der_psi(T_SM))
-        return -3.*hubble*(cf.rho_SM_no_nu(T_SM)+self.rho_psi(T_SM)+cf.P_SM_no_nu(T_SM)+self.P_psi(T_SM))/(cf.rho_der_SM_no_nu(T_SM)+self.rho_der_psi(T_SM))
+        else:
+            return -3.*hubble*(cf.rho_SM_no_nu(T_SM)+self.rho_psi(T_SM)+cf.P_SM_no_nu(T_SM)+self.P_psi(T_SM))/(cf.rho_der_SM_no_nu(T_SM)+self.rho_der_psi(T_SM))
 
     def dTnu_dt(self, T_nu, hubble, nu_dec):
         if not nu_dec:
             return self.dTSM_dt(T_nu, hubble, nu_dec)
-        return -hubble*T_nu
+        else:
+            return -hubble*T_nu
 
     def der(self, t, Ts):
         t = t
@@ -86,18 +117,35 @@ class TimeTempRelation(object):
 
         hubble = self.hubble_of_temps(T_SM, T_nu)
         hubble_T5 = hubble/(T_SM**5.)
-        nu_dec = True if not np.isfinite(hubble_T5) or hubble_T5 > cf.hubble_T5_nu_dec else False
-
-        # if nu_dec:
-        #     print(T_nu)
+        if not np.isfinite(hubble_T5) or hubble_T5 > cf.hubble_T5_nu_dec:
+            nu_dec = True
+        else:
+            nu_dec = False
 
         der_SM = T_SM/(2.*sqrt_t) + sqrt_t*self.dTSM_dt(T_SM, hubble, nu_dec)
         der_nu = T_nu/(2.*sqrt_t) + sqrt_t*self.dTnu_dt(T_nu, hubble, nu_dec)
 
         return [der_SM, der_nu]
 
+
 class Pandemolator(object):
-    def __init__(self, m_N1, m_N2, m_X, m_h, m_psi, k_d, k_X, k_psi, dof_d, dof_X, C_n, C_rho, C_xi0, t_grid, T_grid, dT_dt_grid, ent_grid, hubble_grid, sf_grid, i_ic, n_ic, rho_ic, i_end):
+    def __init__(
+            self,
+            m_N1, m_N2, m_X, m_h, m_psi,
+            k_d, k_X, k_psi,
+            dof_d, dof_X,
+            C_n, C_rho, C_xi0,
+            t_grid,
+            T_grid,
+            dT_dt_grid,
+            ent_grid,
+            hubble_grid,
+            sf_grid,
+            i_ic,
+            n_ic,
+            rho_ic,
+            i_end
+        ):
         self.m_N1 = m_N1 # in GeV
         self.k_N1 = k_d
         self.dof_N1 = dof_d
@@ -163,13 +211,16 @@ class Pandemolator(object):
     def n_X(self, T_chi, xi_X):
         return dens.n(self.k_X, T_chi, self.m_X, self.dof_X, xi_X)
 
+    # TODO: Halvor: Check factor of 2.
     def rho(self, T_chi, xi_chi, xi_X):
         return 2*dens.rho(self.k_chi, T_chi, self.m_chi, self.dof_chi, xi_chi) + dens.rho(self.k_X, T_chi, self.m_X, self.dof_X, xi_X)
 
+    # TODO: Halvor: Check factor of 2.
     def P(self, T_chi, xi_chi, xi_X):
         return 2*dens.P(self.k_chi, T_chi, self.m_chi, self.dof_chi, xi_chi) + dens.P(self.k_X, T_chi, self.m_X, self.dof_X, xi_X)
 
     def rho_3P_diff(self, T_chi, xi_chi, xi_X):
+        # TODO: Halvor: Check factor of 2. Probably right?
         return 2*dens.rho_3P_diff(self.k_chi, T_chi, self.m_chi, self.dof_chi, xi_chi) + dens.rho_3P_diff(self.k_X, T_chi, self.m_X, self.dof_X, xi_X)
 
     def n_chi_der_T(self, T_chi, xi_chi):
@@ -180,7 +231,7 @@ class Pandemolator(object):
 
     def n_X_der_T(self, T_chi, xi_X):
         return dens.n_der_T(self.k_X, T_chi, self.m_X, self.dof_X, xi_X)
-    
+
     def n_X_der_xi(self, T_chi, xi_X):
         return dens.n_der_xi(self.k_X, T_chi, self.m_X, self.dof_X, xi_X)
 
@@ -199,6 +250,12 @@ class Pandemolator(object):
         xi_chi = min(Txi_chi[1]+self.m_chi/T_chi, (1.-1e-14)*self.m_X/(self.fac_n_X*T_chi))
         n = max(2*self.n_chi(T_chi, xi_chi) + self.fac_n_X*self.n_X(T_chi, self.fac_n_X*xi_chi), 1e-300)
         rho = max(self.rho(T_chi, xi_chi, self.fac_n_X*xi_chi), 1e-300)
+        if n/n_in < 0:
+            print('n/n_ic < 0 in n_rho_root')
+            return [log(1e-100), log(rho/rho_in)]
+        if rho/rho_in < 0:
+            print('rho/rho_ic < 0 in n_rho_root')
+            return [log(n/n_in), log(1e-100)]
         return [log(n/n_in), log(rho/rho_in)]
 
     def jac_n_rho_root(self, Txi_chi, n_in, rho_in):
@@ -210,11 +267,13 @@ class Pandemolator(object):
 
         n_der_T = 2*self.n_chi_der_T(T_chi, xi_chi) + self.fac_n_X*self.n_X_der_T(T_chi, self.fac_n_X*xi_chi)
         rho_der_T = self.rho_der_T(T_chi, xi_chi, self.fac_n_X*xi_chi)
-        
+
         n_der_xi = 2*self.n_chi_der_xi(T_chi, xi_chi) + self.fac_n_X*self.fac_n_X*self.n_X_der_xi(T_chi, self.fac_n_X*xi_chi)
         rho_der_xi = self.rho_chi_der_xi(T_chi, xi_chi) + self.fac_n_X*self.rho_X_der_xi(T_chi, self.fac_n_X*xi_chi)
-        return [[T_chi*(n_der_T/n - (self.m_chi/(T_chi*T_chi))*n_der_xi/n), n_der_xi/n],
-         [T_chi*(rho_der_T/rho - (self.m_chi/(T_chi*T_chi))*rho_der_xi/rho), rho_der_xi/rho]]
+        return [
+            [T_chi*(n_der_T/n - (self.m_chi/(T_chi*T_chi))*n_der_xi/n), n_der_xi/n],
+            [T_chi*(rho_der_T/rho - (self.m_chi/(T_chi*T_chi))*rho_der_xi/rho), rho_der_xi/rho]
+        ]
 
     # Anton: In case of xi = 0, only solve root-equation for rho with jacobian
     def rho_root(self, log_T_chi, rho_in):
@@ -233,7 +292,8 @@ class Pandemolator(object):
     def der(self, log_x, y):
         x = exp(log_x)
         T = self.m_chi / x
-        print('Temp.:', x)
+        print("x = ", x)
+        print("T = ", T)
         H = self.H_interp_T(T)
         dT_dt = self.dT_dt_interp_T(T)
         ent = self.ent_interp_T(T)
@@ -241,28 +301,43 @@ class Pandemolator(object):
         Y = y[0]
         n = Y * ent
         rho = y[1] / (sf**4.)
+        print("rho = ", rho)
+        print("Total mass = ", self.m_chi*n)
 
-        if rho < (1.+1e-10)*self.m_chi*n or n < 0.: # energy density too small
+        # TODO: Remove debugging.
+        # TODO: This error is triggered. Is it related to the fact that n includes contributions from different paritcles?
+        if rho < (1.+1e-10)*self.m_chi*n: # energy density too small
+            print("Error: Energy denstiy is too small.")
+            # exit(1)
             return [0., 0.]
+        if n < 0:
+            print("Error: Number density is negative")
+            exit()
         elif rho/n - self.m_chi < self.m_chi:
             self.T_chi_last = (rho/n - self.m_chi)/1.5
             self.xi_chi_last = log(n/(self.dof_chi*((self.m_chi*self.T_chi_last/(2.*np.pi))**1.5)))+self.m_chi/self.T_chi_last
-        root_sol = root(self.n_rho_root, [log(self.T_chi_last), self.xi_chi_last-self.m_chi/self.T_chi_last], args=(n, rho), jac=self.jac_n_rho_root, method='lm')
+        root_sol = root(
+            self.n_rho_root,
+            [log(self.T_chi_last), self.xi_chi_last-self.m_chi/self.T_chi_last],
+            args=(n, rho),
+            jac=self.jac_n_rho_root,
+            method='lm'
+        )
         T_chi = exp(root_sol.x[0])
+        print("T_chi = ", T_chi)
         xi_chi = min(root_sol.x[1] + self.m_chi/T_chi, (1.-1e-14)*self.m_X/(self.fac_n_X*T_chi))
         xi_X = self.fac_n_X*xi_chi
 
-        # print(np.exp(xi_chi), self.n_X(T_chi, self.fac_n_X*xi_chi)/self.n_chi(T_chi, xi_chi), dens.rho(self.k_X, T_chi, self.m_X, self.dof_X, 2.*xi_chi)/dens.rho(self.k_chi, T_chi, self.m_chi, self.dof_chi, xi_chi))
-        # n_sol = 2*self.n_chi(T_chi, xi_chi) + self.fac_n_X*self.n_X(T_chi, xi_X)
-        # rho_sol = self.rho(T_chi, xi_chi, xi_X)
         self.T_chi_last, self.xi_chi_last = T_chi, xi_chi
-        # print(self.m_chi/T, T, self.m_chi/T_chi, Y * cf.s0 * self.m_chi / cf.rho_crit0_h2, rho, xi_chi, xi_X)
 
-        # P = self.P(T_chi, xi_chi, xi_X, xi_h)
-
+        start = time.time()
         C_n = self.C_n(T, T_chi, xi_chi, xi_X)
+        end = time.time()
+        print('C_n time:', end - start)
+        start = time.time()
         C_rho = self.C_rho(T, T_chi, xi_chi, xi_X)
-        # print('Rel. density changes:', C_n/(3.*H*n), C_rho/(3.*H*(rho+P)))
+        end = time.time()
+        print('C_rho time:', end - start)
 
         der_Y = -(T/dT_dt)*C_n/ent
         der_rho = -(T/dT_dt)*(H*self.rho_3P_diff(T_chi, xi_chi, xi_X) + C_rho)*(sf**4.)
@@ -288,7 +363,13 @@ class Pandemolator(object):
             self.T_chi_last = (rho/n - self.m_chi)/1.5
             self.xi_chi_last = log(n/(self.dof_chi*((self.m_chi*self.T_chi_last/(2.*np.pi))**1.5)))+self.m_chi/self.T_chi_last
         # print('xi_zero', log(self.T_chi_last), self.xi_chi_last-self.m_chi/self.T_chi_last)
-        root_sol = root(self.n_rho_root, [log(self.T_chi_last), self.xi_chi_last-self.m_chi/self.T_chi_last], args = (n, rho), jac=self.jac_n_rho_root, method='lm')
+        root_sol = root(
+            self.n_rho_root,
+            [log(self.T_chi_last), self.xi_chi_last-self.m_chi/self.T_chi_last],
+            args = (n, rho),
+            jac=self.jac_n_rho_root,
+            method='lm'
+        )
         T_chi = exp(root_sol.x[0])
         xi_chi = min(root_sol.x[1] + self.m_chi/T_chi, (1.-1e-14)*self.m_X/(self.fac_n_X*T_chi))
         xi_X = self.fac_n_X*xi_chi
@@ -307,6 +388,7 @@ class Pandemolator(object):
         sf = self.sf_interp_T(T)
         Y = y[0]
         Odh2_today = Y * cf.s0 * self.m_chi / cf.rho_crit0_h2
+        # TODO: Is fac_abund_stop unreasonably big?
         return 1. - Odh2_today/(fac_abund_stop*cf.omega_d0)
 
     def der_xi_0(self, log_x, y):
@@ -316,7 +398,12 @@ class Pandemolator(object):
         dT_dt = self.dT_dt_interp_T(T)
         sf = self.sf_interp_T(T)
         rho = y[0] / (sf**4.)
-        root_sol = root(self.rho_root, [log(self.T_chi_last)], jac=self.jac_rho_root, args=(rho))
+        root_sol = root(
+            self.rho_root,
+            [log(self.T_chi_last)],
+            jac=self.jac_rho_root,
+            args=(rho)
+        )
         T_chi = exp(root_sol.x[0])
         self.T_chi_last, self.xi_chi_last = T_chi, 0.
         # print(self.m_chi/T, T, T_chi)
@@ -339,7 +426,12 @@ class Pandemolator(object):
         dT_dt = self.dT_dt_interp_T(T)
         sf = self.sf_interp_T(T)
         rho = y[0] / (sf**4.)
-        root_sol = root(self.rho_root, [log(self.T_chi_last)], jac=self.jac_rho_root, args=(rho))
+        root_sol = root(
+            self.rho_root,
+            [log(self.T_chi_last)],
+            jac=self.jac_rho_root,
+            args=(rho)
+        )
         T_chi = exp(root_sol.x[0])
         self.T_chi_last, self.xi_chi_last = T_chi, 0.
 
@@ -360,7 +452,12 @@ class Pandemolator(object):
         sf = self.sf_interp_T(T)
         ent = self.ent_interp_T(T)
         rho = y[0] / (sf**4.)
-        root_sol = root(self.rho_root, [log(self.T_chi_last)], jac=self.jac_rho_root, args = (rho))
+        root_sol = root(
+            self.rho_root,
+            [log(self.T_chi_last)],
+            jac=self.jac_rho_root,
+            args=(rho)
+        )
         T_chi = exp(root_sol.x[0])
         self.T_chi_last, self.xi_chi_last = T_chi, 0.
         Y = (2*self.n_chi(T_chi, 0.) + self.fac_n_X*self.n_X(T_chi, 0.)) / ent
@@ -386,6 +483,7 @@ class Pandemolator(object):
 
         self.log_x_pts = np.log(self.m_chi/self.T_grid[self.i_ic:self.i_end+1])
         n_pts = self.log_x_pts.size
+        print("n_pts = ", n_pts)
 
         self.t_grid_sol = self.t_grid[self.i_ic:self.i_end+1]
         self.T_grid_sol = self.T_grid[self.i_ic:self.i_end+1]
@@ -415,7 +513,17 @@ class Pandemolator(object):
                 event_abund.terminal = True
                 event_abund.direction = -1
                 print(f'Start solve_ivp xi zero')
-                sol_xi0 = solve_ivp(self.der_xi_0, [self.log_x_pts[i_max], self.log_x_pts[-1]], [rho0*(sf0**4.)], t_eval=self.log_x_pts[i_max:], events=(event_xi, event_abund), rtol=rtol_ode_pan, atol=0., method='RK45', first_step=self.log_x_pts[i_max+1]-self.log_x_pts[i_max])
+                sol_xi0 = solve_ivp(
+                    self.der_xi_0,
+                    [self.log_x_pts[i_max], self.log_x_pts[-1]],
+                    [rho0*(sf0**4.)],
+                    t_eval=self.log_x_pts[i_max:],
+                    events=(event_xi, event_abund),
+                    rtol=rtol_ode_pan,
+                    atol=0.,
+                    method='RK45',
+                    first_step=self.log_x_pts[i_max+1]-self.log_x_pts[i_max]
+                )
                 print(f'End solve_ivp xi zero')
                 i_xi_nonzero = i_max + sol_xi0.t.size - 1
 
@@ -425,7 +533,12 @@ class Pandemolator(object):
                     ent = self.ent_interp_T(self.T_grid_sol[i])
                     sf = self.sf_interp_T(self.T_grid_sol[i])
                     rho = sol_xi0.y[0, i-i_max]/(sf**4.)
-                    root_sol = root(self.rho_root, [log(self.T_chi_last)], jac=self.jac_rho_root, args=(rho))
+                    root_sol = root(
+                        self.rho_root,
+                        [log(self.T_chi_last)],
+                        jac=self.jac_rho_root,
+                        args=(rho)
+                    )
                     self.T_chi_grid_sol[i] = exp(root_sol.x[0])
                     self.xi_chi_grid_sol[i] = 0.
                     self.T_chi_last, self.xi_chi_last = self.T_chi_grid_sol[i], self.xi_chi_grid_sol[i]
@@ -456,20 +569,46 @@ class Pandemolator(object):
                 event_abund.direction = -1
                 # print('Start solve_ivp for Y, rho')
                 print('Start solve_ivp xi non-zero')
+                start = time.time()
                 # print(self.log_x_pts[i_xi_nonzero], self.log_x_pts[-1])
-                sol = solve_ivp(self.der, [self.log_x_pts[i_xi_nonzero], self.log_x_pts[-1]], y0, t_eval=self.log_x_pts[i_xi_nonzero:], events=(event_xi, event_abund), rtol=rtol_ode_pan, atol=0., method='RK45', first_step=self.log_x_pts[i_xi_nonzero+1]-self.log_x_pts[i_xi_nonzero], max_step=1.)
+                # TODO: Jobb med solveren, og beregn Jacobian.
+                sol = solve_ivp(
+                    self.der,
+                    [self.log_x_pts[i_xi_nonzero], self.log_x_pts[-1]],
+                    y0,
+                    t_eval=self.log_x_pts[i_xi_nonzero:],
+                    events=(event_xi, event_abund),
+                    # events=(event_abund,),
+                    rtol=rtol_ode_pan,
+                    atol=0.,
+                    # atol=1e-9,
+                    # method='BDF',
+                    method='RK45',
+                    first_step=self.log_x_pts[i_xi_nonzero+1]-self.log_x_pts[i_xi_nonzero],
+                    max_step=1.
+                )
+                end = time.time()
+                print('solve_ivp time:', end - start)
                 print('End solve_ivp xi non-zero')
                 i_max = i_xi_nonzero + sol.t.size - 1
 
                 self.T_chi_last = (rho0 / (cf.pi2*(2*dof_fac_chi+dof_fac_X)/30.))**0.25
                 self.xi_chi_last = 0.
                 i_start = i_xi_nonzero + 1 if i_xi_nonzero > 0 else 0
+                start = time.time()
+                print(f'i_start={i_start}, i_max={i_max}')
                 for i in range(i_start, i_max + 1):
                     ent = self.ent_interp_T(self.T_grid_sol[i])
                     sf = self.sf_interp_T(self.T_grid_sol[i])
                     n = sol.y[0, i-i_xi_nonzero]*ent
                     rho = sol.y[1, i-i_xi_nonzero]/(sf**4.)
-                    root_sol = root(self.n_rho_root, [log(self.T_chi_last), (self.xi_chi_last-self.m_chi/self.T_chi_last)], jac=self.jac_n_rho_root, args=(n, rho), method='lm')
+                    root_sol = root(
+                        self.n_rho_root,
+                        [log(self.T_chi_last), (self.xi_chi_last-self.m_chi/self.T_chi_last)],
+                        jac=self.jac_n_rho_root,
+                        args=(n, rho),
+                        method='lm'
+                    )
                     # print(exp(root_sol.x[0]))
                     self.T_chi_grid_sol[i] = exp(root_sol.x[0])
                     self.xi_chi_grid_sol[i] = min(root_sol.x[1] + self.m_chi/self.T_chi_grid_sol[i], (1.-1e-14)*self.m_X/(self.fac_n_X*self.T_chi_grid_sol[i]))#root_sol.x[1] + self.m_chi/self.T_chi_grid_sol[i]
@@ -477,6 +616,8 @@ class Pandemolator(object):
                     self.xi_X_grid_sol[i] = self.fac_n_X*self.xi_chi_grid_sol[i]
                     self.n_chi_grid_sol[i] = self.n_chi(self.T_chi_grid_sol[i], self.xi_chi_grid_sol[i])
                     self.n_X_grid_sol[i] = self.n_X(self.T_chi_grid_sol[i], self.xi_X_grid_sol[i])
+                end = time.time()
+                print('Root-solving time:', end - start)
 
                 ent0 = self.ent_interp_T(self.T_grid_sol[i_max])
                 sf0 = self.sf_interp_T(self.T_grid_sol[i_max])
@@ -485,7 +626,7 @@ class Pandemolator(object):
                 self.T_chi_last = self.T_chi_grid_sol[i_max]
                 self.xi_chi_last = self.xi_chi_grid_sol[i_max]
 
-                if sol.t_events[1].size != 0 or sol.t.size < 2: # abundance becomes > fac_abund_stop*DM abundance, loop ends then due to new n_pts
+                if sol.t_events[0].size != 0 or sol.t.size < 2: # abundance becomes > fac_abund_stop*DM abundance, loop ends then due to new n_pts
                     self.i_end = self.i_ic + sol.t.size + i_xi_nonzero - 1
                     n_pts = i_max + 1
             else:

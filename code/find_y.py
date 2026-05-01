@@ -70,6 +70,7 @@ def find_y(params):
     th = 0.5*np.arcsin(np.sqrt(sin2_2th))
     m_X = r_m_Xd*m_d 
 
+    # TODO: Halvor: Faktor 2 skal vekk, siden vi DW bare produserer N_2. Se om denne faktoren dukker opp noe annet sted.
     O_d_h2_dw = 2*cf.O_h2_dw(m_d, th)         # Anton: Omega_DM * h^2 from Dodelson-Widrow mechanism
     log_enhance_req = np.log(cf.omega_d0/O_d_h2_dw)
     if log_enhance_req < 0.:

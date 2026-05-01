@@ -100,7 +100,7 @@ def C_n_3_12(m1, m2, m3, k1, k2, k3, T1, T2, T3, xi1, xi2, xi3, M2, type=0):
     E1_max = max((max_exp_arg + xi1)*T1, 1e1*m1)    # Infinity, could use np.inf in quad 
 
     res, err = quad(ker_C_n_3_12_E1, log(E1_min), log(E1_max), args=(m1, m2, m3, k1, k2, k3, T1, T2, T3, xi1, xi2, xi3, type), epsabs=0., epsrel=rtol_int)
-    
+
     return M2*res/(32.*(pi**3.))
 
 # E_type * (f1*f2*(1+f3) - f3*(1-f1)*(1-f2))
@@ -171,7 +171,16 @@ def C_rho_3_12(type, m1, m2, m3, k1, k2, k3, T1, T2, T3, xi1, xi2, xi3, M2):
     return M2*res/(32.*(pi**3.))
 
 # @nb.jit(nopython=True, cache=True)
-def ker_C_n_XX_dd_s_t_integral_revival(ct_min, ct_max, ct_p, ct_m, a, s, E1, E3, p1, p3, m_d, m_X, vert):
+def ker_C_n_XX_dd_s_t_integral_revival(
+        ct_min, ct_max,
+        ct_p, ct_m,
+        a,
+        s,
+        E1, E3,
+        p1, p3,
+        m_d, m_X,
+        vert
+    ):
 
     """
     Solved for matrix-element and integrated over variable t in collision
@@ -215,7 +224,7 @@ def ker_C_n_XX_dd_s_t_integral_revival(ct_min, ct_max, ct_p, ct_m, a, s, E1, E3,
     Always have X_min < 0, and Y_min >= 0. For = case, 
     as ct_min --> c_p from above, Y_min --> 0+.
     Therefore, sqrt_fac_tmin = 1 as well.
-    """    
+    """
     
     # in_min_neq = (ct_min != ct_p)
     # in_max_neq = (ct_max != ct_m)
@@ -291,7 +300,15 @@ def ker_C_n_XX_dd_s_t_integral_revival(ct_min, ct_max, ct_p, ct_m, a, s, E1, E3,
     return vert*(int_tmax - int_tmin + log_part).real
 
 # @nb.jit(nopython=True, cache=True)
-def ker_C_n_XX_dd_s(s, E1, E2, E3, p1, p3, m_d, m_X, m_h, s12_min, s12_max, s34_min, s34_max, vert, th, m_Gamma_h2):
+def ker_C_n_XX_dd_s(
+        s,
+        E1, E2, E3,
+        p1, p3,
+        m_d, m_X,
+        s12_min, s12_max,
+        s34_min, s34_max,
+        vert,
+    ):
     p12 = p1*p1
     p32 = p3*p3
     # Anton: a,b,c definition in a*cos^2 + b*cos + c = 0 in integrand
@@ -314,19 +331,33 @@ def ker_C_n_XX_dd_s(s, E1, E2, E3, p1, p3, m_d, m_X, m_h, s12_min, s12_max, s34_
     # print(in_res.size)
     # if np.count_nonzero(in_res) == 0: 
     #     return t_int
-    # t_int[in_res] = ker_C_n_XX_dd_s_t_integral_new_3(ct_min[in_res], ct_max[in_res], ct_p[in_res], ct_m[in_res], a[in_res], s[in_res], E1[in_res], E3[in_res], p1[in_res], p3[in_res], m_d, m_X, vert)
-    # t_int[in_res] = ker_C_n_XX_dd_s_t_integral_Higgs_new(ct_min[in_res], ct_max[in_res], ct_p[in_res], ct_m[in_res], a[in_res], s[in_res], E1[in_res], E3[in_res], p1[in_res], p3[in_res], m_d, m_X, m_h, vert, th, m_Gamma_h2)
 
-    t_int[in_res] = ker_C_n_XX_dd_s_t_integral_revival(ct_min[in_res], ct_max[in_res], ct_p[in_res], ct_m[in_res], a[in_res], s[in_res], E1[in_res], E3[in_res], p1[in_res], p3[in_res], m_d, m_X, vert)
+    t_int[in_res] = ker_C_n_XX_dd_s_t_integral_revival(
+        ct_min[in_res], ct_max[in_res],
+        ct_p[in_res], ct_m[in_res],
+        a[in_res],
+        s[in_res],
+        E1[in_res], E3[in_res],
+        p1[in_res], p3[in_res],
+        m_d, m_X,
+        vert
+    )
 
     return t_int
 
 # 3 4 -> 1 2 <=> X X -> d d
 # @nb.jit(nopython=True, cache=True)
-def ker_C_n_XX_dd(x, m_d, m_X, m_h, k_d, k_X, T_d, xi_d, xi_X, vert, th, m_Gamma_h2):
+def ker_C_n_XX_dd(
+        x,
+        m_d, m_X,
+        k_d, k_X,
+        T_d,
+        xi_d, xi_X,
+        vert,
+    ):
     """
     Anton: Seems like E1 <--> E3, E2 <--> E4 compared to article.
-    Set up for production of X. 
+    Set up for production of X.
     """
     log_E3_min = log(m_X*offset)
     log_E3_max = log(max((max_exp_arg + xi_X)*T_d, 1e1*m_X))
@@ -372,7 +403,15 @@ def ker_C_n_XX_dd(x, m_d, m_X, m_h, k_d, k_X, T_d, xi_d, xi_X, vert, th, m_Gamma
     log_s_max = np.log(np.fmax(np.fmin(s12_max, s34_max), 1e-200))
     s = np.exp(np.fmin(log_s_min * (1.-x[:,3]) + log_s_max * x[:,3], 6e2))
 
-    ker_s = ker_C_n_XX_dd_s(s, E1, E2, E3, p1, p3, m_d, m_X, m_h, s12_min, s12_max, s34_min, s34_max, vert, th, m_Gamma_h2)
+    ker_s = ker_C_n_XX_dd_s(
+        s,
+        E1, E2, E3,
+        p1, p3,
+        m_d, m_X,
+        s12_min, s12_max,
+        s34_min, s34_max,
+        vert,
+    )
     ker_s[~np.isfinite(ker_s)] = 0.0
 
     jac = E3*(log_E3_max-log_E3_min)*E4*(log_E4_max-log_E4_min)*E1*(log_E1_max-log_E1_min)*s*(log_s_max-log_s_min)
@@ -381,12 +420,21 @@ def ker_C_n_XX_dd(x, m_d, m_X, m_h, k_d, k_X, T_d, xi_d, xi_X, vert, th, m_Gamma
     return res
 
 # type == -1: only X X -> d d, type == 0: both reactions, type == 1: only d d -> X X, type == 2: (X X -> d d, d d -> X X)
-def C_n_XX_dd(m_d, m_X, m_h, k_d, k_X, T_d, xi_d, xi_X, vert, th, m_Gamma_h2, type=0):
+def C_n_XX_dd(
+        m_d, m_X,
+        k_d, k_X,
+        T_d,
+        xi_d, xi_X,
+        vert,
+        th=0.,
+        m_Gamma_h2=0.,
+        type=0
+    ):
     """
     Anton: 
     Collision operator C[X]_XX_dd for X, C[X]_XX_dd = -C[d]_XX_dd.
     1,2 = d,d, 3,4 = X,X
-    
+
     dist = f3*f4*f1t*f2t
     type = -1, XX --> dd
     -f3*f4*f1t*f2t = -1*dist
@@ -431,7 +479,14 @@ def C_n_XX_dd(m_d, m_X, m_h, k_d, k_X, T_d, xi_d, xi_X, vert, th, m_Gamma_h2, ty
     # Send arrays in batches
     @vegas.batchintegrand
     def kernel(x):
-        return ker_C_n_XX_dd(x, m_d, m_X, m_h, k_d, k_X, T_d, xi_d, xi_X, vert, th, m_Gamma_h2)
+        return ker_C_n_XX_dd(
+            x,
+            m_d, m_X,
+            k_d, k_X,
+            T_d,
+            xi_d, xi_X,
+            vert,
+        )
 
     """
     Anton: Order of integration in analytic expression: E1, E2, E3, s. 
@@ -447,8 +502,12 @@ def C_n_XX_dd(m_d, m_X, m_h, k_d, k_X, T_d, xi_d, xi_X, vert, th, m_Gamma_h2, ty
     """
 
     # Anton: Monte-Carlo integration of the 4 integrals from 0 to 1 
+    # Halvor: neval gir antall integrand evalueringer per iterasjon, og nitn antall iterasjoner.
     integ = vegas.Integrator(4 * [[0., 1.]])
-    result = integ(kernel, nitn=10, neval=2e5)
+    result = integ(kernel, nitn=10, neval=1e4)
+    # print(result.mean)
+    # print(chem_eq_fac)
+    # print()
 
     if type == 2:
         return np.array([-1., exp(2.*(xi_d-xi_X))])*result.mean/(256.*(pi**6.))
@@ -730,27 +789,10 @@ def sigma_XX_dd_Higgs(s, m_d, m_X, m_h, vert, th, m_Gamma_h2):
 
     # Added Higgs instead of removing longitudinal by hand 
 
-    # int_t_M2_upper = 8*vert*(-((2*t_upper*(gss2*((m_h2-s)**2+m_Gamma_h2)*(m_d2*(8*m_X2-2*s)+m_X4)-4*gss*m_d2*(m_h2-s)*(4*m_X4-2*m_X2*s+s2)+2*m_d2*(4*m_d2-s)*(12*m_X4-4*m_X2*s+s2)))/(gss2*m_X4*((m_h2-s)**2+m_Gamma_h2)))+((np.log(t_upper-m_d2)-np.log(-m_d2-2*m_X2+s+t_upper))*(gss*((m_h2-s)**2+m_Gamma_h2)*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))-8*m_d2*(m_h2-s)*(s-2*m_X2)*(m_d2*(8*m_X4-4*m_X2*s+s2)-2*m_X6)))/(gss*m_X4*(2*m_X2-s)*((m_h2-s)**2+m_Gamma_h2))+(m_X2-4*m_d2)**2/(-m_d2-2*m_X2+s+t_upper)-(m_X2-4*m_d2)**2/(m_d2-t_upper))
-
-    # int_t_M2_lower = 8*vert*(-((2*t_lower*(gss2*((m_h2-s)**2+m_Gamma_h2)*(m_d2*(8*m_X2-2*s)+m_X4)-4*gss*m_d2*(m_h2-s)*(4*m_X4-2*m_X2*s+s2)+2*m_d2*(4*m_d2-s)*(12*m_X4-4*m_X2*s+s2)))/(gss2*m_X4*((m_h2-s)**2+m_Gamma_h2)))+((np.log(t_lower-m_d2)-np.log(-m_d2-2*m_X2+s+t_lower))*(gss*((m_h2-s)**2+m_Gamma_h2)*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))-8*m_d2*(m_h2-s)*(s-2*m_X2)*(m_d2*(8*m_X4-4*m_X2*s+s2)-2*m_X6)))/(gss*m_X4*(2*m_X2-s)*((m_h2-s)**2+m_Gamma_h2))+(m_X2-4*m_d2)**2/(-m_d2-2*m_X2+s+t_lower)-(m_X2-4*m_d2)**2/(m_d2-t_lower))
-
     int_t_M2_upper = 8*vert*(-((4*m_d2*t_upper*(gss2*(4*m_X2-s)+2*gss*hprop*(4*m_X4-2*m_X2*s+s2)+hprop2*(4*m_d2-s)*(12*m_X4-4*m_X2*s+s2)))/(gss2*m_X4))+(1/(gss*m_X4*(2*m_X2-s)))*(gss*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))*np.log(m_d2-t_upper)-gss*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))*np.log(m_d2+2*m_X2-s-t_upper)+8*hprop*m_d2*(2*m_X2-s)*(m_d2*(8*m_X4-4*m_X2*s+s2)-2*m_X6)*(np.log(-m_d2-2*m_X2+s+t_upper)-np.log(t_upper-m_d2)))-(m_X2-4*m_d2)**2/(m_d2+2*m_X2-s-t_upper)-(m_X2-4*m_d2)**2/(m_d2-t_upper)-2*t_upper)
 
     int_t_M2_lower = 8*vert*(-((4*m_d2*t_lower*(gss2*(4*m_X2-s)+2*gss*hprop*(4*m_X4-2*m_X2*s+s2)+hprop2*(4*m_d2-s)*(12*m_X4-4*m_X2*s+s2)))/(gss2*m_X4))+(1/(gss*m_X4*(2*m_X2-s)))*(gss*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))*np.log(m_d2-t_lower)-gss*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))*np.log(m_d2+2*m_X2-s-t_lower)+8*hprop*m_d2*(2*m_X2-s)*(m_d2*(8*m_X4-4*m_X2*s+s2)-2*m_X6)*(np.log(-m_d2-2*m_X2+s+t_lower)-np.log(t_lower-m_d2)))-(m_X2-4*m_d2)**2/(m_d2+2*m_X2-s-t_lower)-(m_X2-4*m_d2)**2/(m_d2-t_lower)-2*t_lower)
     
-    # int_t_M2_upper = 8*vert*((1/((2*m_X2-s)))*((4*m_d2*(-4*m_X2-3*s)+(4*m_X4+s2))*np.log(m_d2-t_upper)-(4*m_d2*(-4*m_X2-3*s)+(4*m_X4+s2))*np.log(m_d2+2*m_X2-s-t_upper))-(m_X2-4*m_d2)**2/(m_d2+2*m_X2-s-t_upper)-(m_X2-4*m_d2)**2/(m_d2-t_upper)-2*t_upper)
-
-    # int_t_M2_lower = 8*vert*((1/((2*m_X2-s)))*((4*m_d2*(-4*m_X2-3*s)+(4*m_X4+s2))*np.log(m_d2-t_lower)-(4*m_d2*(-4*m_X2-3*s)+(4*m_X4+s2))*np.log(m_d2+2*m_X2-s-t_lower))-(m_X2-4*m_d2)**2/(m_d2+2*m_X2-s-t_lower)-(m_X2-4*m_d2)**2/(m_d2-t_lower)-2*t_lower)
-
-    # Remove longitudinal by hand in addition to Higgs 
-    # int_t_M2_upper = -((8*vert*(gss2*((m_X2-6*m_d2)**2/(m_d2+2*m_X2-s-t_upper)+(m_X2-6*m_d2)**2/(m_d2-t_upper)+2*t_upper)+32*gss*hprop*m_d2*t_upper-(gss*(gss*(24*m_d4+m_d2*(12*s-40*m_X2)+4*m_X4+s2)-16*hprop*m_d2*(2*m_X2-s)*(6*m_d2-m_X2-s))*(np.log(t_upper-m_d2)-np.log(-m_d2-2*m_X2+s+t_upper)))/(2*m_X2-s)+64*hprop2*m_d2*t_upper*(4*m_d2-s)))/gss2)
-
-    # int_t_M2_lower = -((8*vert*(gss2*((m_X2-6*m_d2)**2/(m_d2+2*m_X2-s-t_lower)+(m_X2-6*m_d2)**2/(m_d2-t_lower)+2*t_lower)+32*gss*hprop*m_d2*t_lower-(gss*(gss*(24*m_d4+m_d2*(12*s-40*m_X2)+4*m_X4+s2)-16*hprop*m_d2*(2*m_X2-s)*(6*m_d2-m_X2-s))*(np.log(t_lower-m_d2)-np.log(-m_d2-2*m_X2+s+t_lower)))/(2*m_X2-s)+64*hprop2*m_d2*t_lower*(4*m_d2-s)))/gss2)
-
-    # Switch sign on Higgs diagram 
-    # int_t_M2_upper = 8*vert*(-((4*m_d2*t_upper*(gss2*(4*m_X2-s)-2*gss*hprop*(4*m_X4-2*m_X2*s+s2)+hprop2*(4*m_d2-s)*(12*m_X4-4*m_X2*s+s2)))/(gss2*m_X4))+(1/(gss*m_X4*(2*m_X2-s)))*(gss*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))*np.log(m_d2-t_upper)-gss*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))*np.log(m_d2+2*m_X2-s-t_upper)+8*hprop*m_d2*(2*m_X2-s)*(m_d2*(8*m_X4-4*m_X2*s+s2)-2*m_X6)*(np.log(t_upper-m_d2)-np.log(-m_d2-2*m_X2+s+t_upper)))-(m_X2-4*m_d2)**2/(m_d2+2*m_X2-s-t_upper)-(m_X2-4*m_d2)**2/(m_d2-t_upper)-2*t_upper)
-
-    # int_t_M2_lower = 8*vert*(-((4*m_d2*t_lower*(gss2*(4*m_X2-s)-2*gss*hprop*(4*m_X4-2*m_X2*s+s2)+hprop2*(4*m_d2-s)*(12*m_X4-4*m_X2*s+s2)))/(gss2*m_X4))+(1/(gss*m_X4*(2*m_X2-s)))*(gss*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))*np.log(m_d2-t_lower)-gss*(4*m_d4*s*(4*m_X2-s)+4*m_d2*m_X2*(-4*m_X4-3*m_X2*s+s2)+m_X4*(4*m_X4+s2))*np.log(m_d2+2*m_X2-s-t_lower)+8*hprop*m_d2*(2*m_X2-s)*(m_d2*(8*m_X4-4*m_X2*s+s2)-2*m_X6)*(np.log(t_lower-m_d2)-np.log(-m_d2-2*m_X2+s+t_lower)))-(m_X2-4*m_d2)**2/(m_d2+2*m_X2-s-t_lower)-(m_X2-4*m_d2)**2/(m_d2-t_lower)-2*t_lower)
 
     sigma = ((int_t_M2_upper - int_t_M2_lower).real / (64.*np.pi*s*p1cm*p1cm))
     # Anton: divide by symmetry factor 2 for identical particles in phase space integral

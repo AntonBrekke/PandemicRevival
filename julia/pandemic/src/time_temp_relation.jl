@@ -38,11 +38,6 @@ function cumsimp_logspace(x_grid::AbstractVector{<:Real}, y_grid::AbstractVector
 end
 
 mutable struct TimeTempRelation
-    psi_in_SM::Bool
-    m_psi::Float64
-    dof_psi::Float64
-    k_psi::Int
-
     t_grid::Vector{Float64}
     sqrt_t_grid::Vector{Float64}
     T_SM_grid::Vector{Float64}
@@ -55,41 +50,8 @@ mutable struct TimeTempRelation
     dTnu_dt_grid::Vector{Float64}
 end
 
-function rho_psi(rel::TimeTempRelation, T_SM::Real)
-    if rel.psi_in_SM
-        return 0.0
-    end
-
-    if rel.k_psi == -1
-        return rho_boson(T_SM, rel.m_psi, rel.dof_psi)
-    end
-    return rho_fermion(T_SM, rel.m_psi, rel.dof_psi)
-end
-
-function P_psi(rel::TimeTempRelation, T_SM::Real)
-    if rel.psi_in_SM
-        return 0.0
-    end
-
-    if rel.k_psi == -1
-        return P_boson(T_SM, rel.m_psi, rel.dof_psi)
-    end
-    return P_fermion(T_SM, rel.m_psi, rel.dof_psi)
-end
-
-function rho_der_psi(rel::TimeTempRelation, T_SM::Real)
-    if rel.psi_in_SM
-        return 0.0
-    end
-
-    if rel.k_psi == -1
-        return rho_der_boson(T_SM, rel.m_psi, rel.dof_psi)
-    end
-    return rho_der_fermion(T_SM, rel.m_psi, rel.dof_psi)
-end
-
 rho(rel::TimeTempRelation, T_SM::Real, T_nu::Real) =
-    rho_SM_no_nu(T_SM) + rho_nu(T_nu) + rho_m(T_SM, T_nu) + rho_psi(rel, T_SM)
+    rho_SM_no_nu(T_SM) + rho_nu(T_nu) + rho_m(T_SM, T_nu)
 
 hubble_of_temps(rel::TimeTempRelation, T_SM::Real, T_nu::Real) =
     sqrt(8.0 * pi * G * rho(rel, T_SM, T_nu) / 3.0)
@@ -97,24 +59,25 @@ hubble_of_temps(rel::TimeTempRelation, T_SM::Real, T_nu::Real) =
 function dTSM_dt(rel::TimeTempRelation, T_SM::Real, hubble::Real, nu_dec::Bool)
     if !nu_dec
         return -3.0 * hubble * (
-            rho_SM_before_nu_dec(T_SM) + rho_psi(rel, T_SM) + P_SM_before_nu_dec(T_SM) + P_psi(rel, T_SM)
+            rho_SM_before_nu_dec(T_SM) + P_SM_before_nu_dec(T_SM)
         ) / (
-            rho_der_SM_before_nu_dec(T_SM) + rho_der_psi(rel, T_SM)
+            rho_der_SM_before_nu_dec(T_SM)
+        )
+    else
+        return -3.0 * hubble * (
+            rho_SM_no_nu(T_SM) + P_SM_no_nu(T_SM)
+        ) / (
+            rho_der_SM_no_nu(T_SM)
         )
     end
-
-    return -3.0 * hubble * (
-        rho_SM_no_nu(T_SM) + rho_psi(rel, T_SM) + P_SM_no_nu(T_SM) + P_psi(rel, T_SM)
-    ) / (
-        rho_der_SM_no_nu(T_SM) + rho_der_psi(rel, T_SM)
-    )
 end
 
 function dTnu_dt(rel::TimeTempRelation, T_nu::Real, hubble::Real, nu_dec::Bool)
     if !nu_dec
         return dTSM_dt(rel, T_nu, hubble, nu_dec)
+    else
+        return -hubble * T_nu
     end
-    return -hubble * T_nu
 end
 
 function der!(du, u, rel::TimeTempRelation, t)
@@ -132,26 +95,12 @@ function der!(du, u, rel::TimeTempRelation, t)
     return nothing
 end
 
-function TimeTempRelation(; T_start::Real=1e8, t_end::Real=t_max, t_gp_pd::Real=1e3,
-    m_psi=nothing, dof_psi=nothing, k_psi=nothing)
-
-    psi_in_SM = isnothing(m_psi)
-    if !psi_in_SM && (isnothing(dof_psi) || isnothing(k_psi))
-        throw(ArgumentError("When m_psi is provided, dof_psi and k_psi must also be provided."))
-    end
-
-    m_psi_val = psi_in_SM ? 0.0 : Float64(m_psi)
-    dof_psi_val = psi_in_SM ? 0.0 : Float64(dof_psi)
-    k_psi_val = psi_in_SM ? 0 : Int(k_psi)
-    if !psi_in_SM && (k_psi_val != -1 && k_psi_val != 1)
-        throw(ArgumentError("k_psi must be -1 (boson) or 1 (fermion)."))
-    end
-
+function TimeTempRelation(;
+    T_start::Real=1e8,
+    t_end::Real=t_max,
+    t_gp_pd::Real=1e3,
+)
     rel = TimeTempRelation(
-        psi_in_SM,
-        m_psi_val,
-        dof_psi_val,
-        k_psi_val,
         Float64[],
         Float64[],
         Float64[],
@@ -171,8 +120,18 @@ function TimeTempRelation(; T_start::Real=1e8, t_end::Real=t_max, t_gp_pd::Real=
     sqrt_t_grid = sqrt.(t_grid)
 
     u0 = [T_start * sqrt_t_grid[1], T_start * sqrt_t_grid[1]]
-    prob = ODEProblem(der!, u0, (t_grid[1], t_grid[end]), rel)
-    sol = solve(prob; reltol=rtol_ode, abstol=0.0, saveat=t_grid)
+    prob = ODEProblem(
+        der!,
+        u0,
+        (t_grid[1], t_grid[end]),
+        rel
+    )
+    sol = solve(
+        prob;
+        reltol=rtol_ode,
+        abstol=0.0,
+        saveat=t_grid
+    )
 
     T_SM_grid = Vector{Float64}(sol[1, :]) ./ sqrt_t_grid
     T_nu_grid = Vector{Float64}(sol[2, :]) ./ sqrt_t_grid

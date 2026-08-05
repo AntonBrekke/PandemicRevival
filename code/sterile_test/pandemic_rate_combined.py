@@ -21,10 +21,10 @@ sys.path.insert(0, grandparentdir)
 
 import constants_functions as cf
 import C_res_vector
-import C_res_scalar
-import C_res_vector_no_spin_stat
+# import C_res_scalar
+# import C_res_vector_no_spin_stat
 import vector_mediator
-import scalar_mediator
+# import scalar_mediator
 import pandemolator as pandemolator
 
 def get_figsize(columnwidth, wf=1.0, hf=(5.**0.5-1.0)/2.0):
@@ -55,13 +55,13 @@ params = {'axes.labelsize': 10,
 plt.rcParams.update(params)
 
 x_therm = 1e-3
-save_fig = False
+save_fig = True
 data_skip_pan = 2
 data_skip_rate = 100
 plot_data_skip = 1
 force_write = False
 ### Benchmark Points ###:
-BP = 0
+BP = None
 if BP == 1:
     # BP1
     load_str = './md_1.12884e-05;mX_5.64419e-05;mh_3.38651e-05;sin22th_1.83298e-13;y_1.93457e-04;full_new.dat' 
@@ -96,9 +96,18 @@ else:
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.4e-03full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.8e-03;full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.55e-03;full_new.dat' 
-load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
+# load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_2e-14;y_5.57e-04;full_new.dat'
 # load_str = './md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat'
+# load_str = "./md_1e-05;mX_2.5e-05;sin22th_2e-11;y_1e-05;full_new.dat"
+# load_str = "./md_1e-05;mX_2.5e-05;sin22th_3e-11;y_1e-05;full_new.dat"
+
+# BP1 (in draft)
+# load_str = "./md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat"
+# BP2 (in draft)
+load_str = "./md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat"
+
+
 data = np.loadtxt(load_str)
 T_SM = data[::data_skip_pan, 1]
 T_nu = data[::data_skip_pan, 2]
@@ -166,8 +175,10 @@ y1_dw = 2*mYd_dw
 x1_tr = md/T_nu
 y1_tr = md*2*nd/ent
 
-x1_dw0, x1_tr0 = x1_dw[x1_dw < x_therm*3e-1], x1_tr[x1_tr > x_therm*3e-1]
-y1_dw0, y1_tr0 = y1_dw[x1_dw < x_therm*3e-1], y1_tr[x1_tr > x_therm*3e-1]
+dw_lim = 3e-1
+
+x1_dw0, x1_tr0 = x1_dw[x1_dw < x_therm*dw_lim], x1_tr[x1_tr > x_therm*dw_lim]
+y1_dw0, y1_tr0 = y1_dw[x1_dw < x_therm*dw_lim], y1_tr[x1_tr > x_therm*dw_lim]
 
 x1, y1 = np.array([*x1_dw0[::-1], *x1_tr0, 1e3]), np.array([*y1_dw0[::-1], *y1_tr0, y1_tr0[-1]])
 
@@ -196,19 +207,21 @@ ax1.text(3e-5, 1e-11, r'$\Omega_s h^2 = 0.12$', color='0.55')
 YX_max = np.max(mX*nX/ent)
 Ys_max = np.max(y1)
 if BP != 5:
-    ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)], Ys_max*1e-1, r'$\nu_s$', color=c1, ha='center', va='top')
+    print("yoman")
+    # ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)], Ys_max*1e-1, r'$\nu_s$', color=c1, ha='center', va='top')
+    ax1.text(4e0, 1e-10, r'$N$', color=c1, ha='center', va='top')
     ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)], YX_max*1e-1, r'$A_\mu^\prime$', color=c2, ha='center', va='top')
 else: 
     ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)]*20, Ys_max*1e-1, r'$\nu_s$', color=c1, ha='center', va='top')
     ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)]*6, YX_max*1e-1, r'$A_\mu^\prime$', color=c2, ha='center', va='top')
 
-if BP != 5:
-    BP_str = r'$\textit{BP' + f'{BP}' + r'}$'
-    legend_plot = ax2.plot(0, 0, color=None, ls=None)
-    legend_BP = ax2.legend(legend_plot, [BP_str], loc='lower left', handlelength=0, handletextpad=0, edgecolor='gray')
-    for item in legend_BP.legend_handles:
-        item.set_visible(False)
-    # plt.gca().add_artist(legend_BP)
+# if BP != 5:
+#     BP_str = r'$\textit{BP' + f'{BP}' + r'}$'
+#     legend_plot = ax2.plot(0, 0, color=None, ls=None)
+#     legend_BP = ax2.legend(legend_plot, [BP_str], loc='lower left', handlelength=0, handletextpad=0, edgecolor='gray')
+#     for item in legend_BP.legend_handles:
+#         item.set_visible(False)
+#     # plt.gca().add_artist(legend_BP)
 
 ax2.loglog(md/T_nu, Td/T_nu, color='0.4', ls='-', zorder=-4)
 
@@ -281,6 +294,7 @@ M2_X_12 = 2.*y2 * (m_X+m_N1-m_N2)*(m_X-m_N1+m_N2)*(2*m_X2 + (m_N1+m_N2)**2)/m_X2
 M2_X_1nu = 2.*y2*C_1nu**2 * (m_X-m_N1-m_nu)*(m_X+m_N1+m_nu)*(2*m_X2+(m_N1-m_nu)**2)/m_X2
 M2_X_10 = 2.*y2*C_10**2 * (m_X+m_N1-m0)*(m_X-m_N1+m0)*(2*m_X2 + (m_N1+m0)**2)/m_X2
 
+print("Hei")
 print(f'M2_X_dd: {M2_X_12:3e}, M2_X_da: {M2_X_1nu:3e}, M2_X_d0: {M2_X_10:3e}')
 
 vert_fi = y2*y2*(c_th**4.)*(s_th**4.)
@@ -347,16 +361,17 @@ if not os.path.isfile('./' + filename) or force_write:
     C_da_X = np.array([C_res_vector.C_n_3_12(m_d, m_a, m_X, k_d, k_a, k_X, T_d, T_a, T_d, xi_d, 0., xi_X, M2_X_1nu, type=1) for T_d, T_a, xi_d, xi_X in zip(T_d_grid, T_nu_grid, xi_d_grid, xi_X_grid)])
     
     print('Get C_XX_dd_both')
-    C_XX_dd_both = np.array([2.*C_res_vector.C_n_XX_dd(m_d, m_X, 0, k_d, k_X, T_d, xi_d, xi_X, vert_el, th, 0, type=2) / 4. for T_d, xi_d, xi_X in zip(T_d_grid, xi_d_grid, xi_X_grid)])
+    # C_XX_dd_both = np.array([2.*C_res_vector.C_n_XX_dd(m_d, m_X, 0, k_d, k_X, T_d, xi_d, xi_X, vert_el, th, 0, type=2) / 4. for T_d, xi_d, xi_X in zip(T_d_grid, xi_d_grid, xi_X_grid)])
+    C_XX_dd_both = np.array([2.*C_res_vector.C_n_XX_dd(m_d, m_X, k_d, k_X, T_d, xi_d, xi_X, vert_el, th, 0, type=2) / 4. for T_d, xi_d, xi_X in zip(T_d_grid, xi_d_grid, xi_X_grid)])
 
-    print('Get C_11_22')
+    # print('Get C_11_22')
 
     # C_11_22_ut = np.array([C_res_vector.C_34_12(type=0, nFW=2, nBW=2, m1=m_N1, m2=m_N1, m3=m_N2, m4=m_N2, k1=k_d, k2=k_d, k3=k_d, k4=k_d, T1=T_d, T2=T_d, T3=T_d, T4=T_d, xi1=xi_d, xi2=xi_d, xi3=xi_d, xi4=xi_d, vert=vert_el, m_d2=m_d2, m_X2=m_X2, m_h2=0, m_Gamma_X2=m_Gamma_X2, m_Gamma_h2=0, res_sub=False, thermal_width=True) / 4. for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
 
-    C_22_11_ut = np.array([C_res_vector.C_n_11_22(m_d=m_d, m_X=m_X, k_d=k_d, T_d=T_d, xi_d=xi_d, vert=vert_el, th=th, type=-1) / 4.  for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
+    # C_22_11_ut = np.array([C_res_vector.C_n_11_22(m_d=m_d, m_X=m_X, k_d=k_d, T_d=T_d, xi_d=xi_d, vert=vert_el, th=th, type=-1) / 4.  for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
 
-    print('Get C_22_11_DW')
-    th_avg_22_11_ut_DW = np.array([C_res_vector.th_avg_sigma_v_22_11(m_N1, m_N2, T, vert_el, m_X, m_Gamma_X2) for T in T_nu_grid])
+    # print('Get C_22_11_DW')
+    # th_avg_22_11_ut_DW = np.array([C_res_vector.th_avg_sigma_v_22_11(m_N1, m_N2, T, vert_el, m_X, m_Gamma_X2) for T in T_nu_grid])
 
     C_dd_dd = np.zeros(T_d_grid.size)#np.array([C_res_vector.C_34_12(0, 1., 0., m_d, m_d, m_d, m_d, k_d, k_d, k_d, k_d, T_d, T_d, T_d, T_d, xi_d, xi_d, xi_d, xi_d, vert_el, m_X2, m_Gamma_X2, res_sub=False) / 4. for T_d, xi_d in zip(T_d_grid, xi_d_grid)])
     C_da_dd = np.zeros(T_d_grid.size)#np.array([C_res_vector.C_34_12(0, 1., 0., m_d, m_d, m_d, m_a, k_d, k_d, k_d, k_a, T_d, T_d, T_d, T_a, xi_d, xi_d, xi_d, 0., vert_tr, m_X2, m_Gamma_X2, res_sub=False) / 2. for T_d, T_a, xi_d in zip(T_d_grid, T_nu_grid, xi_d_grid)])
@@ -381,8 +396,9 @@ if not os.path.isfile('./' + filename) or force_write:
         C_dd_da/n_d_grid, 
         C_aa_dd/n_d_grid, 
         C_dd_aa/n_d_grid,
-        C_22_11_ut/n_d_grid,
-        th_avg_22_11_ut_DW)))
+        # C_22_11_ut/n_d_grid,
+        # th_avg_22_11_ut_DW
+    )))
     print(f'Saved file in {time.time()-time_start}s')
 
 data = np.loadtxt(filename)
@@ -401,8 +417,8 @@ C_da_dd   = data[::plot_data_skip, 10]
 C_dd_da   = data[::plot_data_skip, 11]
 C_aa_dd   = data[::plot_data_skip, 12]
 C_dd_aa   = data[::plot_data_skip, 13]
-C_22_11_ut = data[::plot_data_skip, 14]
-th_avg_22_11_ut_DW = data[::plot_data_skip, 15]
+# C_22_11_ut = data[::plot_data_skip, 14]
+# th_avg_22_11_ut_DW = data[::plot_data_skip, 15]
 
 # help-function
 def smooth_loglog_pchip(x, y, npts=400):
@@ -435,11 +451,11 @@ _, C_da_dd = smooth_loglog_pchip(x_grid, abs(C_da_dd), n_points)
 _, C_dd_da = smooth_loglog_pchip(x_grid, abs(C_dd_da), n_points)
 _, C_aa_dd = smooth_loglog_pchip(x_grid, abs(C_aa_dd), n_points)
 _, C_dd_aa = smooth_loglog_pchip(x_grid, abs(C_dd_aa), n_points)
-_, th_avg_22_11_ut_DW = smooth_loglog_pchip(x_grid, abs(th_avg_22_11_ut_DW), n_points)
+# _, th_avg_22_11_ut_DW = smooth_loglog_pchip(x_grid, abs(th_avg_22_11_ut_DW), n_points)
 skip = 2
 _, C_dd_XX = smooth_loglog_pchip(x_grid[::skip], abs(C_dd_XX[::skip]), n_points)
 skip = 3
-_, C_22_11_ut = smooth_loglog_pchip(x_grid[::skip], abs(C_22_11_ut[::skip]), n_points)
+# _, C_22_11_ut = smooth_loglog_pchip(x_grid[::skip], abs(C_22_11_ut[::skip]), n_points)
 x_grid = np.logspace(np.log10(x_grid.min()), np.log10(x_grid.max()), n_points)
 x_SM_grid = np.logspace(np.log10(x_SM_grid.min()), np.log10(x_SM_grid.max()), n_points)
 T_nu_grid = m_d/x_grid      # GeV 
@@ -477,7 +493,7 @@ ax3.loglog(x_grid, 1e6*abs(C_dd_X), color=c1, ls='-', zorder=-4) #114B5F
 ax3.loglog(x_grid, 1e6*abs(C_da_X), color=c2, ls='-', zorder=-4) #458751
 ax3.loglog(x_grid, 1e6*abs(C_dd_XX), color=c3, ls='-', zorder=-4) #95190C
 ax3.loglog(x_grid, 1e6*abs(C_XX_dd), color=c5, ls='-', zorder=-4) #D02411
-ax3.loglog(x_grid, 1e6*abs(C_22_11_ut), color=c4, ls='-', zorder=-4) #D02411
+# ax3.loglog(x_grid, 1e6*abs(C_22_11_ut), color=c4, ls='-', zorder=-4) #D02411
 
 T_eq = (147.8e9)*(y/0.1)**4*(th**2/1e-15) * 1e-6    # GeV 
 
@@ -489,15 +505,15 @@ nd_dw = lambda T, TSM: cf.O_h2_dw_Tevo(T, m_d, th)*cf.rho_crit0_h2/m_d * s(T, TS
 # Ttrel = pandemolator.TimeTempRelation()
 # s = np.vectorize(cf.s_SM_no_nu)(Ttrel.T_SM_grid) + np.vectorize(cf.s_nu)(Ttrel.T_nu_grid)
 # nd_dw = cf.O_h2_dw_Tevo(Ttrel.T_nu_grid, m_d, th)*cf.rho_crit0_h2/m_d * s/cf.s0  
-# x_dw, nd_dw_grid = smooth_loglog_pchip(m_d/Ttrel.T_nu_grid, nd_dw, n_points)'
+# x_dw, nd_dw_grid = smooth_loglog_pchip(m_d/Ttrel.T_nu_grid, nd_dw, n_points)
 
 # plt.loglog(x_dw, nd_dw_grid, 'b')
 # plt.loglog(x_grid, n2(m_d/x_grid), 'k')
 
 # C_22_11_ut_DW = n2(T_nu_grid)*th_avg_22_11_ut_DWq
-C_22_11_ut_DW = nd_dw(T_nu_grid, T_SM_grid)*th_avg_22_11_ut_DW/2
-ax3.loglog(x_grid, 1e6*abs(C_22_11_ut_DW), color='r') #D02411
-ax3.text(6e-3, 1e-14, r"$n_2\langle \sigma v\rangle_{22\to 11}$", color='r', rotation=0, ha='left', va='bottom')
+# C_22_11_ut_DW = nd_dw(T_nu_grid, T_SM_grid)*th_avg_22_11_ut_DW/2
+# ax3.loglog(x_grid, 1e6*abs(C_22_11_ut_DW), color='r') #D02411
+# ax3.text(6e-3, 1e-14, r"$n_2\langle \sigma v\rangle_{22\to 11}$", color='r', rotation=0, ha='left', va='bottom')
 # ax3.loglog(x_grid, 1e6*abs(n2(T_nu_grid)*th_avg_22_11_ut_DW), color='b') #D02411
 
 x_therm_index = np.where(np.min(np.abs(x_grid-x_therm)) == np.abs(x_grid-x_therm))
@@ -530,9 +546,10 @@ elif BP == 5:
     xpos_nus = 2e0
 else: 
     xpos_nus = 3e-1
-ax3.text(xpos_nus, ypos_nus, r"$N_1 N_2 \leftrightarrow A^\prime$", color=c1, rotation=0, ha='center', va='top')
-ax3.text(xpos_nus, np.max(np.abs(1e6*C_da_X)), r"$\nu N_1 \to A^\prime$", color=c2, rotation=0, ha='left', va='bottom')
-ax3.text(xpos_nus, np.max(np.abs(1e6*C_22_11_ut[x_therm_index[0][0]:]))**(1.3), r"$N_2 N_2 \to N_1 N_1$", color=c4, rotation=0, ha='left', va='bottom')
+# ax3.text(xpos_nus, ypos_nus, r"$N_1 N_2 \leftrightarrow A^\prime$", color=c1, rotation=0, ha='center', va='top')
+ax3.text(xpos_nus*1.8, ypos_nus*50, r"$N_1 N_2 \leftrightarrow A^\prime$", color=c1, rotation=0, ha='center', va='top')
+ax3.text(xpos_nus, np.max(np.abs(2e6*C_da_X)), r"$\nu N_1 \to A^\prime$", color=c2, rotation=0, ha='left', va='bottom')
+# ax3.text(xpos_nus, np.max(np.abs(1e6*C_22_11_ut[x_therm_index[0][0]:]))**(1.3), r"$N_2 N_2 \to N_1 N_1$", color=c4, rotation=0, ha='left', va='bottom')
 
 x_mult = 1.3
 y_PP_ss = 2e-28
@@ -581,8 +598,9 @@ else:
     y_sa_P = 0.9
 
 
-ax3.text(x_therm*x_ss_PP, y_ss_PP*np.abs(1e6*C_dd_XX[x_therm_index]), r"$NN \to A^\prime A^\prime$", color=c3, rotation=0, ha='left', va='bottom')
-ax3.text(x_therm*x_PP_ss, y_PP_ss, r"$A'A' \to NN$", color=c5, rotation=0, va='bottom')
+# ax3.text(x_therm*x_ss_PP*2., y_ss_PP*np.abs(5e5*C_dd_XX[x_therm_index]), r"$NN \to A^\prime A^\prime$", color=c3, rotation=0, ha='left', va='bottom')
+ax3.text(x_therm*x_ss_PP/1.3, y_ss_PP*np.abs(1e6*C_dd_XX[x_therm_index]), r"$NN \to A^\prime A^\prime$", color=c3, rotation=0, ha='left', va='bottom')
+ax3.text(x_therm*x_PP_ss*9e-2, y_PP_ss, r"$A'A' \to NN$", color=c5, rotation=0, va='bottom')
 
 # ax3.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='-', color='black', label=r'$\Phi=X_\mu$')
 BP_str = r'$\textit{BP' + f'{BP}' + r'}$'
@@ -612,25 +630,31 @@ ax3.yaxis.set_ticks_position('right')
 
 ax3.set_xlim(2e-5, 20)
 ymax = max(np.max(1e6*abs(C_X_dd)), np.max(1e6*abs(C_dd_X)))
-ax3.set_ylim(1e-28, max(np.max(1e6*H)*2e3, ymax*1e1))
+ax3.set_ylim(1e-28, max(np.max(1e6*H)*2e1, ymax*1e1))
 # md, mX, sin22th, y
-md_str = f'{md:.3e}'.split('e-')
-mX_str = f'{mX:.3e}'.split('e-')
-sin22th_str = f'{sin22th:.3e}'.split('e-')
-y_str = f'{y:.3e}'.split('e-')
+md *= 10**6
+mX *= 10**6
+md_str = f'{md:.2e}'.split('e+')
+print(md_str)
+mX_str = f'{mX:.2e}'.split('e+')
+sin22th_str = f'{sin22th:.2e}'.split('e-')
+y_str = f'{y:.2e}'.split('e-')
 
-md_str = md_str[0] + '\cdot 10^{-' + md_str[1].lstrip('0') + '}'
-mX_str = f'{mX/md}m_N'
+# md_str = md_str[0] + '\cdot 10^{-' + md_str[1].lstrip('0') + '}'
+md_str = f"{md:.0f}" + "\ \mathrm{keV}"
+mX_str = f'{mX/md}'
 y_str = y_str[0] + '\cdot 10^{-' + y_str[1].lstrip('0') + '}'
 sin22th_str = sin22th_str[0] + '\cdot 10^{-' + sin22th_str[1].lstrip('0') + '}'
 
-fig.suptitle(fr"$m_N={md_str}, m_A={mX_str}, y={y_str}, \sin^2(2\theta)={sin22th_str}$")
+fig.suptitle(fr"$m_N={md_str},\ m_A={mX_str}\, m_N,\ y={y_str},\ \sin^2(2\theta)={sin22th_str}$")
 fig.tight_layout()
 
 if BP is None:
     fig_str = f'./saved_benchmarks/combined_pandemic_rate{load_str[2:].split(';full_new')[0]}.pdf'
+    print(fig_str)
 else:
     fig_str = f'./saved_benchmarks/combined_pandemic_rate_BP{BP}.pdf'
 if save_fig:
     plt.savefig(fig_str, bbox_inches='tight', dpi=300)
-plt.show()
+# plt.show()
+print("test?")

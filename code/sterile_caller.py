@@ -63,8 +63,7 @@ def call(
             # n = n_N1 + n_N2 + 2*n_X
             def C_n(T_a, T_d, xi_d, xi_X):
                 """
-                Anton: A lot of processes do not contriubute due to equilibrium or no change
-                in particle number. 
+                Anton: A lot of processes do not contriubute due to equilibrium or no change in particle number. 
 
                 Collision operator describing particle alpha: 
                 Cn[alpha]_{I_r -> F_r} = eps^alpha_r int dPI |M|^2 prod_{i in I_r} f_i * prod_{j in F_r} (1+k_j*f_j) / kappa_r 
@@ -114,19 +113,19 @@ def call(
                     exit(1)
 
                 x = m_d / T_a
-                if call.count % 10 == 0:
-                    call.x_list.append(x)
-                    # call.C_list.append([CX_XX_dd, Ch_hh_dd, Ch_h_XX])
-                    call.C_list.append([CX_X_1nu, CX_XX_11])
-                    i = call.count // 10
-                    if i > 0: 
-                        plt.semilogy([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][0]), abs(call.C_list[i][0])], color='r', marker='o', markersize=3)
-                        plt.semilogy([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][1]), abs(call.C_list[i][1])], color='tab:blue', marker='o', markersize=3)
-                        # plt.loglog([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][2]), abs(call.C_list[i][2])], color='tab:green', marker='o', markersize=3)
-                        plt.pause(0.05)
+                # if call.count % 10 == 0:
+                #     call.x_list.append(x)
+                #     # call.C_list.append([CX_XX_dd, Ch_hh_dd, Ch_h_XX])
+                #     call.C_list.append([CX_X_1nu, CX_XX_11])
+                #     i = call.count // 10
+                #     if i > 0: 
+                #         plt.semilogy([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][0]), abs(call.C_list[i][0])], color='r', marker='o', markersize=3)
+                #         plt.semilogy([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][1]), abs(call.C_list[i][1])], color='tab:blue', marker='o', markersize=3)
+                #         # plt.loglog([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][2]), abs(call.C_list[i][2])], color='tab:green', marker='o', markersize=3)
+                #         plt.pause(0.05)
                 call.count += 1
 
-                print("C_ns:", f'{CX_XX_11:.5e}', f'{CX_X_1nu:.5e}')
+                # print("C_ns:", f'{CX_XX_11:.5e}', f'{CX_X_1nu:.5e}')
                 # Factor 2 as N_1 and N_2 both contribute. Second factor of two from number change in n_d = n_N + 2*n_X
                 return CX_X_1nu + 4*CX_XX_11
 
@@ -272,6 +271,7 @@ def call(
     print("Done with Pandemolator.pandemolate")
     # print(f"Pandemolator.pandemolate ran in {time.time() - time1}s ")
 
+    # HM: Not sure if this is used for anything
     try:
         C_therm_grid = np.array([C_therm(T_d, xi_d, xi_X) for T_d, xi_d, xi_X in zip(pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol)])
     except:

@@ -35,6 +35,7 @@ class TimeTempRelation(object):
         if m_psi is None:
             self.psi_in_SM = True
         else:
+            # HM: Never used(?)
             self.psi_in_SM = False
             self.m_psi   = m_psi   # in GeV
             self.dof_psi = dof_psi
@@ -44,7 +45,11 @@ class TimeTempRelation(object):
         grid_size_time = int(log10(t_end/t_start) * t_gp_pd)
         print("Grid size: ", grid_size_time)
         # print(f'Time grid size: {grid_size_time}')
-        self.t_grid = np.logspace(log10(t_start), log10(t_end), num=grid_size_time)
+        self.t_grid = np.logspace(
+            log10(t_start),
+            log10(t_end),
+            num=grid_size_time
+        )
         self.sqrt_t_grid = np.sqrt(self.t_grid)
 
         sol = solve_ivp(
@@ -221,7 +226,10 @@ class Pandemolator(object):
 
     def rho_3P_diff(self, T_chi, xi_chi, xi_X):
         # TODO: Halvor: Check factor of 2. Probably right?
-        return 2*dens.rho_3P_diff(self.k_chi, T_chi, self.m_chi, self.dof_chi, xi_chi) + dens.rho_3P_diff(self.k_X, T_chi, self.m_X, self.dof_X, xi_X)
+        return (
+            2 * dens.rho_3P_diff(self.k_chi, T_chi, self.m_chi, self.dof_chi, xi_chi)
+            + dens.rho_3P_diff(self.k_X, T_chi, self.m_X, self.dof_X, xi_X)
+        )
 
     def n_chi_der_T(self, T_chi, xi_chi):
         return dens.n_der_T(self.k_chi, T_chi, self.m_chi, self.dof_chi, xi_chi)
@@ -292,8 +300,8 @@ class Pandemolator(object):
     def der(self, log_x, y):
         x = exp(log_x)
         T = self.m_chi / x
-        print("x = ", x)
-        print("T = ", T)
+        # print("x = ", x)
+        # print("T = ", T)
         H = self.H_interp_T(T)
         dT_dt = self.dT_dt_interp_T(T)
         ent = self.ent_interp_T(T)
@@ -301,13 +309,13 @@ class Pandemolator(object):
         Y = y[0]
         n = Y * ent
         rho = y[1] / (sf**4.)
-        print("rho = ", rho)
-        print("Total mass = ", self.m_chi*n)
+        # print("rho = ", rho)
+        # print("Total mass = ", self.m_chi*n)
 
         # TODO: Remove debugging.
         # TODO: This error is triggered. Is it related to the fact that n includes contributions from different paritcles?
         if rho < (1.+1e-10)*self.m_chi*n: # energy density too small
-            print("Error: Energy denstiy is too small.")
+            print("Error: Energy density is too small.")
             # exit(1)
             return [0., 0.]
         if n < 0:
@@ -324,20 +332,20 @@ class Pandemolator(object):
             method='lm'
         )
         T_chi = exp(root_sol.x[0])
-        print("T_chi = ", T_chi)
+        # print("T_chi = ", T_chi)
         xi_chi = min(root_sol.x[1] + self.m_chi/T_chi, (1.-1e-14)*self.m_X/(self.fac_n_X*T_chi))
         xi_X = self.fac_n_X*xi_chi
 
         self.T_chi_last, self.xi_chi_last = T_chi, xi_chi
 
-        start = time.time()
+        # start = time.time()
         C_n = self.C_n(T, T_chi, xi_chi, xi_X)
-        end = time.time()
-        print('C_n time:', end - start)
-        start = time.time()
+        # end = time.time()
+        # print('C_n time:', end - start)
+        # start = time.time()
         C_rho = self.C_rho(T, T_chi, xi_chi, xi_X)
-        end = time.time()
-        print('C_rho time:', end - start)
+        # end = time.time()
+        # print('C_rho time:', end - start)
 
         der_Y = -(T/dT_dt)*C_n/ent
         der_rho = -(T/dT_dt)*(H*self.rho_3P_diff(T_chi, xi_chi, xi_X) + C_rho)*(sf**4.)
@@ -577,20 +585,23 @@ class Pandemolator(object):
                     [self.log_x_pts[i_xi_nonzero], self.log_x_pts[-1]],
                     y0,
                     t_eval=self.log_x_pts[i_xi_nonzero:],
-                    events=(event_xi, event_abund),
-                    # events=(event_abund,),
+                    # events=(event_xi, event_abund),
+                    events=(event_abund,),
                     rtol=rtol_ode_pan,
                     atol=0.,
                     # atol=1e-9,
                     # method='BDF',
                     method='RK45',
-                    first_step=self.log_x_pts[i_xi_nonzero+1]-self.log_x_pts[i_xi_nonzero],
+                    # first_step=self.log_x_pts[i_xi_nonzero+1]-self.log_x_pts[i_xi_nonzero],
                     max_step=1.
                 )
                 end = time.time()
                 print('solve_ivp time:', end - start)
                 print('End solve_ivp xi non-zero')
                 i_max = i_xi_nonzero + sol.t.size - 1
+                print("i_xi = ", i_xi_nonzero)
+                print("t_size = ", sol.t.size)
+                print("i_max = ", i_max)
 
                 self.T_chi_last = (rho0 / (cf.pi2*(2*dof_fac_chi+dof_fac_X)/30.))**0.25
                 self.xi_chi_last = 0.
@@ -598,6 +609,8 @@ class Pandemolator(object):
                 start = time.time()
                 print(f'i_start={i_start}, i_max={i_max}')
                 for i in range(i_start, i_max + 1):
+                    if i%100 == 0:
+                        print("i = ", i)
                     ent = self.ent_interp_T(self.T_grid_sol[i])
                     sf = self.sf_interp_T(self.T_grid_sol[i])
                     n = sol.y[0, i-i_xi_nonzero]*ent

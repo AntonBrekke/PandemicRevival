@@ -7,7 +7,7 @@ import .coll_3_12
 
 
 function test_coll_3_12()
-    energy_type = 0
+    # energy_type = Val{0}
 
     m_N = 1e-5
     m_A = 2.5 * m_N
@@ -15,24 +15,41 @@ function test_coll_3_12()
     xi_N = -20.
     xi_A = 2. * xi_N
 
-    N = Particle(m_N, 1., xi_N)
-    A = Particle(m_A, -1., xi_A)
-    nu = Particle(0., 1., 0)
+    n = 1000
+    x = logrange(1e-6, 1e2, n)
+    temp = m_N ./ x
+
+    N = Array{Particle{Float64}}(undef, n)
+    A = Array{Particle{Float64}}(undef, n)
+    nu = Array{Particle{Float64}}(undef, n)
+    for i in 1:n
+        N[i] = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp[i])
+        A[i] = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp[i])
+        nu[i] = Particle{Float64}(0., 1., xi=0., temp=temp[i])
+    end
 
     y = 1e-5
     sin2_2th = 2e-11
     theta = asin(sqrt(sin2_2th)) / 2.
     model_params = ModelParams(y, theta)
 
-    x = logrange(1e-6, 1e2, 1000)
-    temp = m_N ./ x
 
-    @time coll = coll_3_12.(temp, Ref(N), Ref(nu), Ref(A), Ref(model_params), Ref(energy_type), Ref(coll_A_Nnu_sq_amp))
+    @time coll_log = coll_3_12_log.(
+        N, nu, A,
+        Ref(model_params),
+        # sq_amp_func = Ref(coll_A_Nnu_sq_amp)
+    )
+    @time coll = coll_3_12.(
+        N, nu, A,
+        Ref(model_params),
+        # Ref(energy_type),
+        # Ref(coll_A_Nnu_sq_amp)
+    )
 
     # println(coll)
 
     Plt.plot(
-        minorgrid=true,
+        # minorgrid=true,
         xlabel=L"$x$",
         ylabel=L"Collision term",
     )
@@ -42,9 +59,10 @@ function test_coll_3_12()
         ylim=(1e-100, 1e-20)
         # ylim = (0., 7e-16)
     )
-    Plt.scatter!(x, coll)
+    Plt.plot!(x, coll)
+    Plt.plot!(x, coll_log)
     Plt.savefig("figures/test_coll.pdf")
-    return 0
+    return nothing
 end
 
 
@@ -55,26 +73,23 @@ function test_coll_3_12_integral()
     xi_N = -20.
     xi_A = 2. * xi_N
 
-    N = Particle(m_N, 1., xi_N)
-    A = Particle(m_A, -1., xi_A)
-    nu = Particle(0., 1., 0)
+    x = 1e0
+    temp = m_N / x
+
+    N = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp)
+    A = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp)
+    nu = Particle{Float64}(0., 1., xi=0, temp=temp)
 
     y = 1e-4
     sin2_2th = 1e-4
     theta = asin(sqrt(sin2_2th))/2
     model_params = ModelParams(y, theta)
 
-    x = 1e0
-    temp = m_N / x
-
     println("T = ", temp)
 
-    params = (
-        temp=temp,
-        p1=N,
-        p2=nu,
-        p3=A,
-        energy_type=0,
+    params = Params_3_12{Float64, Val{0}}(
+        model_params,
+        N, nu, A
     )
 
     e1_min = N.m
@@ -83,7 +98,7 @@ function test_coll_3_12_integral()
     e1_max = logrange(1e0 * N.m, 1e8 * N.m, length=n)
 
     res = zeros(n)
-    for i in 1:n
+    @time for i in 1:n
         problem = Integrals.IntegralProblem(coll_3_12_int_e2, (e1_min, e1_max[i]), params)
         sol = Integrals.solve(
             problem,
@@ -91,7 +106,25 @@ function test_coll_3_12_integral()
             abstol=1e-60,
             reltol=1e-4,
         )
-        res[i] = sol[1]
+        res[i] = sol.u
+    end
+
+    y1_min = log(e1_min)
+    y1_max = log.(e1_max)
+    res_log = zeros(n)
+    @time for i in 1:n
+        problem = Integrals.IntegralProblem(
+            coll_3_12_int_e2_log,
+            (y1_min, y1_max[i]),
+            params
+        )
+        sol = Integrals.solve(
+            problem,
+            Integrals.QuadGKJL(),
+            abstol=1e-60,
+            reltol=1e-4,
+        )
+        res_log[i] = sol[1]
     end
 
     Plt.plot(
@@ -105,109 +138,110 @@ function test_coll_3_12_integral()
         ylim=(1e-60, 9e-10)
         # ylim = (0., 7e-16)
     )
-    Plt.scatter!(e1_max / N.m, res)
+    Plt.plot!(e1_max / N.m, res_log)
+    Plt.plot!(e1_max / N.m, res)
     Plt.savefig("figures/test_e_max.pdf")
 
     # sq_amp = coll_3_12_sq_amp(model_params, N, nu, A)
 
-    return 0
+    return nothing
 end
 
-function test_inner_kernel()
+function test_kernel()
     m_N = 1e-5
     m_A = 2.5 * m_N
 
     xi_N = -10.
     xi_A = 2. * xi_N
 
-    N = Particle(m_N, 1., xi_N)
-    A = Particle(m_A, -1., xi_A)
-    nu = Particle(0., 1., 0)
+    x = 1e0
+    temp = m_N / x
+
+    N = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp)
+    A = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp)
+    nu = Particle{Float64}(0., 1., xi=0, temp=temp)
 
     y = 1e-4
     sin2_2th = 1e-4
     theta = asin(sqrt(sin2_2th))/2
     model_params = ModelParams(1e-4, theta)
 
-    x = 1e0
-    temp = m_N / x
+    N.e = 2 * N.m
+    N.mom = momentum(N)
 
-    n = 100
-    e1 = 2 * N.m
-
-    e2_m = coll_3_12_e2_min(e1, N, nu, A)
-    e2_p = coll_3_12_e2_max(e1, N, nu, A)
-    e2 = range(e2_m, e2_p, length=n)
-
-    params = (
-        e1=e1,
-        temp=temp,
-        p1=N,
-        p2=nu,
-        p3=A,
-        energy_type=0,
+    params = Params_3_12{Float64, Val{0}}(
+        model_params,
+        N, nu, A,
     )
 
-    println(params)
+    n = 1000
+    e2_m = coll_3_12_e2_min(params)
+    e2_p = coll_3_12_e2_max(params)
+    e2 = logrange(e2_m, e2_p, length=n)
+
+    coll = coll_3_12_ker.(e2, Ref(params))
 
     Plt.plot(
         # xscale=:log10,
         # yscale=:log10,
         minorgrid=true,
         xlabel=L"$E_2$",
-        ylabel=L"Inner Kernel",
+        ylabel=L"\textrm{Inner\ Kernel}",
     )
     Plt.plot!(
         # xlim=(7e-6, 1.1e-4),
         # ylim=(1e-20, 9e-10)
     )
-    Plt.plot!(e2, coll_3_12_ker.(e2, Ref(params)))
+    Plt.scatter!(e2, coll)
     Plt.savefig("figures/test_inner_kernel.pdf")
 
-    return 0
+    return nothing
 end
 
-function test_outer_kernel()
+function test_e2_int()
     m_N = 1e-5
     m_A = 2.5 * m_N
 
     xi_N = -10.
     xi_A = 2. * xi_N
 
-    N = Particle(m_N, 1., xi_N)
-    A = Particle(m_A, -1., xi_A)
-    nu = Particle(0., 1., 0)
+    x = 1e-2
+    temp = m_N / x
+
+    N = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp)
+    A = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp)
+    nu = Particle{Float64}(0., 1., xi=0, temp=temp)
 
     y = 1e-4
     sin2_2th = 1e-4
     theta = asin(sqrt(sin2_2th))/2
     model_params = ModelParams(y, theta)
 
-    x = 1e-2
-    temp = m_N / x
 
     e1_max = max(1e1*temp, 6*m_N)
     # e1_max = 3 * m_N
 
-    n = 300
-    e1 = range(N.m, e1_max, length=n)
+    n = 40000
+    e1 = logrange(N.m, e1_max, length=n)
 
-    params = (
-        temp=temp,
-        p1=N,
-        p2=nu,
-        p3=A,
-        energy_type=0,
+    params = Params_3_12{Float64, Val{0}}(
+        model_params,
+        N, nu, A,
     )
 
-    sols = coll_3_12_int_e2.(e1, Ref(params))
+    y1 = log.(e1)
+    @time sols = coll_3_12_int_e2.(e1, Ref(params))
+    @time sols_log = coll_3_12_int_e2_log.(y1, Ref(params)) ./ e1
+
     res = zeros(n)
+    res_log = zeros(n)
     for i in 1:n
-        res[i] = sols[i].u
+        res[i] = sols[i]
+        res_log[i] = sols_log[i]
     end
 
     Plt.plot(
-        # xscale=:log10,
+        xscale=:log10,
         # yscale=:log10,
         minorgrid=true,
         xlabel=L"$E_1$",
@@ -217,13 +251,14 @@ function test_outer_kernel()
         # xlim=(7e-6, 1.1e-4),
         # ylim=(1e-20, 9e-10)
     )
-    Plt.scatter!(e1, res)
+    Plt.plot!(e1, res)
+    Plt.plot!(e1, res_log)
     Plt.savefig("figures/test_outer_kernel.pdf")
 
-    return 0
+    return nothing
 end
 
-test_inner_kernel()
-test_outer_kernel()
-test_coll_3_12()
-@time test_coll_3_12_integral()
+test_kernel()
+# test_e2_int()
+# test_coll_3_12()
+# test_coll_3_12_integral()

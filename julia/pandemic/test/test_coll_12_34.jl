@@ -1,3 +1,5 @@
+import BenchmarkTools as BT
+
 include(joinpath(@__DIR__, "../src/coll_12_34.jl"))
 
 
@@ -13,18 +15,27 @@ function test_int_e1()
     xi_N = -10.
     xi_A = 2. * xi_N
 
-    temp = range(
-        1e-3,
-        1e3,
-        length=100,
+    n = 100
+    temp = logrange(
+        1e-6,
+        1e1,
+        length=n,
     )
 
-    p1 = Particle(m_N, 1., xi_N)
-    p2 = Particle(m_N, 1., xi_N)
-    p3 = Particle(m_A, -1., xi_A)
-    p4 = Particle(m_A, -1., xi_A)
+    p1 = Array{Particle{Float64}}(undef, n)
+    p2 = Array{Particle{Float64}}(undef, n)
+    p3 = Array{Particle{Float64}}(undef, n)
+    p4 = Array{Particle{Float64}}(undef, n)
 
-    sol = coll_12_34_int_e1.(temp, Ref(p1), Ref(p2), Ref(p3), Ref(p4), Ref(model_params))
+    for i in 1:n
+        p1[i] = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp[i])
+        p2[i] = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp[i])
+        p3[i] = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp[i])
+        p4[i] = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp[i])
+    end
+    params = Params_12_34{Float64}.(Ref(model_params), p1, p2, p3, p4)
+
+    sol = coll_12_34_int_e1.(params)
     println("sol = ", sol)
     p = Plt.plot(
         minorgrid=true,
@@ -33,8 +44,9 @@ function test_int_e1()
     )
     Plt.plot!(
         p,
-        # xscale=:log10,
-        # yscale=:log10,
+        xscale=:log10,
+        yscale=:log10,
+        ylim=(1e-60, 1e-10)
     )
     Plt.scatter!(
         p,
@@ -48,7 +60,7 @@ function fix_params()
     y = 1e-4
     sin2_2th = 1e-11
     theta = asin(sqrt(sin2_2th))/2
-    model_params = ModelParams(y, theta)
+    model_params = ModelParams{Float64}(y, theta)
 
     m_N = 1e-5
     m_A = 2.5 * m_N
@@ -59,18 +71,17 @@ function fix_params()
     x = 1e0
     temp = m_N / x
 
-    p1 = Particle(m_A, -1., xi=xi_A)
-    p2 = Particle(m_A, -1., xi=xi_A)
-    p3 = Particle(m_N, 1., xi=xi_N)
-    p4 = Particle(m_N, 1., xi=xi_N)
+    p1 = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp)
+    p2 = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp)
+    p3 = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp)
+    p4 = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp)
 
-    params = Params_12_34(
+    params = Params_12_34{Float64}(
         model_params,
         p1,
         p2,
         p3,
         p4,
-        temp,
     )
 
     return params
@@ -87,7 +98,7 @@ function test_ker()
     rest_e = p.p1.e + p.p2.e - p.p3.m - p.p4.m
 
     # p.p3.e = p.p3.m
-    p.p3.e = p.p3.m + rest_e/4.9999999
+    p.p3.e = p.p3.m + rest_e / 2.
     p.p3.mom = momentum(p.p3)
     p.p4.e = p.p1.e + p.p2.e - p.p3.e
     p.p4.mom = momentum(p.p4)
@@ -100,7 +111,7 @@ function test_ker()
     if smin >= smax
         error("smin = ", smin, " >= smax = ", smax)
     end # if
-    p.s = smin + (smax - smin)/1e3
+    p.s = smin + (smax - smin)/1e2
     println("s = ", p.s)
 
     p.t_min = t_lim(-1., p)
@@ -108,17 +119,17 @@ function test_ker()
     p.a = a_theta(p)
     println("t_min = ", p.t_min, ", t_max = ", p.t_max)
 
-    n = 100
+    n = 10000
     t = range(p.t_min, p.t_max, length=n)
     sq_amp = coll_12_34_sq_amp.(t, Ref(p))
     ker_vals = coll_12_34_ker.(t, Ref(p))
 
     # println("sq_amp = ", sq_amp)
-    println("ker_vals = ", ker_vals)
+    # println("ker_vals = ", ker_vals)
     amp_plot = Plt.plot(
         minorgrid=true,
         xlabel=L"$t$",
-        ylabel=L"Squared amplitude",
+        ylabel=L"\textrm{Squared amplitude}",
         # xlims=(t_min, t_max),
         # ylims=(1e18, 1e20),
         # xscale=:log10,
@@ -136,7 +147,7 @@ function test_ker()
         minorgrid=true,
         xlabel=L"$t$",
         ylabel=L"Kernel",
-        # xlims=(t_min, t_max),
+        # xlims=(p.t_min, p.t_max),
         # ylims=(1e18, 1e20),
         # xscale=:log10,
         # yscale=:log10,
@@ -149,10 +160,10 @@ function test_ker()
     Plt.savefig(ker_plot, "figures/coll_12_34_ker.pdf")
 end
 
-function test_int_t()
+function test_rescale_ker()
     p = fix_params()
 
-    p.p1.e = 2. * p.p1.m
+    p.p1.e = 1.1 * p.p1.m
     p.p1.mom = momentum(p.p1)
     p.p2.e = p.p1.e
     p.p2.mom = momentum(p.p2)
@@ -160,13 +171,90 @@ function test_int_t()
     rest_e = p.p1.e + p.p2.e - p.p3.m - p.p4.m
 
     # p.p3.e = p.p3.m
-    p.p3.e = p.p3.m + rest_e/2.
+    p.p3.e = p.p3.m + rest_e / 2.
     p.p3.mom = momentum(p.p3)
     p.p4.e = p.p1.e + p.p2.e - p.p3.e
     p.p4.mom = momentum(p.p4)
     e_check = p.p1.e + p.p2.e - p.p3.e - p.p4.e
     println("e_check = ", e_check)
-    println("e1 = ", p.p1.e, ", e2 = ", p.p2.e, ", e3 = ", p.p3.e, ", e4 = ", p.p4.e)
+
+    smin = s_min(p)
+    smax = s_max(p)
+    println("smin = ", smin, ", smax = ", smax)
+    if smin >= smax
+        error("smin = ", smin, " >= smax = ", smax)
+    end # if
+    p.s = smin + (smax - smin)/1e2
+    println("s = ", p.s)
+
+    p.t_min = t_lim(-1., p)
+    p.t_max = t_lim(1., p)
+    p.a = a_theta(p)
+    println("t_min = ", p.t_min, ", t_max = ", p.t_max)
+
+    t_0 = (p.t_max + p.t_min) / 2.
+
+    n = 4000
+    t = range(t_0, p.t_max, length=n)
+    sq_amp = coll_12_34_sq_amp.(t, Ref(p))
+    ker_vals = coll_12_34_ker.(t, Ref(p))
+
+    r = log.(t .- p.t_min)
+    q = log.(p.t_max .- t)
+
+    # println("sq_amp = ", sq_amp)
+    # println("ker_vals = ", ker_vals)
+    amp_plot = Plt.plot(
+        minorgrid=true,
+        xlabel=L"$t$",
+        ylabel=L"\textrm{Squared amplitude}",
+        # xlims=(t_min, t_max),
+        # ylims=(1e18, 1e20),
+        # xscale=:log10,
+        # yscale=:log10,
+    )
+    Plt.plot!(
+        amp_plot,
+        t,
+        sq_amp,
+    )
+    Plt.savefig(amp_plot, "figures/coll_12_34_sq_amp.pdf")
+
+    # println("ker_vals = ", ker_vals)
+    ker_plot = Plt.plot(
+        minorgrid=true,
+        xlabel=L"$t$",
+        ylabel=L"Kernel",
+        # xlims=(t_0, p.t_max),
+        # ylims=(1e18, 1e20),
+        # xscale=:log10,
+        # yscale=:log10,
+    )
+    Plt.scatter!(
+        ker_plot,
+        q,
+        ker_vals .* exp.(q),
+    )
+    Plt.savefig(ker_plot, "figures/coll_12_34_rescaled_ker.pdf")
+end
+
+function test_int_t()
+    p = fix_params()
+
+    p.p1.e = 4. * p.p1.m
+    p.p1.mom = momentum(p.p1)
+    p.p2.e = p.p1.e
+    p.p2.mom = momentum(p.p2)
+
+    rest_e = p.p1.e + p.p2.e - p.p3.m - p.p4.m
+
+    p.p3.e = p.p3.m + rest_e/2.
+    p.p3.mom = momentum(p.p3)
+    p.p4.e = p.p1.e + p.p2.e - p.p3.e
+    p.p4.mom = momentum(p.p4)
+    # e_check = p.p1.e + p.p2.e - p.p3.e - p.p4.e
+    # println("e_check = ", e_check)
+    # println("e1 = ", p.p1.e, ", e2 = ", p.p2.e, ", e3 = ", p.p3.e, ", e4 = ", p.p4.e)
 
     smin = s_min(p)
     smax = s_max(p)
@@ -175,21 +263,18 @@ function test_int_t()
         println("smin = ", smin, " >= smax = ", smax)
         println("Result is 0 for all t.")
     else
-        # Regularisation of integral at s=s_min/s_max
+        # Regularisation of integral at s=(s_min and s_max)
         reg = (smax - smin) / 1e5
         # reg = 0.
-        n = 100
+        n = 1000
         s = range(smin + reg, smax - reg, length=n)
-        # s = 2e-8
-        println("s = ", s)
 
         sol = coll_12_34_int_t.(s, Ref(p))
-        println("Integral over t = ", sol)
 
         anal_sol = coll_12_34_int_t_anal.(s, Ref(p))
         new_sol = coll_12_34_int_t_new.(s, Ref(p))
 
-        println("First fraction = ", sol[1] / anal_sol[1])
+        qr_sol = coll_12_34_int_t_qr.(s, Ref(p))
 
         plot = Plt.plot(
             minorgrid=true,
@@ -217,6 +302,11 @@ function test_int_t()
             new_sol,
             ls=:dashdot
         )
+        Plt.plot!(
+            plot,
+            s,
+            qr_sol,
+        )
         Plt.savefig(plot, "figures/test_t_int.pdf")
     end # if
     return nothing
@@ -237,24 +327,23 @@ function test_int_s()
         length=n,
     )
 
-    sol = coll_12_34_int_s.(e3, Ref(p))
-    println("Integral over s = ", sol)
+    @time sol = coll_12_34_int_s.(e3, Ref(p))
+    # println("Integral over s = ", sol)
 
     plot = Plt.plot(
         minorgrid=true,
         xlabel=L"$e3$",
         ylabel=L"Kernel",
-        # xlims=(t_min, t_max),
-        # ylims=(1e18, 1e20),
-        # xscale=:log10,
-        # yscale=:log10,
+        xlims=(0, 1.5e-4),
+        ylims=(-5e-33, 1.5e-34),
     )
     Plt.plot!(
         plot,
         e3,
         sol
     )
-    Plt.savefig(plot, "figures/test_e3_int.pdf")
+    Plt.savefig(plot, "figures/test_s_int.pdf")
+    return nothing 
 end
 
 function test_int_e3()
@@ -263,15 +352,15 @@ function test_int_e3()
     p.p1.e = 3. * p.p1.m
     p.p1.mom = momentum(p.p1)
 
-    max_mult = 1e3
+    max_mult = 1e2
     e2 = range(
         max(p.p2.m, p.p3.m + p.p4.m - p.p1.e),
-        max(max_mult * p.temp, max_mult * p.p2.m),
+        max(max_mult * p.p2.temp, max_mult * p.p2.m),
         length=1000,
     )
 
     sol = coll_12_34_int_e3.(e2, Ref(p))
-    println("Integral over e3 = ", sol)
+    # println("Integral over e3 = ", sol)
 
     plot = Plt.plot(
         minorgrid=true,
@@ -287,14 +376,14 @@ function test_int_e3()
         e2,
         -sol
     )
-    Plt.savefig(plot, "figures/test_e2_int.pdf")
+    Plt.savefig(plot, "figures/test_e3_int.pdf")
 end # function
 
 
 function test_int()
     p = fix_params()
 
-    sol = coll_12_34(p.model_params, p.p1, p.p2, p.p3, p.p4, p.temp)
+    sol = coll_12_34(p.model_params, p.p1, p.p2, p.p3, p.p4)
 
     println("Integral = ", sol)
 end
@@ -302,6 +391,7 @@ end
 
 # test_int_e1()
 # test_ker()
+# test_rescale_ker()
 # test_int_t()
 # test_int_s()
 # @time test_int_e3()

@@ -80,7 +80,7 @@ data_avg_mom_dw = np.loadtxt(data_dir + 'dw/0612182_dw_fig_8.dat', skiprows=2)
 avg_mom_interp_dw = interp1d(np.log(data_avg_mom_dw[:,0]), np.log(data_avg_mom_dw[:,1]), bounds_error=False, fill_value=(np.log(data_avg_mom_dw[0,1]), np.log(data_avg_mom_dw[-1,1])))
 avg_mom_0_dw = lambda md: np.exp(avg_mom_interp_dw(np.log(md)))*7.*pi2*pi2*temp_nu_dec_sm*sf_nu_dec_sm/(180.*zeta3)
 
-T_d_dw = lambda md: 0.133*((1e6*md)**1./3.) # temperature of maximal d production by DW mechanism
+T_d_dw = lambda md: 0.133 * (1e6*md)**(1./3.) # temperature of maximal d production by DW mechanism
 
 data_Tevo_dw = np.loadtxt(data_dir + 'dw/0612182_dw_fig_3.dat', skiprows=2)
 data_Tevo_dw[:,1] = data_Tevo_dw[:,1]/data_Tevo_dw[-1,1]

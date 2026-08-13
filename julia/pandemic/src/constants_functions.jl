@@ -91,7 +91,7 @@ rho_m(T_SM, T_nu) = rho_m0 * (s_SM_no_nu(T_SM) + s_nu(T_nu)) / s0
 
 const _dw_cache = Ref{Any}(nothing)
 
-T_d_dw(md) = 0.133 * ((1e6 * md)^(1.0 / 3.0))
+T_d_dw(md) = 0.133 * ((1e6 * md)^(1. / 3.))
 sf_nu_dec_sm() = (s0 / s_SM_before_nu_dec(temp_nu_dec_sm))^(1.0 / 3.0)
 
 function _get_dw_cache()
@@ -131,7 +131,7 @@ function _get_dw_cache()
 end
 
 C_e_dw(md) = exp(_get_dw_cache().log_C_e_dw_interp(log(md)))
-O_h2_dw(md, th) = 0.11 * C_e_dw(md) * ((0.5 * sin(2.0 * th) * md * 1e10)^2.0)
+O_h2_dw(md, th) = 0.11 * C_e_dw(md) * (0.5 * sin(2. * th) * md * 1e10)^2
 n_0_dw(md, th) = O_h2_dw(md, th) * rho_crit0_h2 / md
 
 avg_mom_0_dw(md) = exp(_get_dw_cache().avg_mom_interp_dw(log(md))) *
@@ -294,7 +294,7 @@ end
 #     return dof * (T^4.0) * exp(xi) * cache.P_red_fermion_interp(x)
 # end
 
-function rho_3P_diff_boson(p::Particle{T}, temp::R, xi::R) where {T<:Real, R<:Real}
+function rho_3P_diff_boson(p::Particle{T}, temp::R, xi::S) where {T<:Real, R<:Real, S<:Real}
     cache = _get_dens_cache()
     x = p.m / temp
     if x - xi > 700.0
@@ -309,7 +309,7 @@ function rho_3P_diff_boson(p::Particle{T}, temp::R, xi::R) where {T<:Real, R<:Re
     return p.dof * p.m^4 / x^2 * exp(xi) * cache.rho_3P_diff_red_boson_interp(x)
 end
 
-function rho_3P_diff_fermion(p::Particle{T}, temp::R, xi::R) where {T<:Real, R<:Real}
+function rho_3P_diff_fermion(p::Particle{T}, temp::R, xi::S) where {T<:Real, R<:Real, S<:Real}
     cache = _get_dens_cache()
     x = p.m / temp
     if x - xi > 700.
@@ -324,14 +324,14 @@ function rho_3P_diff_fermion(p::Particle{T}, temp::R, xi::R) where {T<:Real, R<:
     return p.dof * p.m^4 / x^2 * exp(xi) * cache.rho_3P_diff_red_fermion_interp(x)
 end
 
-function n_boson(p::Particle{T}, temp::R, xi::R) where {T<:Real, R<:Real}
+function n_boson(p::Particle{T}, temp::R, xi::S) where {T<:Real, R<:Real, S<:Real}
     cache = _get_dens_cache()
     x = p.m / temp
     if x - xi > 700.0
         return 0.0
     end
     if x > cache.n_red_boson[end, 1] || xi > 700.0
-        return p.dof * exp(xi - x) * ((p.m^2 / (2. * pi * x))^1.5)
+        return p.dof * exp(xi - x) * (p.m^2 / (2. * pi * x))^1.5
     end
     if x < cache.n_red_boson[1, 1]
         return p.dof * exp(xi) * zeta3 * temp^3 / pi^2
@@ -339,7 +339,7 @@ function n_boson(p::Particle{T}, temp::R, xi::R) where {T<:Real, R<:Real}
     return p.dof * temp^3 * exp(xi) * cache.n_red_boson_interp(x)
 end
 
-function n_fermion(p::Particle{T}, temp::R, xi::R) where {T<:Real, R<:Real}
+function n_fermion(p::Particle{T}, temp::R, xi::S) where {T<:Real, R<:Real, S<:Real}
     cache = _get_dens_cache()
     x = p.m / temp
     if x - xi > 700.0

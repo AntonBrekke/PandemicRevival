@@ -58,7 +58,7 @@ mutable struct TimeTempRelation{T<:Real}
             t_end::T=t_max,
             t_gp_pd::Int64=1000,
         ) where T <: Real
-        t_start = 1.0 / (2.0 * hubble_of_temps(T_start, T_start))
+        t_start = 1. / (2. * hubble_of_temps(T_start, T_start))
         grid_size_time = max(2, floor(Int, log10(t_end / t_start) * t_gp_pd))
 
         t_grid = 10.0 .^ range(log10(t_start), log10(t_end), length=grid_size_time)

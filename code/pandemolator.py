@@ -43,8 +43,6 @@ class TimeTempRelation(object):
 
         t_start = 1./(2.*self.hubble_of_temps(T_start, T_start))
         grid_size_time = int(log10(t_end/t_start) * t_gp_pd)
-        print("Grid size: ", grid_size_time)
-        # print(f'Time grid size: {grid_size_time}')
         self.t_grid = np.logspace(
             log10(t_start),
             log10(t_end),
@@ -336,6 +334,14 @@ class Pandemolator(object):
         xi_chi = min(root_sol.x[1] + self.m_chi/T_chi, (1.-1e-14)*self.m_X/(self.fac_n_X*T_chi))
         xi_X = self.fac_n_X*xi_chi
 
+        n_total = 2*self.n_chi(T_chi, xi_chi) + self.fac_n_X*self.n_X(T_chi, self.fac_n_X*xi_chi)
+        print("n_init = ", n)
+        print("n_total = ", n_total)
+
+        rho_total = self.rho(T_chi, xi_chi, self.fac_n_X*xi_chi)
+        print("rho_init = ", rho)
+        print("rho_total = ", rho_total)
+
         self.T_chi_last, self.xi_chi_last = T_chi, xi_chi
 
         # start = time.time()
@@ -487,10 +493,13 @@ class Pandemolator(object):
         dof_fac_chi = self.dof_chi if self.k_chi == -1 else self.dof_chi*7./8.
         dof_fac_X = self.dof_X if self.k_X == -1 else self.dof_X*7./8.
         self.T_chi_last = (self.rho_ic / (cf.pi2*(2*dof_fac_chi+dof_fac_X)/30.))**0.25
+        print("rho_dw = ", self.rho_ic)
+        print("T_chi_last = ", self.T_chi_last)
         self.xi_chi_last = 0.
 
         self.log_x_pts = np.log(self.m_chi/self.T_grid[self.i_ic:self.i_end+1])
         n_pts = self.log_x_pts.size
+        print("T_0 = m / x_0 = ", self.m_chi / np.exp(self.log_x_pts[0]))
         print("n_pts = ", n_pts)
 
         self.t_grid_sol = self.t_grid[self.i_ic:self.i_end+1]

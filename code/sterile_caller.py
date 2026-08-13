@@ -32,6 +32,7 @@ def call(
     m_h2 = m_h*m_h
     if sin2_2th is None:
         sin2_2th = (m2*ma/(2*m0*m12))**2
+        print(f"sin^2(2th) = {sin2_2th:.3e} (calculated from m0, m12, m2, ma)")
     th = 1/2*np.arcsin(sqrt(sin2_2th))
     sin2_th = np.sin(th)**2
     y2 = y*y
@@ -227,28 +228,11 @@ def call(
     i_ic = np.argmax(Ttrel.T_nu_grid < T_d_dw)      # Anton: Start when T_nu < T_dw
     i_end = np.argmax(Ttrel.T_nu_grid < m_d/2e1)    # Anton: End when T_nu < m_d/20 <--> 20 < m_d/T_nu
     sf_ic_norm_0 = (cf.s0/(cf.s_SM_no_nu(Ttrel.T_SM_grid[i_ic]) + cf.s_nu(Ttrel.T_nu_grid[i_ic])))**(1./3.)
-    # TODO: Halvor: The factor of 2 should probably be removed.
-    n_ic = 2 * cf.n_0_dw(m_d, th) / (sf_ic_norm_0**3.)      # 2* due to 2 species of neutrinos
+    n_ic = cf.n_0_dw(m_d, th) / (sf_ic_norm_0**3.)
     rho_ic = n_ic * cf.avg_mom_0_dw(m_d) / sf_ic_norm_0
 
     print("i_ic = ", i_ic)
     print("i_end = ", i_end)
-
-    # fig1, ax1 = plt.subplots()
-    # ax1.set_xscale("log")
-    # ax1.set_yscale("log")
-    # ax1.scatter(Ttrel.t_grid, Ttrel.T_SM_grid)
-    # ax1.scatter(Ttrel.t_grid, Ttrel.T_nu_grid)
-    # fig1.savefig("test_timetemp.pdf")
-
-    # fig2, ax2 = plt.subplots()
-    # ax2.set_xscale("log")
-    # ax2.set_yscale("log")
-    # ax2.scatter(Ttrel.t_grid, - Ttrel.dTSM_dt_grid)
-    # ax2.scatter(Ttrel.t_grid, - Ttrel.dTnu_dt_grid)
-    # fig2.savefig("test_timetemp2.pdf")
-
-
 
     # Anton: Run main computation
     pan = pandemolator.Pandemolator(
@@ -262,7 +246,8 @@ def call(
         ent_grid,
         Ttrel.hubble_grid,
         Ttrel.sf_grid,
-        i_ic, n_ic, rho_ic, i_end)
+        i_ic, n_ic, rho_ic, i_end
+    )
 
     # time1 = time.time()
     print("Running Pandemolator.pandemolate")
@@ -504,27 +489,28 @@ if __name__ == '__main__':
     # Anton: remember to run sterile_caller on this combination
 
     # BP1 (in draft)
-    m_d = 1e-05
-    m_N1 = m_d
-    m_N2 = m_d
-    m_X = 2.5*m_d
-    sin2_2th = 4.85e-13
-    y = 1e-04
+    # m_d = 1e-05
+    # m_N1 = m_d
+    # m_N2 = m_d
+    # m_X = 2.5*m_d
+    # sin2_2th = 4.85e-13
+    # y = 1e-04
 
     # BP2 (in draft)
-    m_d = 1e-5
-    m_N1 = m_d
-    m_N2 = m_d
-    m_X = 2.5*m_d
-    y = 2.522e-3
-    sin2_2th = 5e-16
-
     # m_d = 1e-5
     # m_N1 = m_d
     # m_N2 = m_d
     # m_X = 2.5*m_d
-    # y = 1e-5
-    # sin2_2th = 3e-11
+    # y = 2.522e-3
+    # sin2_2th = 5e-16
+
+    # Compare with julia
+    m_d = 1e-5
+    m_N1 = m_d
+    m_N2 = m_d
+    m_X = 2.5*m_d
+    y = 1e-4
+    sin2_2th = 5e-16
 
     m12 = m_d
     # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12), m1 = 0
@@ -553,7 +539,7 @@ if __name__ == '__main__':
     off_shell = False
     run_sim = True
 
-    if run_sim is True: 
+    if run_sim is True:
         print('Start sterile_caller')
         start = time.time()
         t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(

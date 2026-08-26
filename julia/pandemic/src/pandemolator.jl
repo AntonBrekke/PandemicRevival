@@ -10,6 +10,7 @@ include(joinpath(@__DIR__, "../src/pandemic_result.jl"))
 include(joinpath(@__DIR__, "../src/densities.jl"))
 include(joinpath(@__DIR__, "../src/coll_3_12.jl"))
 include(joinpath(@__DIR__, "../src/coll_12_34.jl"))
+include(joinpath(@__DIR__, "../src/collision_table.jl"))
 
 # """
 #     Pandemolator
@@ -103,6 +104,7 @@ function pandemolate(
         tT_rel::TimeTempRelation{T},
         dw::DodelsonWidrow{T},
         pan::Pandemolator{T},
+    ; collision_table::Union{Nothing, CollisionTable}=nothing,
     ) where T <: Real
     """
     Anton: Not entirely clear how this works. We use the fact that the dark 
@@ -140,12 +142,13 @@ function pandemolate(
     temp_lim = pan.N1.m ./ exp.(log_x_lim)
     println("temp_lim = ", temp_lim)
 
+    dae_params = isnothing(collision_table) ? pan : (pan, collision_table)
     prob = DE.DAEProblem{true}(
         dae_func!,
         du0,
         u0,
         log_x_lim,
-        pan,
+        dae_params,
         differential_vars = differential_vars,
     )
     tol = 1e-8
@@ -231,7 +234,8 @@ function dae_func!(
         du,
         u,
         pan::Pandemolator{T},
-        log_x
+        log_x;
+        collision_table::Union{Nothing, CollisionTable}=nothing,
     ) where {T<:Real}
     x = exp(log_x)
     T_nu = pan.N1.m / x
@@ -246,8 +250,9 @@ function dae_func!(
     T_N = pan.N1.m / x_N
     xi_N = u[4]
 
-    coll_n = C_n(pan, T_nu, T_N, xi_N)
-    coll_rho = C_rho(pan, T_nu, T_N, xi_N)
+    coll_n, coll_rho = isnothing(collision_table) ?
+        collision_terms(pan, T_nu, T_N, xi_N) :
+        collision_terms(collision_table, T_nu, T_N, xi_N)
 
     # TODO: [13.08.26] Double-check the signs.
     der_Y_n = - (T_nu / dT_nu_dt) * coll_n / ent
@@ -260,6 +265,17 @@ function dae_func!(
     out[2] = du[2] - der_Y_rho
     out[3] = n - n_anal
     out[4] = rho - rho_anal
+end
+
+function dae_func!(
+        out,
+        du,
+        u,
+        params::Tuple{Pandemolator{T}, CollisionTable},
+        log_x
+    ) where {T<:Real}
+    pan, collision_table = params
+    dae_func!(out, du, u, pan, log_x; collision_table=collision_table)
 end
 
 

@@ -29,9 +29,6 @@ function number_density(
     x = p.m / temp
     x_xi_diff = x - xi
     if (p.k == 0) || (x_xi_diff >= m_T_r_MB)
-        if debug
-            println("n_nonrelativistic")
-        end
         if (x > 1e-10) && (x < m_T_r_nr)
             return p.dof * exp(xi) * SF.besselk(2, x) * p.m^3 / (2. * pi^2 * x)
         elseif x >= m_T_r_nr

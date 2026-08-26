@@ -21,11 +21,23 @@ struct ModelParams{T <: Real}
     theta::T
 end
 
-function dist(p::Particle{T}, temp::R, xi::R, e::R) where {T<:Real, R<:Real}
+function dist(
+        p::Particle{T},
+        temp::R,
+        xi::R,
+        e::R;
+        debug=false
+    ) where {T<:Real, R<:Real}
     if isnothing(xi) || (isnothing(temp) || isnothing(e))
         error("Chemical potential, temperature or energy is not set for particle with mass ", p.m)
     end # if
-    return p.dof / (exp(e / temp - xi) + p.k)
+    res = p.dof / (exp(e / temp - xi) + p.k)
+    if res < 0.
+        println("Error: Negative distribution function.")
+        println("x = ", p.m / temp, ", xi = ", xi, ", e = ", e)
+        error()
+    end
+    return res
 end
 
 function momentum(p::Particle{T}, e::R) where {T<:Real, R<:Real}
@@ -63,5 +75,22 @@ function temp_interpolation(temp, u; neg=false)
         return (temp_nu) -> - exp(log_interp(log(temp_nu)))
     else
         return (temp_nu) -> exp(log_interp(log(temp_nu)))
+    end
+end
+
+function chem_pot_check(
+        p::Particle{T},
+        temp::R,
+        xi::R,
+    ) where {T<:Real, R<:Real}
+    """Checks if the chemical potential has a valid value for a boson."""
+    if p.k != -1
+        return true
+    end
+    check = p.m / temp - xi
+    if check < 0.
+        return false
+    else
+        return true
     end
 end

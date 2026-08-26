@@ -72,8 +72,9 @@ function delta(
     return del
 end # function
 
+# TODO: [17.08.26] Check if this sign is correct. Anton Has used this convention. Opposite sign in supplement to BringmannEtAl23.
 function a_theta(p::Params_12_34{T, R}) where {T <: Real, R <: Real}
-    return 4. * p.mom3^2. * ((p.e1 + p.e2)^2 - p.s)
+    return 4. * p.mom3^2 * ((p.e1 + p.e2)^2 - p.s)
 end # function
 
 function b_theta(p::Params_12_34{T, R}) where {T <: Real, R <: Real}
@@ -82,64 +83,70 @@ end # function
 
 function c_theta(p::Params_12_34{T, R}) where {T <: Real, R <: Real}
     return (
-        delta(p.s, p.p3, p.p4, p.e3, p.e4)^2 
+        delta(p.s, p.p3, p.p4, p.e3, p.e4)^2
         + p.mom3^2 / p.mom1^2
-        * (p.s - s_lim(1., p.e1, p.e2, p.mom1, p.mom2)) * (p.s - s_lim(-1., p.e3, p.e4, p.mom3, p.mom4))
+        * (p.s - s_lim(1, p.e1, p.e2, p.mom1, p.mom2)) * (p.s - s_lim(-1, p.e3, p.e4, p.mom3, p.mom4))
     )
 end # function
 
 # TODO: The square root can be negative. From notes it should be positive. 
 # Probably a numerical issue
 function cos_theta_lim(
-        pm::Float64,
+        pm::Int64,
         p::Params_12_34{T, R}
     ) where {T <: Real, R <: Real}
     a = a_theta(p)
     b = b_theta(p)
     c = c_theta(p)
-    insqrt = b^2 - 4. * a * c
+    # TODO: [17.08.26] Check if sign in square root is correct. Opposite convention in supplement to BringmannEtAl23 and Antons notes.
+    insqrt = b^2 + 4. * a * c
     if insqrt < 0.
-        # println("Warning: b^2 - 4ac = ", insqrt, " < 0.")
-        # println("Set b^2 - 4ac = 0.")
+        println("Warning: b^2 - 4ac = ", insqrt, " < 0.")
+        println("b^2 = ", b^2, ", 4ac = ", 4. * a * c)
+        println("Set b^2 - 4ac = 0.")
         insqrt = 0.
     end # if
-    c_th_lim = (- b + pm * sqrt(insqrt)) / (2. * a)
+    c_th_lim = (- b + pm * sqrt(insqrt)) / (- 2. * a) # TODO: [17.08.26] Check sign in front of a
+    # println("pm = ", pm)
     if c_th_lim < -1.
+        # println("c_th_lim is less than -1: ", c_th_lim)
         return -1.
     elseif c_th_lim > 1.
+        # println("c_th_lim is greater than 1: ", c_th_lim)
         return 1.
     end # if
+    # println("c_th_lim = ", c_th_lim)
     return c_th_lim
 end # function
 
 # TODO: Probably not needed.
 function t_minmax(
-        pm::Float64,
+        pm::Int64,
         p::Params_12_34{T, R}
     ) where {T <: Real, R <: Real}
     return p.p1.m^2 + p.p3.m^2 - 2. * p.e1 * p.e3 + pm * 2. * p.mom1 * p.mom3
 end # function
 
-function t_lim(pm::Float64, p::Params_12_34{T, R}) where {T <: Real, R <: Real}
+function t_lim(pm::Int64, p::Params_12_34{T, R}) where {T <: Real, R <: Real}
     cos_theta_lim_val = cos_theta_lim(pm, p)
     return p.p1.m^2 + p.p3.m^2 - 2. * p.e1 * p.e3 + 2. * p.mom1 * p.mom3 * cos_theta_lim_val
 end # function
 
-function s_lim(pm::Float64, ea::R, eb::R, moma::R, momb::R) where R <: Real
+function s_lim(pm::Int64, ea::R, eb::R, moma::R, momb::R) where R <: Real
     return (ea + eb)^2 - (moma - pm * momb)^2
 end # function
 
 function s_min(p::Params_12_34{T, R}) where {T <: Real, R <: Real}
     return max(
-        s_lim(-1., p.e1, p.e2, p.mom1, p.mom2),
-        s_lim(-1., p.e3, p.e4, p.mom3, p.mom4)
+        s_lim(-1, p.e1, p.e2, p.mom1, p.mom2),
+        s_lim(-1, p.e3, p.e4, p.mom3, p.mom4)
     )
 end
 
 function s_max(p::Params_12_34{T, R}) where {T<:Real, R<:Real}
     return min(
-        s_lim(1., p.e1, p.e2, p.mom1, p.mom2),
-        s_lim(1., p.e3, p.e4, p.mom3, p.mom4)
+        s_lim(1, p.e1, p.e2, p.mom1, p.mom2),
+        s_lim(1, p.e3, p.e4, p.mom3, p.mom4)
     )
 end
 
@@ -174,10 +181,15 @@ function coll_12_34_sq_amp(
         + 2. * mA^2 * t * (p.s + 2. * t)^2
         - t * (p.s + t) * (p.s^2 + 2. * p.s * t + 2. * t^2)
     )
-    return pre * nom / denom
-    # return 1.
+    res = pre * nom / denom
+    # max = 5e-13
+    # if res > max
+    #     return max
+    # elseif res < - max
+    #     return - max
+    # end
+    return res
 end # function
-
 
 function coll_12_34_ker(
         t::R,
@@ -185,33 +197,137 @@ function coll_12_34_ker(
     ) where {T <: Real, R <: Real}
     amp_sq = coll_12_34_sq_amp(t, p)
     denom = p.a * (t - p.t_min) * (p.t_max - t)
-    if denom <= 0.
-        # println("Denominator in kernel is negative: ", denom)
+    if denom < 0.
+        println("Denominator in kernel is negative: ", denom)
         return zero(R)
     end # if
     return amp_sq / sqrt(denom)
 end # function
 
+# TODO: [16.08.26] Used for testing
+function coll_12_34_sq_amp_no_pole(
+        t::R,
+        p::Params_12_34{T, R}
+    ) where {T <: Real, R <: Real}
+    mN = p.p3.m
+    mA = p.p1.m
+    pre = 8. * p.model_params.y^4
+    denom = (mN^2 - t)^2
+    nom = (
+        - 2. * mN^8
+        - 8. * mN^6 * (
+            mA^2
+            - t
+        )
+        - mN^4 * (
+            30. * mA^4
+            - 8. * mA^2 * (2. * p.s + 3. * t)
+            + 3. * p.s^2 + 4. * p.s * t + 12. * t^2
+        )
+        + mN^2 * (
+            - 28. * mA^6
+            + 4. * mA^4 * (22. * p.s + 28. * t)
+            - 2. * mA^2 * (3. * p.s^2 + 4. * p.s * t + 12. * t^2)
+            + p.s^3 + 2. * p.s^2 * t + 8. * p.s * t^2 + 8. * t^3
+        )
+        - 4. * mA^8
+        + 4. * mA^6 * (p.s + 3. * t)
+        - mA^4 * (p.s^2 + 6. * p.s * t + 14. * t^2)
+        + 2. * mA^2 * t * (p.s + 2. * t)^2
+        - t * (p.s + t) * (p.s^2 + 2. * p.s * t + 2. * t^2)
+    )
+    res = pre * nom / denom
+    # max = 5e-13
+    # if res > max
+    #     return max
+    # elseif res < - max
+    #     return - max
+    # end
+    return res
+end # function
 
+# TODO: [16.08.26] Used for testing
+function coll_12_34_sq_amp_pole(
+        t::R,
+        p::Params_12_34{T, R}
+    ) where {T <: Real, R <: Real}
+    mA = p.p1.m
+    mN = p.p3.m
+    t_pole = 2. * mA^2 + mN^2 - p.s
+    residue = coll_12_34_sq_amp_no_pole(t_pole, p)
+    return residue / (t - t_pole)^2
+end # function
+
+# TODO: [16.08.26] Used for testing
+function coll_12_34_ker_pole(
+        t::R,
+        p::Params_12_34{T, R}
+    ) where {T <: Real, R <: Real}
+    amp_sq = coll_12_34_sq_amp_pole(t, p)
+    denom = p.a * (t - p.t_min) * (p.t_max - t)
+    if denom < 0.
+        println("Denominator in kernel is negative: ", denom)
+        return zero(R)
+    end # if
+    return amp_sq / sqrt(denom)
+end # function
+
+# TODO: [16.08.26] Integral does not converge as there is a 1/(t-t_pole)^2 in the squared amplitude
 function coll_12_34_int_t(s::R, p::Params_12_34{T, R}) where {T<:Real, R<:Real}
     p.s = s
     p.a = a_theta(p)
-    p.t_min = t_lim(-1., p)
-    p.t_max = t_lim(1., p)
+    p.t_min = t_lim(-1, p)
+    p.t_max = t_lim(1, p)
     if p.t_min >= p.t_max
         return 0.
     end # if
-    problem = Integrals.IntegralProblem(
+    t_pole = 2. * p.p1.m^2 + p.p3.m^2 - p.s
+    t_pole_width = 1e-3 * (p.t_max - p.t_min)
+    t_lim1 = t_pole - t_pole_width
+    t_lim2 = t_pole + t_pole_width
+
+    reg_pole = 8e-2
+    reg_max = 1e-1
+    problem1 = Integrals.IntegralProblem(
         coll_12_34_ker,
-        (p.t_min, p.t_max),
+        (p.t_min, t_lim1),
+        # (p.t_min, t_pole * (1. - reg_pole)),
         p
     )
-    sol = Integrals.solve(
-        problem,
+    sol1 = Integrals.solve(
+        problem1,
         Integrals.QuadGKJL(),
+        # abstol=1e-20,
+        # reltol=1e-20,
     )
-    return sol.u
+    # problem2 = Integrals.IntegralProblem(
+    #     coll_12_34_ker_pole,
+    #     (t_lim1, t_lim2),
+    #     p
+    # )
+    # sol2 = Integrals.solve(
+    #     problem2,
+    #     Integrals.QuadGKJL(),
+    #     # abstol=1e-20,
+    #     # reltol=1e-20,
+    # )
+    # integ2 = (t_lim2 - t_lim1) / ((t_pole - ))
+    # sol2 = 
+    # problem3 = Integrals.IntegralProblem(
+    #     coll_12_34_ker,
+    #     # (t_pole * (1 + reg_pole), p.t_max * (1 - reg_max)),
+    #     ((t_pole + p.t_max) / 3., (p.t_max + t_pole) * 2/3),
+    #     p
+    # )
+    # sol3 = Integrals.solve(
+    #     problem3,
+    #     Integrals.QuadGKJL(),
+    #     # abstol=1e-20,
+    #     # reltol=1e-20,
+    # )
+    return sol1.u # + sol3.u
 end # function
+
 
 function coll_12_34_int_s(e3::R, p::Params_12_34{T, R}) where {T<:Real, R<:Real}
     p.e3 = e3
@@ -220,7 +336,7 @@ function coll_12_34_int_s(e3::R, p::Params_12_34{T, R}) where {T<:Real, R<:Real}
     p.e4 = p.e1 + p.e2 - p.e3
     if p.e4 < p.p4.m
         println("e3 = ", e3, " gives")
-        println("p4.e = ", p.p4.e, " < p4.m = ", p.p4.m)
+        println("p4.e = ", p.e4, " < p4.m = ", p.p4.m)
         println("Set manually to p4.e = p4.m")
         p.e4 = p.p4.m
     end # if
@@ -237,8 +353,12 @@ function coll_12_34_int_s(e3::R, p::Params_12_34{T, R}) where {T<:Real, R<:Real}
     f3 = dist(p.p3, p.temps[3], p.xis[3], p.e3)
     f4 = dist(p.p4, p.temps[4], p.xis[4], p.e4)
 
-    dist_dep_12_34 = f1 * f2 * (1 - p.p3.k * f3) * (1 - p.p4.k * f4)
-    dist_dep_34_12 = f3 * f4 * (1 - p.p1.k * f1) * (1 - p.p2.k * f2)
+    dist_dep_12_34 = (
+        f1 * f2 * (p.p3.dof - p.p3.k * f3) * (p.p4.dof - p.p4.k * f4)
+    )
+    dist_dep_34_12 = (
+        f3 * f4 * (p.p1.dof - p.p1.k * f1) * (p.p2.dof - p.p2.k * f2)
+    )
 
     if (dist_dep_12_34 < 1e-30) && (dist_dep_34_12 < 1e-30)
         return 0.
@@ -248,23 +368,28 @@ function coll_12_34_int_s(e3::R, p::Params_12_34{T, R}) where {T<:Real, R<:Real}
         return 0.
     end
 
-    # reg = (smax - smin) / 1e5
+    # reg = 2e-1 * (smax - smin)
     reg = 0.
     problem = Integrals.IntegralProblem(
         # coll_12_34_int_t,
-        coll_12_34_int_t_anal,
+        # coll_12_34_int_t_anal,
+        coll_12_34_int_t_new,
         (smin + reg, smax - reg),
         p
     )
     sol = Integrals.solve(
         problem,
         Integrals.QuadGKJL(),
+        # abstol=1e-10,
+        # reltol=1e-10,
     )
     if sol.u > 1.
         println("sol is big: ", sol.u)
     end
 
     return p.mom3 * (dist_dep_12_34 - dist_dep_34_12) * sol.u
+    # TODO: Only for testing integral
+    # return sol.u
     # return sol[1]
 end # function
 
@@ -333,6 +458,7 @@ function coll_12_34_int_e1(p::Params_12_34{T, R}) where {T<:Real, R<:Real}
     return sol.u
 end # function
 
+# TODO: [18.08.26] Set to zero for testing.
 function coll_12_34(
         model_params::ModelParams{T},
         p1::Particle{T},
@@ -342,6 +468,8 @@ function coll_12_34(
         temps::Vector{R},
         xis::Vector{R},
     ) where {T<:Real, R<:Real}
+    return 0.
+    """
     params = Params_12_34{T, R}(
         model_params,
         p1,
@@ -353,6 +481,7 @@ function coll_12_34(
     )
     integral = coll_12_34_int_e1(params)
     return integral
+    """
 end # function
 
 function coll_12_34_int_t_anal(
@@ -365,8 +494,8 @@ function coll_12_34_int_t_anal(
     p.a = a_theta(p)
     a = p.a
     # println("a = ", a)
-    tm = t_lim(-1., p)
-    tp = t_lim(1., p)
+    tm = t_lim(-1, p)
+    tp = t_lim(1, p)
     pre = -8. * p.model_params.y^4
     # println(mN^2 - tm)
     # println(mN^2 - tp)
@@ -381,47 +510,19 @@ function coll_12_34_int_t_anal(
         + 2*s^2*tm*tp - 2*mA^6*(tm+tp) + mA^4*(s*(tm+tp) + 8*tm*tp)
     )
 
-    problem1 = mN^2 - tp
-    problem3 = mN^2 - tm
+    problem1a = mN^2 - tp
+    problem1b = mN^2 - tm
+    problem1 = problem1a * problem1b
     if problem1 < 0
         term1 = 0
-        if (problem1 / tp) > 1e-2
+        println("s = ", s)
+        println("problem1 = ", problem1)
+        # TODO: [16.08.26] Compare with tp^2 or only problem1a?
+        if abs(problem1 / tp) > 1e-7
             println("Assumtion that factor is zero could be wrong.")
         end
-    elseif problem3 < 0
-        a = a_theta(p)
-        b = b_theta(p)
-        c = c_theta(p)
-        println("m_N^2 = ", mN^2)
-        println("tp = ", tp)
-        println("tm = ", tm)
-        println("problem 1 = ", problem1)
-        println("problem 3 = ", problem3)
-        println("cos_+ = ", cos_theta_lim(1., p))
-        println("cos_- = ", cos_theta_lim(-1., p))
-        println("s = ", s)
-        println("s_min = ", s_min(p))
-        println("s_max = ", s_max(p))
-        println("s_12- = ", s_lim(-1., p.p1, p.p2))
-        println("s_34- = ", s_lim(-1., p.p3, p.p4))
-        println("s_12+ = ", s_lim(1., p.p1, p.p2))
-        println("s_34+ = ", s_lim(1., p.p3, p.p4))
-        println("a = ", a)
-        println("b = ", b)
-        println("c = ", c)
-        println("b^2 = ", b_theta(p)^2)
-        println("4ac = ", 4. * a_theta(p) * c_theta(p))
-        println("Delta_12 = ", delta(p.s, p.p1, p.p2, p.e1, p.e2))
-        println("Delta_34 = ", delta(p.s, p.p3, p.p4, p.e3, p.e4))
-        println("m1 = ", p.p1.m)
-        println("E1 = ", p.p1.e)
-        println("p1 = ", p.p1.mom)
-        println(sqrt(p.p1.e^2 - p.p1.mom^2))
-        println((b^2 - 4 * a * c) / (4 * a^2))
-        println(b^2 / (4 * a^2))
-        error("Does this make any sense?")
     else
-        denom1 = sqrt(a) * (s - 2*mA^2) * ((mN^2 - tm) * problem1)^(3/2)
+        denom1 = sqrt(a) * (s - 2*mA^2) * problem1^(3/2)
         term1 = - num1 / denom1 * pi/2
     end
 
@@ -442,20 +543,28 @@ function coll_12_34_int_t_anal(
     )
 
     # TODO: Maybe more clever way to do this? [HM: 09.07.26]
-    problem2 = s + tm - mN^2 - 2*mA^2
+    problem2a = s + tm - mN^2 - 2*mA^2
+    problem2b = s + tp - mN^2 - 2*mA^2
+    problem2 = problem2a * problem2b
     if problem2 < 0
         term2 = 0
-        if (problem2 / s) > 1e-2
-            error("Assumtion that factor is zero could be wrong.")
+        println("s = ", s)
+        println("problem2a = ", problem2a)
+        println("tm = ", tm)
+        println("tp = ", tp)
+        # println("problem2b = ", problem2b)
+        if abs(problem2a / s) > 1e-7
+            # println(abs(problem2a / s))
+            # error("Assumtion that factor is zero could be wrong.")
         end
     else
-        denom2 = sqrt(a) * (2*mA^2 - s) * (problem2 * (s + tp - mN^2 - 2*mA^2))^(3/2)
+        denom2 = sqrt(a) * (2*mA^2 - s) * problem2^(3/2)
         term2 = - num2/denom2 * pi/2
     end
 
     term3 = 4 / sqrt(a) * pi/2
 
-    res = pre * (term1 + term2 + term3)
+    # res = pre * (term1 + term2 + term3)
 
     # if (p.p1.e > 1000) && (p.p2.e > 1000) && (p.p3.e > 1000)
     #     println("s = ", s)
@@ -463,6 +572,7 @@ function coll_12_34_int_t_anal(
     # end
 
     return pre * (term1 + term2 + term3)
+    # return pre * term2
 end
 
 function coll_12_34_int_t_new(
@@ -474,10 +584,20 @@ function coll_12_34_int_t_new(
     mN = p.p3.m
     p.a = a_theta(p)
     a = p.a
-    tm = t_lim(-1., p)
-    tp = t_lim(1., p)
+    tm = t_lim(-1, p)
+    tp = t_lim(1, p)
 
     term1 = -(16*pi)/sqrt(a)
+
+    try
+        (a*(mN^2-tm)*(mN^2-tp))^(3/2)
+    catch e
+        println("a = ", a)
+        println("mN^2-tm = ", mN^2-tm)
+        println("mN^2-tp = ", mN^2-tp)
+        println("tp = ", tp)
+        error(e)
+    end
 
     term2 = (
         pi / (
@@ -497,29 +617,70 @@ function coll_12_34_int_t_new(
         )
     )
 
-    term3 = (
-        - pi / (
-            (2*mA^2-s)*(a*(mN^2+2*mA^2-s-tm)*(mN^2+2*mA^2-s-tp))^(3/2)
+    num3 = - pi * 4 * a * (
+        - 16 * mN^8
+        + 16 * mN^6 * (-6*mA^2+3*s+tm+tp)
+        - 2 * mN^4 * (
+            84*mA^4-28*mA^2*(3*s+tm+tp)
+            +19*s^2+14*s*(tm+tp)+8*tm*tp
         )
-        * 4 * a * (
-            - 16 * mN^8
-            + 16 * mN^6 * (-6*mA^2+3*s+tm+tp)
-            - 2 * mN^4 * (
-                84*mA^4-28*mA^2*(3*s+tm+tp)
-                +19*s^2+14*s*(tm+tp)+8*tm*tp
-            )
-            + 2 * mN^2 * (
-                -34*mA^6+mA^4*(57*s+16*(tm+tp))
-                -2*mA^2*(12*s^2+9*s*(tm+tp)+4*tm*tp)
-                +s*(2*s^2+3*s*(tm+tp)+4*tm*tp)
-            )
-            + 24 * mA^8
-            - 2 * mA^6 * (12*s+7*(tm+tp))
-            + mA^4 * (14*s^2+7*s*(tm+tp)+8*tm*tp)
-            - 4 * mA^2 * s^2*(2*s+tm+tp)
-            + 2 * s^2*(s+tm)*(s+tp)
+        + 2 * mN^2 * (
+            -34*mA^6+mA^4*(57*s+16*(tm+tp))
+            -2*mA^2*(12*s^2+9*s*(tm+tp)+4*tm*tp)
+            +s*(2*s^2+3*s*(tm+tp)+4*tm*tp)
         )
+        + 24 * mA^8
+        - 2 * mA^6 * (12*s+7*(tm+tp))
+        + mA^4 * (14*s^2+7*s*(tm+tp)+8*tm*tp)
+        - 4 * mA^2 * s^2*(2*s+tm+tp)
+        + 2 * s^2*(s+tm)*(s+tp)
     )
+    problem3 = (mN^2+2*mA^2-s-tm)*(mN^2+2*mA^2-s-tp)
+    no_problem3 = mN^2+2*mA^2-s-tm
+    if problem3 < 0
+        # println("problem3 = ", problem3)
+        # println("tm = ", tm)
+        # println("tp = ", tp)
+        # println("s = ", s)
+        # println("mN^2 = ", mN^2)
+        # println("2*mA^2 = ", 2*mA^2)
+        # println("num3 = ", num3)
+        term3 = 0
+        if abs(problem3 / s) > 1e-7
+            println("Assumption that factor is zero could be wrong.")
+            println("mN^2 + 2*mA^2 - s - tp = ", problem3)
+            println("mN^2 + 2*mA^2 - s - tm = ", no_problem3)
+            println("tp = ", tp)
+            println("s = ", s)
+            println("mN^2 = ", mN^2)
+            println("2*mA^2 = ", 2*mA^2)
+            println("num3 = ", num3)
+        end
+    else
+        term3 = (
+            - pi / (
+                (2*mA^2-s)*(a*(mN^2+2*mA^2-s-tm)*(mN^2+2*mA^2-s-tp))^(3/2)
+            )
+            * 4 * a * (
+                - 16 * mN^8
+                + 16 * mN^6 * (-6*mA^2+3*s+tm+tp)
+                - 2 * mN^4 * (
+                    84*mA^4-28*mA^2*(3*s+tm+tp)
+                    +19*s^2+14*s*(tm+tp)+8*tm*tp
+                )
+                + 2 * mN^2 * (
+                    -34*mA^6+mA^4*(57*s+16*(tm+tp))
+                    -2*mA^2*(12*s^2+9*s*(tm+tp)+4*tm*tp)
+                    +s*(2*s^2+3*s*(tm+tp)+4*tm*tp)
+                )
+                + 24 * mA^8
+                - 2 * mA^6 * (12*s+7*(tm+tp))
+                + mA^4 * (14*s^2+7*s*(tm+tp)+8*tm*tp)
+                - 4 * mA^2 * s^2*(2*s+tm+tp)
+                + 2 * s^2*(s+tm)*(s+tp)
+            )
+        )
+    end
     return p.model_params.y^4 * (term1 + term2 + term3)
 
 end
@@ -551,8 +712,8 @@ function coll_12_34_int_t_qr(
     ) where {T <: Real, R <: Real}
     p.s = s
     p.a = a_theta(p)
-    p.t_min = t_lim(-1., p)
-    p.t_max = t_lim(1., p)
+    p.t_min = t_lim(-1, p)
+    p.t_max = t_lim(1, p)
     if p.t_min >= p.t_max
         return 0.
     end # if

@@ -92,7 +92,9 @@ function coll_3_12_e2_min(
     end
 end
 
-function coll_3_12_e2_max(p::Params_3_12{T, R, E}) where {T<:Real, R<:Real, E}
+function coll_3_12_e2_max(
+        p::Params_3_12{T, R, E}
+    ) where {T<:Real, R<:Real, E}
     mass_comb = p.p3.m^2 - p.p1.m^2 - p.p2.m^2
     e2_p = (p.e1 * mass_comb + p.mom1 * sqrt(mass_comb^2 - 4. * p.p1.m^2 * p.p2.m^2)) / (2. * p.p1.m^2)
     return e2_p
@@ -118,10 +120,14 @@ function coll_3_12_ker(
     f3 = dist(p.p3, p.temps[3], p.xis[3], p.e3)
 
     # TODO: Double check sign in front of k and of total expression
-    dist_fac = (
-        + f3 * (1 - p.p1.k * f1) * (1 - p.p2.k * f2)
-        - f1 * f2 * (1 - p.p3.k * f3)
+    dist_fac_3_12 = (
+        f3 * (p.p1.dof - p.p1.k * f1) * (p.p2.dof - p.p2.k * f2)
     )
+    dist_fac_12_3 = (
+        f1 * f2 * (p.p3.dof - p.p3.k * f3)
+    )
+    dist_fac = dist_fac_3_12 - dist_fac_12_3
+
     return energy_factor(p) * dist_fac
 end
 

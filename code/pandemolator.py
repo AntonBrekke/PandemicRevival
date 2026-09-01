@@ -334,14 +334,6 @@ class Pandemolator(object):
         xi_chi = min(root_sol.x[1] + self.m_chi/T_chi, (1.-1e-14)*self.m_X/(self.fac_n_X*T_chi))
         xi_X = self.fac_n_X*xi_chi
 
-        n_total = 2*self.n_chi(T_chi, xi_chi) + self.fac_n_X*self.n_X(T_chi, self.fac_n_X*xi_chi)
-        print("n_init = ", n)
-        print("n_total = ", n_total)
-
-        rho_total = self.rho(T_chi, xi_chi, self.fac_n_X*xi_chi)
-        print("rho_init = ", rho)
-        print("rho_total = ", rho_total)
-
         self.T_chi_last, self.xi_chi_last = T_chi, xi_chi
 
         # start = time.time()
@@ -510,12 +502,15 @@ class Pandemolator(object):
         self.xi_X_grid_sol = np.empty(n_pts)
         self.n_chi_grid_sol = np.empty(n_pts)
         self.n_X_grid_sol = np.empty(n_pts)
+        self.rho_grid_sol = np.empty(n_pts)
 
         i_max = 0
         n0 = self.n_ic
         ent0 = self.ent_interp_T(self.T_grid[self.i_ic + i_max])
         rho0 = self.rho_ic
         sf0 = self.sf_grid[self.i_ic + i_max]
+
+        print("y_0 = ", n0/ent0)
         # print("Enter pandemolate while-loop ")
         while i_max < n_pts - 1:
             # print(f'Pandemolator while loop iteration i_max={i_max}')
@@ -562,6 +557,7 @@ class Pandemolator(object):
                     self.xi_X_grid_sol[i] = self.fac_n_X*self.xi_chi_grid_sol[i]
                     self.n_chi_grid_sol[i] = self.n_chi(self.T_chi_grid_sol[i], self.xi_chi_grid_sol[i])
                     self.n_X_grid_sol[i] = self.n_X(self.T_chi_grid_sol[i], self.xi_X_grid_sol[i])
+                    self.rho_grid_sol[i] = self.rho(self.T_chi_grid_sol[i], self.xi_chi_grid_sol[i], self.xi_X_grid_sol[i])
 
                 if sol_xi0.t_events[1].size == 0: # abundance always < fac_abund_stop*DM abundance
                     sf0 = self.sf_grid[self.i_ic + i_xi_nonzero]
@@ -576,6 +572,7 @@ class Pandemolator(object):
                 i_xi_nonzero = i_max
             if i_xi_nonzero < n_pts - 1:
                 y0 = [n0/ent0, rho0*(sf0**4.)]
+                print("y0 = ", y0)
                 def event_xi(log_x, y):
                     return self.event_xi_zero(log_x, y)
                 event_xi.terminal = True
@@ -638,6 +635,7 @@ class Pandemolator(object):
                     self.xi_X_grid_sol[i] = self.fac_n_X*self.xi_chi_grid_sol[i]
                     self.n_chi_grid_sol[i] = self.n_chi(self.T_chi_grid_sol[i], self.xi_chi_grid_sol[i])
                     self.n_X_grid_sol[i] = self.n_X(self.T_chi_grid_sol[i], self.xi_X_grid_sol[i])
+                    self.rho_grid_sol[i] = self.rho(self.T_chi_grid_sol[i], self.xi_chi_grid_sol[i], self.xi_X_grid_sol[i])
                 end = time.time()
                 print('Root-solving time:', end - start)
 
@@ -664,4 +662,5 @@ class Pandemolator(object):
         self.xi_X_grid_sol = self.xi_X_grid_sol[:n_pts]
         self.n_chi_grid_sol = self.n_chi_grid_sol[:n_pts]
         self.n_X_grid_sol = self.n_X_grid_sol[:n_pts]
+        self.rho_grid_sol = self.rho_grid_sol[:n_pts]
 

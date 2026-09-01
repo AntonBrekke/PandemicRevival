@@ -25,14 +25,14 @@ function test_coll_3_12()
     # (xi < m_A / T)
     xi_N = -1.
     xi_A = 2. * xi_N
-    xis = [xi_N, 0., xi_A]
+    xis = (xi_N, 0., xi_A)
 
     n = 1000
     x = logrange(1e-6, 1e2, n)
     temp = m_N ./ x
-    temps = Vector{Vector{Float64}}(undef, n)
+    temps = Vector{NTuple{3, Float64}}(undef, n)
     for i in 1:n
-        temps[i] = [temp[i], temp[i], temp[i]]
+        temps[i] = (temp[i], temp[i], temp[i])
     end
 
     # N = Array{Particle{Float64}}(undef, n)
@@ -47,7 +47,7 @@ function test_coll_3_12()
     A = Particle{Float64}(m_A, -1, dof=dof_A)
     nu = Particle{Float64}(0., 1, dof=dof_nu)
     y = 1e-5
-    sin2_2th = 2e-11
+    sin2_2th = 1e-11
     theta = asin(sqrt(sin2_2th)) / 2.
     model_params = ModelParams(y, theta)
 
@@ -121,7 +121,7 @@ function test_coll_3_12_fixed_temperature()
     nu = Particle{Float64}(0., 1, dof=dof_nu)
 
     y = 1e-5
-    sin2_2th = 2e-11
+    sin2_2th = 1e-11
     theta = asin(sqrt(sin2_2th)) / 2.
     model_params = ModelParams(y, theta)
 
@@ -263,8 +263,8 @@ function test_coll_3_12_integral()
         error()
     end
 
-    y = 1e-4
-    sin2_2th = 1e-4
+    y = 1e-5
+    sin2_2th = 1e-11
     theta = asin(sqrt(sin2_2th))/2
     model_params = ModelParams(y, theta)
 
@@ -345,8 +345,8 @@ function test_kernel()
 
     x = 1e0
     temp = m_N / x
-    temps = fill(temp, 3)
-    xis = [xi_N, 0., xi_A]
+    temps = (temp, temp, temp)
+    xis = (xi_N, 0., xi_A)
 
     N = Particle{Float64}(m_N, 1, dof=2)
     nu = Particle{Float64}(0., 1, dof=2)
@@ -362,12 +362,12 @@ function test_kernel()
         error()
     end
 
-    y = 1e-4
-    sin2_2th = 1e-4
+    y = 1e-5
+    sin2_2th = 1e-11
     theta = asin(sqrt(sin2_2th))/2
     model_params = ModelParams(1e-4, theta)
 
-    params = Params_3_12{Float64, Float64, Val{0}}(
+    params = Params_3_12{Float64, Float64, Float64, Val{0}}(
         model_params,
         N, nu, A,
         temps,
@@ -408,14 +408,14 @@ function test_e2_int()
     m_N = 1e-5
     m_A = 2.5 * m_N
 
-    xi_N = 0.
+    xi_N = -1.
     xi_A = 2. * xi_N
 
     x = 1e0
     temp = m_N / x
 
-    temps = fill(temp, 3)
-    xis = [xi_N, 0., xi_A]
+    temps = (temp, temp, temp)
+    xis = (xi_N, 0., xi_A)
 
     N = Particle{Float64}(m_N, 1, dof=2)
     A = Particle{Float64}(m_A, -1, dof=3)
@@ -431,8 +431,8 @@ function test_e2_int()
         error()
     end
 
-    y = 1e-4
-    sin2_2th = 5e-16
+    y = 1e-5
+    sin2_2th = 1e-11
     theta = asin(sqrt(sin2_2th))/2
     model_params = ModelParams(y, theta)
 
@@ -442,7 +442,7 @@ function test_e2_int()
     n = 1000
     e1 = logrange(N.m, e1_max, length=n)
 
-    params = Params_3_12{Float64, Float64, Val{0}}(
+    params = Params_3_12{Float64, Float64, Float64, Val{0}}(
         model_params,
         N, nu, A,
         temps,
@@ -480,6 +480,6 @@ end
 
 # test_kernel()
 # test_e2_int()
-# test_coll_3_12()
-test_coll_3_12_fixed_temperature()
+test_coll_3_12()
+# test_coll_3_12_fixed_temperature()
 # test_coll_3_12_integral()

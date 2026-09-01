@@ -11,8 +11,8 @@ mutable struct Params_12_34{T<:Real, R<:Real}
     p2::Particle{T}
     p3::Particle{T}
     p4::Particle{T}
-    temps::Vector{R}
-    xis::Vector{R}
+    temps::NTuple{4, R}
+    xis::NTuple{4, R}
     e1::Union{R, Nothing}
     e2::Union{R, Nothing}
     e3::Union{R, Nothing}
@@ -33,8 +33,8 @@ mutable struct Params_12_34{T<:Real, R<:Real}
             p2::Particle{T},
             p3::Particle{T},
             p4::Particle{T},
-            temps::Vector{R}, # = Vector{R}(undef, 4),
-            xis::Vector{R}, # = Vector{R}(undef, 4),
+            temps::NTuple{4, R}, # = Vector{R}(undef, 4),
+            xis::NTuple{4, R}, # = Vector{R}(undef, 4),
         ) where {T<:Real, R<:Real}
         new{T, R}(
             model_params,
@@ -465,11 +465,10 @@ function coll_12_34(
         p2::Particle{T},
         p3::Particle{T},
         p4::Particle{T},
-        temps::Vector{R},
-        xis::Vector{R},
+        temps::NTuple{4, R},
+        xis::NTuple{4, R},
     ) where {T<:Real, R<:Real}
-    return 0.
-    """
+    # return 0.
     params = Params_12_34{T, R}(
         model_params,
         p1,
@@ -481,7 +480,6 @@ function coll_12_34(
     )
     integral = coll_12_34_int_e1(params)
     return integral
-    """
 end # function
 
 function coll_12_34_int_t_anal(

@@ -81,13 +81,15 @@ function n_xi(
     #     # end
     #     epsabs = 1e-15
     # end
-    if xi * temp >= p.m
-        println("Error: xi * temp >= p.m in n_xi")
-        println("xi = ", xi)
-        println("temp = ", temp)
-        println("p.m = ", p.m)
-        # error()
-        # return nothing
+    if p.k == -1
+        if xi * temp >= p.m
+            println("Error: xi * temp >= p.m in n_xi")
+            println("xi = ", xi)
+            println("temp = ", temp)
+            println("p.m = ", p.m)
+            throw(XiError)
+            # return nothing
+        end
     end
 
     params = (

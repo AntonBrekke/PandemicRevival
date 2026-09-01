@@ -7,13 +7,13 @@ include(joinpath(@__DIR__, "utils.jl"))
 Collision operator for decay of particle 3 into particles 1 and 2 (and inverse process).
 """
 
-mutable struct Params_3_12{T<:Real, R<:Real, E}
+mutable struct Params_3_12{T<:Real, R<:Real, S<:Real, E}
     model_params::ModelParams{T}
     p1::Particle{T}
     p2::Particle{T}
     p3::Particle{T}
-    temps::Vector{R}
-    xis::Vector{R}
+    temps::NTuple{3, R}
+    xis::NTuple{3, S}
     energy_type::E
     e1::Union{R, Nothing}
     e2::Union{R, Nothing}
@@ -21,17 +21,18 @@ mutable struct Params_3_12{T<:Real, R<:Real, E}
     mom1::Union{R, Nothing}
     mom2::Union{R, Nothing}
     mom3::Union{R, Nothing}
+    debug::Bool
 
-    function Params_3_12{T, R, E}(
+    function Params_3_12{T, R, S, E}(
             model_params::ModelParams{T},
             p1::Particle{T},
             p2::Particle{T},
             p3::Particle{T},
-            temps::Vector{R}, # = Vector{R}(undef, 3),
-            xis::Vector{R}; # = Vector{R}(undef, 3),
+            temps::NTuple{3, R}, # = Vector{R}(undef, 3),
+            xis::NTuple{3, S}; # = Vector{S}(undef, 3),
             energy_type::E = Val(0),
-        ) where {T<:Real, R<:Real, E}
-        new{T, R, E}(
+        ) where {T<:Real, R<:Real, S<:Real, E}
+        new{T, R, S, E}(
             model_params,
             p1, p2, p3,
             temps,
@@ -43,28 +44,29 @@ mutable struct Params_3_12{T<:Real, R<:Real, E}
             nothing,
             nothing,
             nothing,
+            false,
         )
     end
 end
 
 @inline function energy_factor(
-        p::Params_3_12{T, R, Val{0}}
-    ) where {T<:Real, R<:Real}
+        p::Params_3_12{T, R, S, Val{0}}
+    ) where {T<:Real, R<:Real, S<:Real}
     return one(R)
 end
 @inline function energy_factor(
-        p::Params_3_12{T, R, Val{1}}
-    ) where {T<:Real, R<:Real}
+        p::Params_3_12{T, R, S, Val{1}}
+    ) where {T<:Real, R<:Real, S<:Real}
     return p.e1
 end
 @inline function energy_factor(
-        p::Params_3_12{T, R, Val{2}}
-    ) where {T<:Real, R<:Real}
+        p::Params_3_12{T, R, S, Val{2}}
+    ) where {T<:Real, R<:Real, S<:Real}
     return p.e2
 end
 @inline function energy_factor(
-        p::Params_3_12{T, R, Val{3}}
-    ) where {T<:Real, R<:Real}
+        p::Params_3_12{T, R, S, Val{3}}
+    ) where {T<:Real, R<:Real, S<:Real}
     return p.e3
 end
 
@@ -81,8 +83,8 @@ function coll_A_Nnu_sq_amp(
 end
 
 function coll_3_12_e2_min(
-        p::Params_3_12{T, R, E},
-    ) where {T<:Real, R<:Real, E}
+        p::Params_3_12{T, R, S, E},
+    ) where {T<:Real, R<:Real, S<:Real, E}
     mass_comb = p.p3.m^2 - p.p1.m^2 - p.p2.m^2
     e2_m = (p.e1 * mass_comb - p.mom1 * sqrt(mass_comb^2 - 4. * p.p1.m^2 * p.p2.m^2)) / (2. * p.p1.m^2)
     if e2_m < p.p2.m
@@ -90,11 +92,12 @@ function coll_3_12_e2_min(
     else
         return e2_m
     end
+    return e2_m
 end
 
 function coll_3_12_e2_max(
-        p::Params_3_12{T, R, E}
-    ) where {T<:Real, R<:Real, E}
+        p::Params_3_12{T, R, S, E}
+    ) where {T<:Real, R<:Real, S<:Real, E}
     mass_comb = p.p3.m^2 - p.p1.m^2 - p.p2.m^2
     e2_p = (p.e1 * mass_comb + p.mom1 * sqrt(mass_comb^2 - 4. * p.p1.m^2 * p.p2.m^2)) / (2. * p.p1.m^2)
     return e2_p
@@ -102,10 +105,10 @@ end
 
 function coll_3_12_ker(
         e2::R,
-        p::Params_3_12{T, R, E}
-    ) where {T<:Real, R<:Real, E}
+        p::Params_3_12{T, R, S, E}
+    ) where {T<:Real, R<:Real, S<:Real, E}
     p.e2 = e2
-    p.mom2 = momentum(p.p2, p.e2)
+    # p.mom2 = momentum(p.p2, p.e2)
 
     p.e3 = p.e1 + p.e2
     if p.e3 < p.p3.m
@@ -113,7 +116,7 @@ function coll_3_12_ker(
         println("Set manually to E_3 = m_3")
         p.e3 = p.p3.m
     end
-    p.mom3 = momentum(p.p3, p.e3)
+    # p.mom3 = momentum(p.p3, p.e3)
 
     f1 = dist(p.p1, p.temps[1], p.xis[1], p.e1)
     f2 = dist(p.p2, p.temps[2], p.xis[2], p.e2)
@@ -128,18 +131,30 @@ function coll_3_12_ker(
     )
     dist_fac = dist_fac_3_12 - dist_fac_12_3
 
+    # if p.debug
+    #     println("dist_fac = ", dist_fac)
+    #     if isnan(FD.partials(dist_fac)[1])
+    #         dist(p.p3, p.temps[3], p.xis[3], p.e3; debug=true)
+    #     end
+    # end
+
     return energy_factor(p) * dist_fac
+    # Used to compare to Python
+    # return energy_factor(p) * dist_fac / (p.p1.dof * p.p2.dof * p.p3.dof)
 end
 
 function coll_3_12_int_e2(
         e1::R,
-        p::Params_3_12{T, R, E}
-    ) where {T<:Real, R<:Real, E}
+        p::Params_3_12{T, R, S, E}
+    ) where {T<:Real, R<:Real, S<:Real, E}
     p.e1 = e1
     p.mom1 = momentum(p.p1, p.e1)
 
     e2_min = coll_3_12_e2_min(p)
     e2_max = coll_3_12_e2_max(p)
+    # if !isfinite(e2_min) || !isfinite(e2_max) || e2_max <= e2_min
+    #     return zero(R)
+    # end
 
     problem = Integrals.IntegralProblem(
         coll_3_12_ker,
@@ -150,10 +165,26 @@ function coll_3_12_int_e2(
         problem,
         Integrals.QuadGKJL(),
     )
+    # if sol.u isa FD.Dual
+    #     if isnan(FD.partials(sol.u)[1])
+    #         println("found NaN")
+    #         p.debug = true
+    #         problem = Integrals.IntegralProblem(
+    #             coll_3_12_ker,
+    #             (e2_min, e2_max),
+    #             p
+    #         )
+    #         sol = Integrals.solve(
+    #             problem,
+    #             Integrals.QuadGKJL(),
+    #         )
+    #         error()
+    #     end
+    # end
     return sol.u
 end
 
-function coll_3_12_int_e1(p::Params_3_12{T, R, E}) where {T<:Real, R<:Real, E}
+function coll_3_12_int_e1(p::Params_3_12{T, R, S, E}) where {T<:Real, R<:Real, S<:Real, E}
     e1_min = p.p1.m
     e1_max = max(1e1*p.temps[1], 1e1*p.p1.m)
     # e1_max = Inf64
@@ -163,10 +194,17 @@ function coll_3_12_int_e1(p::Params_3_12{T, R, E}) where {T<:Real, R<:Real, E}
         (e1_min, e1_max),
         p
     )
-    sol = Integrals.solve(
+    sol = try Integrals.solve(
         problem,
         Integrals.QuadGKJL(),
     )
+    catch e
+        println(p.temps)
+        println(p.xis)
+        println("e_min = ", e1_min)
+        println("e_max = ", e1_max)
+        throw(e)
+    end
     return sol.u
 end
 
@@ -175,12 +213,12 @@ function coll_3_12(
         p1::Particle{T},
         p2::Particle{T},
         p3::Particle{T},
-        temps::Vector{R},
-        xis::Vector{R};
+        temps::NTuple{3, R},
+        xis::NTuple{3, S};
         energy_type::E = Val(0),
         sq_amp_func::F = coll_A_Nnu_sq_amp,
-    ) where {T<:Real, R<:Real, E, F}
-    params = Params_3_12{T, R, E}(
+    ) where {T<:Real, R<:Real, S<:Real, E, F}
+    params = Params_3_12{T, R, S, E}(
         model_params,
         p1, p2, p3,
         temps,
@@ -199,15 +237,15 @@ end
 
 function coll_3_12_ker_log(
         y2::R,
-        p::Params_3_12{T, R, E}
-    ) where {T<:Real, R<:Real, E}
+        p::Params_3_12{T, R, S, E}
+    ) where {T<:Real, R<:Real, S<:Real, E}
     e2 = exp(y2)
     return e2 * coll_3_12_ker(e2, p)
 end
 
 function coll_3_12_int_e2_log(
-        y1::R, p::Params_3_12{T, R, E}
-    ) where {T<:Real, R<:Real, E}
+        y1::R, p::Params_3_12{T, R, S, E}
+    ) where {T<:Real, R<:Real, S<:Real, E}
     p.e1 = exp(y1)
     p.mom1 = momentum(p.p1, p.e1)
 
@@ -231,8 +269,8 @@ function coll_3_12_int_e2_log(
 end
 
 function coll_3_12_int_e1_log(
-        p::Params_3_12{T, R, E}
-    ) where {T<:Real, R<:Real, E}
+        p::Params_3_12{T, R, S, E}
+    ) where {T<:Real, R<:Real, S<:Real, E}
     e1_min = p.p1.m
     e1_max = max(1e1*p.temps[1], 1e1*p.p1.m)
     # e1_max = Inf64
@@ -258,12 +296,12 @@ function coll_3_12_log(
         p1::Particle{T},
         p2::Particle{T},
         p3::Particle{T},
-        temps::Vector{R},
-        xis::Vector{R};
+        temps::NTuple{3, R},
+        xis::NTuple{3, S};
         energy_type::E = Val(0),
         sq_amp_func::F = coll_A_Nnu_sq_amp,
-    ) where {T<:Real, R<:Real, E, F}
-    params = Params_3_12{T, R, E}(
+    ) where {T<:Real, R<:Real, S<:Real, E, F}
+    params = Params_3_12{T, R, S, E}(
         model_params,
         p1, p2, p3,
         temps,

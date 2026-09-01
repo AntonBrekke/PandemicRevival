@@ -27,8 +27,17 @@ function test_pandemolator()
     A = Particle{Float64}(m_A, k_A, dof=dof_A)
     nu = Particle{Float64}(m_nu, k_nu, dof=dof_nu)
 
-    y = 1e-4
-    sin2_2th = 5e-16
+    # TODO: Remember that y is rescaled below! Remove rescaling when we don't have to compare to Python code.
+    y_pyt = 1e-5
+    sin2_2th = 2.65e-11
+    # y_pyt = 1e-5
+    # sin2_2th = 1e-11
+
+
+    # Rescale to compare with python code. 
+    # D.o.f. was forgotten in Python code for collision term
+    y = y_pyt / sqrt(dof_N * dof_A * dof_nu)
+
     th = asin(sqrt(sin2_2th)) / 2.
     mp = ModelParams{Float64}(y, th)
 
@@ -43,23 +52,13 @@ function test_pandemolator()
         dw
     )
 
-    x_pan = m_N ./ tT_rel.T_nu_grid
-    println("x_0 = ", x_pan[1])
-    println("x_end = ", x_pan[end])
-    println("T_nu_0 = ", tT_rel.T_nu_grid[1])
-    println("T_nu_end = ", tT_rel.T_nu_grid[end])
-    x = logrange(x_pan[1], x_pan[end], 1000)
-    T_nu = m_N ./ x
-    dT_dt = pan.dT_nu_dt_interp_T_nu.(T_nu)
-    ent = pan.ent_interp_T_nu.(T_nu)
-    hubble = pan.H_interp_T_nu.(T_nu)
+    sol = pandemolate(tT_rel, dw, pan)
 
-    pandemolator_array = [x;; T_nu;; dT_dt;; ent;; hubble]
-    csv_path = joinpath(@__DIR__, "../tmp/test_pandemolator.csv")
-    export_array_to_csv(
-        DataFrames.DataFrame(pandemolator_array, :auto),
-        csv_path
-    )
+    results = transform_sol(pan, sol)
+
+    println(results.size)
+
+    export_array_to_csv(DataFrames.DataFrame(results, :auto), joinpath(@__DIR__, "../tmp/sol.csv"))
 
     return nothing
 end

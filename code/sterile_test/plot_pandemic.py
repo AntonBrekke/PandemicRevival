@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, NullLocator, FixedFormatter
 
 import matplotlib
-matplotlib.rcParams['hatch.linewidth'] = 8.0
+# matplotlib.rcParams['hatch.linewidth'] = 8.0
 
 import os
 import sys
@@ -53,6 +53,12 @@ params = {'axes.labelsize': 10,
 # print(plt.rcParams.keys())
 plt.rcParams.update(params)
 
+# plt.rcParams.update({
+#     "text.usetex": True,
+#     "font.family": "serif",
+#     "lines.markersize": .8,
+#     #"lines.linewidth": .3
+# })
 
 
 
@@ -109,185 +115,18 @@ data = np.loadtxt('./md_1e-5_mX_2.5e-5_sin22th_1e-12_y_5.6e-5_full.dat')
 data: t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, xi_h, n_d, n_X, n_h
 """
 
-load_str = './md_9.41205e-05;mX_2.82361e-04;sin22th_6.23551e-17;y_1.11318e-02;full.dat'
-load_str = './md_9.41205e-05;mX_2.82361e-04;sin22th_6.61474e-16;y_3.50346e-03;full.dat'
-load_str = './md_5.13483e-05;mX_1.54045e-04;sin22th_1.19378e-15;y_2.23145e-03;full_new.dat'
-load_str = './md_2.15e-05;mX_6.45e-05;sin22th_1.2e-15;y_1.9e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;sin22th_3e-15;y_1.5e-03;full_new.dat'
-load_str = './md_2.1503e-05;mX_6.4509e-05;sin22th_1.32739e-15;y_1.77827e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_3e-04;sin22th_1.32739e-15;y_1.77827e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_8e-05;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_5e-05;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.8e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-05;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-07;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-10;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-05;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-02;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.8e-04;sin22th_1e-15;y_3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.8e-04;sin22th_1e-15;y_1e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_1e-02;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_2e-08;sin22th_1e-15;y_5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_4e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_5e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.8e-04;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_4e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1.3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.4e-04;sin22th_1e-15;y_1e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.4e-04;sin22th_1e-15;y_2e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.4e-04;sin22th_1e-15;y_3e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_4e-04;sin22th_1e-15;y_3e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.2e-03;sin22th_1e-15;y_3e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.8e-04;sin22th_1e-15;y_1e-05;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.8e-04;sin22th_1e-15;y_1e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.8e-04;sin22th_1e-15;y_1e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1.9e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1.3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.22e-04;sin22th_1e-15;y_1.3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.22e-04;sin22th_1e-15;y_1e-07;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.22e-04;sin22th_1e-15;y_1e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.22e-04;sin22th_1e-15;y_3e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.22e-04;sin22th_1e-15;y_3e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.22e-04;sin22th_1e-15;y_1e-05;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_2e-03;sin22th_1e-15;y_1e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-03;sin22th_1e-15;y_1e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.22e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.18e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.202e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.22e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_5e-05;mh_1.02e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_2.02e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_4.02e-05;mh_8.0802e-05;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_3e-03;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_1.99e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1.7e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.206e-04;sin22th_1e-15;y_1e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.206e-04;sin22th_1e-15;y_1e-05;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.206e-04;sin22th_1e-15;y_2e-06;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_2e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-13;y_2e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-13;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-13;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_1.5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_2e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_2.3e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_2.5e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_1.2e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_1.7e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_2e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_2.5e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1.1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-15;y_1.15e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-16;y_1.3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-16;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-16;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_1e-03;mh_6e-05;sin22th_1e-15;y_2.3e-03;full_new.dat'
-load_str = './md_2e-05;mX_4e-04;mh_6e-05;sin22th_1e-15;y_1.8e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_6e-05;sin22th_1e-15;y_1.5e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_6e-05;sin22th_1e-15;y_1.3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.194e-04;sin22th_1e-13;y_2.3e-04;full_new.dat'      # **
 load_str = './md_2e-05;mX_1.4e-04;mh_2.786e-04;sin22th_1e-15;y_1.5e-03;full_new.dat'        # interesting 
 load_str = './md_2e-05;mX_1.4e-04;mh_1.68e-04;sin22th_1e-15;y_1.5e-03;full_new.dat'         # interesting 
 load_str = './md_2e-05;mX_1.4e-04;mh_6e-05;sin22th_1e-15;y_1.8e-03;full_new.dat'         # interesting 
 load_str = './md_2e-05;mX_2e-04;mh_1e-04;sin22th_1e-15;y_1.68e-03;full_new.dat'     # Nice
-load_str = './md_2e-05;mX_2e-04;mh_4.02e-04;sin22th_1e-15;y_1e-05;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_1e-04;sin22th_1e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_1e-04;sin22th_1e-15;y_1.6e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_1e-04;sin22th_1e-15;y_1.7e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_1e-04;sin22th_1e-15;y_1.65e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_1e-04;sin22th_1e-15;y_1.67e-03;full_new.dat'
-load_str = './md_2e-05;mX_4e-04;mh_2e-04;sin22th_1e-15;y_1.68e-03;full_new.dat'
-load_str = './md_2e-05;mX_4e-04;mh_2e-04;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_6e-05;sin22th_1e-15;y_1.5e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_6e-05;sin22th_1e-15;y_1.8e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-04;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_1.2e-03;mh_6e-05;sin22th_1e-15;y_2.7e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-04;mh_6e-05;sin22th_1e-15;y_2.2e-03;full_new.dat'
-load_str = './md_2e-05;mX_4e-04;mh_6e-05;sin22th_1e-15;y_1.8e-03;full_new.dat'
-load_str = './md_2e-05;mX_4e-04;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.206e-04;sin22th_1e-15;y_1e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.2e-04;sin22th_1e-15;y_1e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.2e-04;sin22th_1e-15;y_5e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.2e-04;sin22th_1e-15;y_6e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.20001e-04;sin22th_1e-15;y_1e-05;full_new.dat'
-load_str = './md_2e-05;mX_4e-04;mh_8e-03;sin22th_1e-15;y_1e-05;full_new.dat'
-load_str = './md_2e-05;mX_4e-04;mh_8e-04;sin22th_1e-15;y_1.5e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_3e-04;sin22th_1e-15;y_1.5e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_3e-04;sin22th_1e-15;y_1.6e-03;full_new.dat'
-load_str = './md_2e-05;mX_2e-04;mh_3e-04;sin22th_1e-15;y_1.7e-03;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_2e-05;sin22th_1e-14;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.4e-04;sin22th_1e-14;y_1e-07;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_1.4e-04;sin22th_1e-14;y_5e-07;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-14;y_1e-07;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-14;y_3e-07;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-12;y_1e-07;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-12;y_1e-08;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-12;y_3e-08;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-1;y_1e-09;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-11;y_5e-09;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-11;y_6e-09;full_new.dat'
-load_str = './md_2e-05;mX_1e-04;mh_3e-04;sin22th_1e-11;y_8e-09;full_new.dat'
 load_str = './md_2e-05;mX_1e-03;mh_6e-05;sin22th_1e-15;y_2.6e-03;full_new.dat'          # interesting 
 load_str = './md_2e-05;mX_1e-04;mh_6e-05;sin22th_1e-15;y_1.5e-03;full_new.dat'          # interesting 
-load_str = './md_2e-05;mX_6e-05;mh_5e-05;sin22th_1e-16;y_3e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_5e-05;sin22th_5e-16;y_1.5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_5e-05;sin22th_5e-16;y_1.5e-03;full_new.dat'
-load_str = './md_2e-05;mX_5e-05;mh_6e-05;sin22th_5e-16;y_1.5e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_5e-05;sin22th_5e-16;y_1.8e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_3e-15;y_1.6e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_3e-15;y_8e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_3e-15;y_9e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_3e-15;y_9e-04;full_new.dat'
-load_str = './md_2e-05;mX_5e-05;mh_1e-04;sin22th_3e-15;y_2e-04;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_2e-15;y_1.1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_2e-15;y_1e-03;full_new.dat'
-load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_2e-15;y_1.05e-03;full_new.dat'
-load_str = './md_1.35388e-06;mX_6.76938e-06;mh_4.06163e-06;sin22th_7.01704e-15;y_4.45923e-04;full_new.dat'
 load_str = './md_2e-05;mX_6e-05;mh_6e-05;sin22th_3e-15;y_8.98e-04;full_new.dat'     # Perfect
 load_str = './md_2e-05;mX_6e-05;mh_5e-05;sin22th_3e-15;y_9.12e-04;full_new.dat'         # Perfect
 load_str = './md_2e-05;mX_1e-04;mh_6e-05;sin22th_1e-15;y_1.51e-03;full_new.dat'     # Perfect
 
-
 x_therm = 1e-3
-save_fig = False
+save_fig = True
 ### Benchmark Points ###:
 BP = 1
 if BP == 1:
@@ -312,6 +151,10 @@ else: None
 # load_str = './md_5.13483e-05;mX_2.56742e-04;mh_1.54045e-04;sin22th_3.66524e-16;y_3.36087e-03;full.dat'
 
 # load_str = './md_2.1e-05;mX_1e-04;mh_6e-05;sin22th_1.6e-15;y_1.271e-03;full_new.dat' 
+
+# [27.08.26] Last string is loaded
+load_str = "./md_1e-05;mX_2.5e-05;sin22th_1e-11;y_1e-05;full_new.dat"
+
 data = np.loadtxt(load_str)
 
 data_skip = 2
@@ -321,10 +164,8 @@ ent = data[::data_skip, 3]
 Td = data[::data_skip, 6]
 xid = data[::data_skip, 7]
 xiX = data[::data_skip, 8]
-xih = data[::data_skip, 9]
-nd = data[::data_skip, 10]
-nX = data[::data_skip, 11]
-nh = data[::data_skip, 12]
+nd = data[::data_skip, 9]
+nX = data[::data_skip, 10]
 
 c1 = '#7bc043'      # green
 c2 = '#f37736'      # orange
@@ -332,15 +173,14 @@ c3 = '#13b9af'      # blue
 
 # Mass: 1e-6 * X GeV = X keV
 var_list = load_str.split(';')[:-1]
-md, mX, mh, sin22th, y = [eval(s.split('_')[-1]) for s in var_list]
-print(f'md: {md:.2e}, mX: {mX:.2e}, mh: {mh:.2e}, sin22th: {sin22th:.2e}, y: {y:.2e}')
+md, mX, sin22th, y = [eval(s.split('_')[-1]) for s in var_list]
+print(f'md: {md:.2e}, mX: {mX:.2e}, sin22th: {sin22th:.2e}, y: {y:.2e}')
 mY_relic = cf.omega_d0 * cf.rho_crit0_h2 / cf.s0        # m*Y = m*n/s = Omega * rho_c0 / s0
 
 T_grid_dw = np.logspace(np.log10(1.4e-3), 1, 400)
 mYd_dw = cf.O_h2_dw_Tevo(T_grid_dw, md, 0.5*np.arcsin(np.sqrt(sin22th)))*cf.rho_crit0_h2 / cf.s0     # Anton: mY from Dodelson-Widrow
 
 if True:
-
     x1_dw = md/T_grid_dw
     y1_dw = mYd_dw
 
@@ -380,18 +220,15 @@ if True:
     #ax1.text(4.5e-5, 1e-22, r'$\hspace{-0.55cm}\mathrm{Therma-}\\\mathrm{lization}\\\mathrm{ }\hspace{0.2cm}\rightarrow$', fontsize=10, color='0')
 
 
-    ax1.loglog(md/T_nu, mh*nh/ent, color=c2, ls='-', zorder=-4)
     ax1.loglog(md/T_nu, mX*nX/ent, color=c3, ls='-', zorder=-4)
 
     ax1.loglog([1e-8, 1e3], [mY_relic, mY_relic], color='0.55', ls='-.', zorder=-2)
     ax1.text(3e-5, 1e-11, r'$\Omega_s h^2 = 0.12$', color='0.55')
 
     YX_max = np.max(mX*nX/ent)
-    Yh_max = np.max(mh*nh/ent)
     Ys_max = np.max(y1)
     ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)], Ys_max*1e-1, r'$\nu_s$', color=c1, ha='center', va='top')
     ax1.text(md/T_nu[np.where(mX*nX/ent==YX_max)], YX_max*1e-1, r'$X_\mu$', color=c3, ha='center', va='top')
-    ax1.text(md/T_nu[np.where(mh*nh/ent==Yh_max)]*3, Yh_max*1e-1, r'$h_{\phi}$', color=c2, ha='left', va='bottom')
 
     # ax2.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='-' , color='black', label=r'$\text{BP1}$')
     # ax2.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='--', color='black', label=r'$\text{BP2}$')
@@ -407,7 +244,7 @@ if True:
 
     ax2.fill_betweenx([1e-1, 1.5e0], x1[0], x_therm, color='white', alpha=1, zorder=-3)
 
-    props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")
+    # props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")
 
     #plt.text(2e-2, 1e-11, r'$m_X = 2.5m_\chi$', fontsize=9, horizontalalignment='center', bbox=props)
     #plt.text(1e0, 3e-23, r'$m_X = 2.5m_\chi$', fontsize=9, horizontalalignment='center', bbox=props, zorder=5)
@@ -417,7 +254,7 @@ if True:
     # ax2.legend(framealpha=0.8, edgecolor='1')
     ax2.xaxis.set_label_text(r"$m_s / T_\nu$")
     ax1.yaxis.set_label_text(r"$m\, n / s\;\;\mathrm{[keV]}$")
-    ax2.yaxis.set_label_text(r"$T_\text{d}/T_\nu$")
+    ax2.yaxis.set_label_text(r"$T_\textrm{d}/T_\nu$")
 
 
     ax1.xaxis.set_major_locator(xMajorLocator)
@@ -426,7 +263,7 @@ if True:
     ax1.yaxis.set_major_locator(yMajorLocator)
     ax1.yaxis.set_minor_locator(yMinorLocator)
     ax1.yaxis.set_major_formatter(yMajorFormatter)
-
+    
     plt.xlim(2e-5, 20)
 
     # ylim + 6 will be shown
@@ -435,11 +272,12 @@ if True:
     # ax1.set_title(fr'$\sin^2(2\theta)$={sin22th:.1e}, $y$={y:.1e}\\$m_d$={md:.1e}, $m_X$={mX:.1e}, $m_h$={mh:.1e}', fontsize=12)
     plt.tight_layout()
     plt.subplots_adjust(hspace=0)
+
     fig_str = f'./saved_benchmarks/dens_evo_{load_str.replace("./", "").replace(".dat","")}_BP{BP}.pdf'
     print(f'saved {fig_str}')
     if save_fig:
         plt.savefig(fig_str, bbox_inches='tight', dpi=300)
-    plt.show()
+    # plt.show()
 elif False:
     plt.loglog(md1/T_nu1, 1e6*Td1, color='dodgerblue', ls='-')
     plt.loglog(md2/T_nu2, 1e6*Td2, color='dodgerblue', ls='--')

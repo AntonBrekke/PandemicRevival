@@ -1,4 +1,5 @@
 using Interpolations
+import ForwardDiff as FD
 # import DelimitedFiles as DF
 import CSV
 
@@ -24,29 +25,37 @@ end
 function dist(
         p::Particle{T},
         temp::R,
-        xi::R,
+        xi::S,
         e::R;
         debug=false
-    ) where {T<:Real, R<:Real}
+    ) where {T<:Real, R<:Real, S<:Real}
     if isnothing(xi) || (isnothing(temp) || isnothing(e))
         error("Chemical potential, temperature or energy is not set for particle with mass ", p.m)
     end # if
-    res = p.dof / (exp(e / temp - xi) + p.k)
+    exp_val = min(
+        exp(e / temp - xi),
+        1e300,
+    )
+    res = p.dof / (exp_val + p.k)
     if res < 0.
         println("Error: Negative distribution function.")
         println("x = ", p.m / temp, ", xi = ", xi, ", e = ", e)
         error()
     end
+    if debug
+        println("res = ", res)
+        println("e/T = ", e/temp)
+        println("xi = ", xi)
+        println(e/temp - xi)
+        println(exp(e/temp - xi) + p.k)
+    end
     return res
 end
 
 function momentum(p::Particle{T}, e::R) where {T<:Real, R<:Real}
-    if e < p.m
-        if (e - p.m) / p.m > 1e-9
-            error("Energy is smaller than the mass")
-        else
-            return 0.
-        end
+    e_value = e isa FD.Dual ? FD.value(e) : e
+    if e_value <= p.m
+        return zero(e)
     end
     return sqrt(e^2 - p.m^2)
 end # function

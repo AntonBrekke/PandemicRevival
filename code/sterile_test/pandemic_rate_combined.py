@@ -62,50 +62,35 @@ plot_data_skip = 1
 force_write = False
 ### Benchmark Points ###:
 BP = None
-if BP == 1:
-    # BP1
-    load_str = './md_1.12884e-05;mX_5.64419e-05;mh_3.38651e-05;sin22th_1.83298e-13;y_1.93457e-04;full_new.dat' 
-    x_therm = 2e-3
-if BP  == 2:
-    # BP2
-    load_str = './md_2.1e-05;mX_1.05e-04;mh_6.3e-05;sin22th_1.5e-15;y_1.313e-03;full_new.dat'
-    x_therm = 2e-3
-if BP  == 3:
-    # BP3
-    load_str = './md_4e-06;mX_2e-05;mh_1.2e-05;sin22th_3e-15;y_8.36e-04;full_new.dat'  
-    x_therm = 2e-3
-if BP == 4:
-    # BP4
-    load_str = './md_5.13483e-05;mX_2.56742e-04;mh_1.54045e-04;sin22th_3.66524e-16;y_3.36087e-03;full_new.dat' 
-    x_therm = 7e-4
-if BP == 5:
-    # BP4
-    load_str = './md_1e-05;mX_2.5e-05;mh_6.25e-05;sin22th_5e-14;y_4e-07;full_new.dat' 
-    x_therm = 2e-2
-else: 
-    BP = None
-
-# load_str = './md_5e-05;mX_1.5e-04;mh_6e-05;sin22th_1e-15;y_2e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-16;y_2.5e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-16;y_3e-03;full_new.dat'
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-14;y_4e-04;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_2e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.5e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.2e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.3e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.4e-03full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_1e-15;y_1.8e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.55e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat' 
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_2e-14;y_5.57e-04;full_new.dat'
-# load_str = './md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat'
-# load_str = "./md_1e-05;mX_2.5e-05;sin22th_2e-11;y_1e-05;full_new.dat"
-# load_str = "./md_1e-05;mX_2.5e-05;sin22th_3e-11;y_1e-05;full_new.dat"
+# if BP == 1:
+#     # BP1
+#     load_str = './md_1.12884e-05;mX_5.64419e-05;mh_3.38651e-05;sin22th_1.83298e-13;y_1.93457e-04;full_new.dat' 
+#     x_therm = 2e-3
+# if BP  == 2:
+#     # BP2
+#     load_str = './md_2.1e-05;mX_1.05e-04;mh_6.3e-05;sin22th_1.5e-15;y_1.313e-03;full_new.dat'
+#     x_therm = 2e-3
+# if BP  == 3:
+#     # BP3
+#     load_str = './md_4e-06;mX_2e-05;mh_1.2e-05;sin22th_3e-15;y_8.36e-04;full_new.dat'  
+#     x_therm = 2e-3
+# if BP == 4:
+#     # BP4
+#     load_str = './md_5.13483e-05;mX_2.56742e-04;mh_1.54045e-04;sin22th_3.66524e-16;y_3.36087e-03;full_new.dat' 
+#     x_therm = 7e-4
+# if BP == 5:
+#     # BP4
+#     load_str = './md_1e-05;mX_2.5e-05;mh_6.25e-05;sin22th_5e-14;y_4e-07;full_new.dat' 
+#     x_therm = 2e-2
+# else: 
+#     BP = None
 
 # BP1 (in draft)
 # load_str = "./md_1e-05;mX_2.5e-05;sin22th_4.85e-13;y_1e-04;full_new.dat"
 # BP2 (in draft)
-load_str = "./md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat"
+# load_str = "./md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat"
+# load_str = "./md_1e-05;mX_2.5e-05;sin22th_1e-11;y_1e-05;full_new.dat"
+load_str = "./md_1e-05;mX_2.5e-05;sin22th_2.65e-11;y_1e-05;full_new.dat"
 
 
 data = np.loadtxt(load_str)
@@ -319,7 +304,7 @@ data_evo = np.loadtxt(load_str)
 10: n_X_grid_sol (n_phi_grid_sol)
 """
 
-t_grid = data_evo[::data_skip_rate,0]
+# t_grid = data_evo[::data_skip_rate,0]
 T_SM_grid = data_evo[::data_skip_rate,1]
 T_nu_grid = data_evo[::data_skip_rate,2]
 ent_grid = data_evo[::data_skip_rate, 3]
@@ -383,18 +368,18 @@ if not os.path.isfile('./' + filename) or force_write:
 
     np.savetxt(filename, np.column_stack((
         m_d/T_nu_grid,
-        m_d/T_SM_grid, 
-        H_grid, 
-        C_X_dd/n_d_grid, 
-        C_dd_X/n_d_grid,  
-        C_X_da/n_d_grid, 
-        C_da_X/n_d_grid, 
-        C_XX_dd/n_d_grid, 
-        C_dd_XX/n_d_grid, 
-        C_dd_dd/n_d_grid, 
-        C_da_dd/n_d_grid, 
-        C_dd_da/n_d_grid, 
-        C_aa_dd/n_d_grid, 
+        m_d/T_SM_grid,
+        H_grid,
+        C_X_dd/n_d_grid,
+        C_dd_X/n_d_grid,
+        C_X_da/n_d_grid,
+        C_da_X/n_d_grid,
+        C_XX_dd/n_d_grid,
+        C_dd_XX/n_d_grid,
+        C_dd_dd/n_d_grid,
+        C_da_dd/n_d_grid,
+        C_dd_da/n_d_grid,
+        C_aa_dd/n_d_grid,
         C_dd_aa/n_d_grid,
         # C_22_11_ut/n_d_grid,
         # th_avg_22_11_ut_DW
@@ -551,7 +536,6 @@ ax3.text(xpos_nus*1.8, ypos_nus*50, r"$N_1 N_2 \leftrightarrow A^\prime$", color
 ax3.text(xpos_nus, np.max(np.abs(2e6*C_da_X)), r"$\nu N_1 \to A^\prime$", color=c2, rotation=0, ha='left', va='bottom')
 # ax3.text(xpos_nus, np.max(np.abs(1e6*C_22_11_ut[x_therm_index[0][0]:]))**(1.3), r"$N_2 N_2 \to N_1 N_1$", color=c4, rotation=0, ha='left', va='bottom')
 
-x_mult = 1.3
 y_PP_ss = 2e-28
 if BP == 1: 
     x_ss_PP = 30.3
@@ -598,20 +582,22 @@ else:
     y_sa_P = 0.9
 
 
-# ax3.text(x_therm*x_ss_PP*2., y_ss_PP*np.abs(5e5*C_dd_XX[x_therm_index]), r"$NN \to A^\prime A^\prime$", color=c3, rotation=0, ha='left', va='bottom')
 ax3.text(x_therm*x_ss_PP/1.3, y_ss_PP*np.abs(1e6*C_dd_XX[x_therm_index]), r"$NN \to A^\prime A^\prime$", color=c3, rotation=0, ha='left', va='bottom')
 ax3.text(x_therm*x_PP_ss*9e-2, y_PP_ss, r"$A'A' \to NN$", color=c5, rotation=0, va='bottom')
 
 # ax3.plot([1e-10, 1e-9], [1e-40, 1e-35], linestyle='-', color='black', label=r'$\Phi=X_\mu$')
-BP_str = r'$\textit{BP' + f'{BP}' + r'}$'
+# BP_str = r'$\textit{BP' + f'{BP}' + r'}$'
 
-legend_plot = ax3.plot(0, 0, color=None, ls=None)
-legend_BP = ax3.legend(legend_plot, [BP_str], loc='lower left', handlelength=0, handletextpad=0, edgecolor='gray')
-for item in legend_BP.legend_handles:
-    item.set_visible(False)
+# legend_plot = ax3.plot(0, 0, color=None, ls=None)
+# legend_BP = ax3.legend(legend_plot, [BP_str], loc='lower left', handlelength=0, handletextpad=0, edgecolor='gray')
+# for item in legend_BP.legend_handles:
+#     item.set_visible(False)
 # plt.gca().add_artist(legend_BP)
 
+# Hides collision rates before Dark Thermalisation
 ax3.fill_betweenx([1e-28, 1e0], 1e-5, x_therm, color='white', alpha=1, zorder=-3)
+# Vertical line representing Dark Thermalisation
+# TODO: [27.08.26] Understand what goes on there
 ax3.axvline(x_therm, ls=':', color='0', zorder=-2)
 
 props = dict(boxstyle='round', facecolor='white', alpha=0.8, linewidth=1, edgecolor="0.8")
@@ -635,7 +621,7 @@ ax3.set_ylim(1e-28, max(np.max(1e6*H)*2e1, ymax*1e1))
 md *= 10**6
 mX *= 10**6
 md_str = f'{md:.2e}'.split('e+')
-print(md_str)
+print("md_str = ", md_str)
 mX_str = f'{mX:.2e}'.split('e+')
 sin22th_str = f'{sin22th:.2e}'.split('e-')
 y_str = f'{y:.2e}'.split('e-')

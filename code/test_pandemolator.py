@@ -249,7 +249,6 @@ def compare_results(pan):
     dT_dt = pan.dT_dt_interp_T(T_nu)
     ent = pan.ent_interp_T(T_nu)
     hubble = pan.H_interp_T(T_nu)
-    sf = pan.sf_interp_T(T_nu)
 
     pan_jul = np.genfromtxt("../julia/pandemic/tmp/test_pandemolator.csv", delimiter=',', skip_header=1)
 
@@ -258,13 +257,11 @@ def compare_results(pan):
     dT_dt_jul = pan_jul[:, 2]
     ent_jul = pan_jul[:, 3]
     hubble_jul = pan_jul[:, 4]
-    sf_jul = pan_jul[:, 5]
 
     plot_results(x, T_nu, x_jul, T_nu_jul, "T_nu")
     plot_results(x, dT_dt, x_jul, dT_dt_jul, "dT_dt", sign=True)
     plot_results(x, ent, x_jul, ent_jul, "ent")
     plot_results(x, hubble, x_jul, hubble_jul, "hubble")
-    plot_results(x, sf, x_jul, sf_jul, "sf")
     return 0
 
 def plot_results(x, u, x_jul, u_jul, str, sign=False):

@@ -15,7 +15,9 @@ mutable struct DodelsonWidrow{T<:Real}
         T_dw = T_d_dw(m_N)
 
         i_ic = findfirst(tt_rel.T_nu_grid .< T_dw)
-        i_end = findfirst(tt_rel.T_nu_grid .< m_N/2e1)
+        # x_end = 2e1
+        x_end = 1e2
+        i_end = findfirst(tt_rel.T_nu_grid .< m_N / x_end)
 
         sf_ic_norm_0 = (s0/(s_SM_no_nu(tt_rel.T_SM_grid[i_ic]) + s_nu(tt_rel.T_nu_grid[i_ic])))^(1/3)
 

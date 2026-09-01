@@ -54,13 +54,14 @@ def call(
     m_Gamma_X2 = m_X2*Gamma_X*Gamma_X
     m_Gamma_h2 = 0
 
+    call.count = 0
+    call.x_list = []
+    call.C_list = []
+
     if spin_facs:       # Anton: If spin statistics is important
         import C_res_vector
         if m_X > m_N1 + m_N2:
             import C_res_vector_no_spin_stat as C_res_vector_no_spin_stat
-            call.count = 0
-            call.x_list = []
-            call.C_list = []
             # n = n_N1 + n_N2 + 2*n_X
             def C_n(T_a, T_d, xi_d, xi_X):
                 """
@@ -97,14 +98,15 @@ def call(
                 # th, m_Gamma_h2 do not matter anymore
                 # as long as mN1 = mN2, xiN1 = xiN2, TN1 = TN2, do not need CX_XX_22 separately -- just add factor 2 
                 # TODO: Why divide by 4 and multiply by 4 in return statement? Symmetry factor (2*2)
-                CX_XX_11 = C_res_vector.C_n_XX_dd(
-                    m_d=m_N1, m_X=m_X,
-                    k_d=k_d, k_X=k_X,
-                    T_d=T_d,
-                    xi_d=xi_d, xi_X=xi_X,
-                    vert=vert_el,
-                    type=0
-                ) / 4.
+                CX_XX_11 = 0.
+                # CX_XX_11 = C_res_vector.C_n_XX_dd(
+                #     m_d=m_N1, m_X=m_X,
+                #     k_d=k_d, k_X=k_X,
+                #     T_d=T_d,
+                #     xi_d=xi_d, xi_X=xi_X,
+                #     vert=vert_el,
+                #     type=0
+                # ) / 4.
 
                 if not off_shell:
                     CX_X_1nu = C_res_vector.C_n_3_12(m1=m_N1, m2=m_nu, m3=m_X, k1=k_d, k2=k_nu, k3=k_X, T1=T_d, T2=T_a, T3=T_d, xi1=xi_d, xi2=0., xi3=xi_X, M2=M2_X_1nu, type=0)
@@ -114,11 +116,10 @@ def call(
                     exit(1)
 
                 x = m_d / T_a
-                # if call.count % 10 == 0:
-                #     call.x_list.append(x)
-                #     # call.C_list.append([CX_XX_dd, Ch_hh_dd, Ch_h_XX])
-                #     call.C_list.append([CX_X_1nu, CX_XX_11])
-                #     i = call.count // 10
+                call.x_list.append(x)
+                # call.C_list.append([CX_XX_dd, Ch_hh_dd, Ch_h_XX])
+                call.C_list.append([CX_X_1nu, CX_XX_11])
+                    # i = call.count // 10
                 #     if i > 0: 
                 #         plt.semilogy([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][0]), abs(call.C_list[i][0])], color='r', marker='o', markersize=3)
                 #         plt.semilogy([call.x_list[i-1], call.x_list[i]], [abs(call.C_list[i-1][1]), abs(call.C_list[i][1])], color='tab:blue', marker='o', markersize=3)
@@ -266,9 +267,9 @@ def call(
     O_d_h2 = 2*pan.n_chi_grid_sol[-1]*m_d*cf.s0/(ent_grid[pan.i_end]*cf.rho_crit0_h2)
 
     if pan.T_chi_grid_sol.size < i_end - i_ic + 1: # integration of ode was stopped (abundance too large); issues calculating fs_length
-        return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False
+        return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, pan.rho_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False, call.x_list, call.C_list
     elif O_d_h2 < 1e-2*cf.omega_d0 or O_d_h2 > 1e1*cf.omega_d0: # computation of lambda_fs does not work for very small O_d_h2
-        return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, True
+        return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, pan.rho_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, True, call.x_list, call.C_list
 
     try:
         T_d_grid = np.empty(Ttrel.t_grid.size - i_ic)
@@ -286,7 +287,7 @@ def call(
         n_d_grid[:n_sol] = pan.n_chi_grid_sol
         n_X_grid[:n_sol] = pan.n_X_grid_sol
         P_grid[:n_sol] = np.array([pan.P(T_d, xi_d, xi_X) for T_d, xi_d, xi_X in zip(T_d_grid[:n_sol], xi_d_grid[:n_sol], xi_X_grid[:n_sol])])
-        rho_grid[:n_sol] = np.array([pan.rho(T_d, xi_d, xi_X) for T_d, xi_d, xi_X in zip(T_d_grid[:n_sol], xi_d_grid[:n_sol], xi_X_grid[:n_sol])])
+        rho_grid[:n_sol] = pan.rho_grid_sol
 
         if n_sol < T_d_grid.size:
             print('n_sol < T_d_grid.size')
@@ -472,12 +473,12 @@ def call(
                 integrand_fs_length[i] = v/sf_norm_today[i]
             fs_length = utils.simp(Ttrel.t_grid, integrand_fs_length)
 
-        return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, C_therm_grid, fs_length/cf.Mpc, fs_length_3/cf.Mpc, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound/cf.Mpc, r_sound_3/cf.Mpc, True#, V_SM_grid, V_d_grid, G_a_grid, G_d_grid
+        return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, pan.rho_grid_sol, C_therm_grid, fs_length/cf.Mpc, fs_length_3/cf.Mpc, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound/cf.Mpc, r_sound_3/cf.Mpc, True, call.x_list, call.C_list #, V_SM_grid, V_d_grid, G_a_grid, G_d_grid
     except Exception as e:
         import traceback
         traceback.print_exc()
         print('Error: return nan')
-        return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, True
+        return Ttrel.t_grid[pan.i_ic:pan.i_end+1], Ttrel.T_SM_grid[pan.i_ic:pan.i_end+1], Ttrel.T_nu_grid[pan.i_ic:pan.i_end+1], ent_grid[pan.i_ic:pan.i_end+1], Ttrel.hubble_grid[pan.i_ic:pan.i_end+1], Ttrel.sf_grid[pan.i_ic:pan.i_end+1]/Ttrel.sf_grid[pan.i_ic], pan.T_chi_grid_sol, pan.xi_chi_grid_sol, pan.xi_X_grid_sol, pan.n_chi_grid_sol, pan.n_X_grid_sol, pan.rho_grid_sol, C_therm_grid, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, True, call.x_list, call.C_list
 
 
 if __name__ == '__main__':
@@ -505,12 +506,19 @@ if __name__ == '__main__':
     # sin2_2th = 5e-16
 
     # Compare with julia
+    # m_d = 1e-5
+    # m_N1 = m_d
+    # m_N2 = m_d
+    # m_X = 2.5*m_d
+    # y = 1e-4
+    # sin2_2th = 5e-16
+    # Compare with Julia (new) [26.08.26]
     m_d = 1e-5
     m_N1 = m_d
     m_N2 = m_d
     m_X = 2.5*m_d
-    y = 1e-4
-    sin2_2th = 5e-16
+    y = 1e-5
+    sin2_2th = 2.65e-11
 
     m12 = m_d
     # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12), m1 = 0
@@ -542,7 +550,7 @@ if __name__ == '__main__':
     if run_sim is True:
         print('Start sterile_caller')
         start = time.time()
-        t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end = call(
+        t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, rho, C_therm, fs_length, fs_length_3, T_kd, T_kd_3, T_d_kd, T_d_kd_3, r_sound, r_sound_3, reached_integration_end, x_list, C_list = call(
             m_N1, m_N2, m_X, m_nu, m0, m12, m2, ma,
             k_d, k_X, k_nu,
             dof_d, dof_X,
@@ -568,6 +576,9 @@ if __name__ == '__main__':
 
         # file_str = f'sterile_test/md_{md_str};mX_{mX_str};mh_{mh_str};sin22th_{sin22th_str};y_{y_str};full_new.dat'
         file_str = f'sterile_test/md_{md_str};mX_{mX_str};sin22th_{sin22th_str};y_{y_str};full_new.dat'
-        np.savetxt(file_str, np.column_stack((t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X)))
+        np.savetxt(file_str, np.column_stack((t, T_SM, T_nu, ent, H, sf, T_d, xi_d, xi_X, n_d, n_X, rho)))
+        c_file_str = f'sterile_test/md_{md_str};mX_{mX_str};sin22th_{sin22th_str};y_{y_str};c_list.dat'
+        print(type(np.column_stack((x_list, C_list))))
+        np.savetxt(c_file_str, np.column_stack((x_list, C_list)))
 
         print(f'Saved data to {file_str}')

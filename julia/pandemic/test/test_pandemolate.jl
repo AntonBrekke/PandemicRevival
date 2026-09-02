@@ -28,15 +28,20 @@ function test_pandemolator()
     nu = Particle{Float64}(m_nu, k_nu, dof=dof_nu)
 
     # TODO: Remember that y is rescaled below! Remove rescaling when we don't have to compare to Python code.
-    y_pyt = 1e-5
-    sin2_2th = 2.65e-11
     # y_pyt = 1e-5
-    # sin2_2th = 1e-11
-
-
+    # sin2_2th = 2.65e-11
+    # y_pyt = 1e-4
+    # sin2_2th = 5.3e-13
     # Rescale to compare with python code. 
     # D.o.f. was forgotten in Python code for collision term
-    y = y_pyt / sqrt(dof_N * dof_A * dof_nu)
+    # y = y_pyt / sqrt(dof_N * dof_A * dof_nu)
+    # Data points from scan
+    # sin2_2th, y = 1.0e-15, 0.0008850401528296398
+    # sin2_2th, y = 1.0e-14, 0.000256953440417192
+    # sin2_2th, y = 1.0e-13, 7.298381120002216e-5
+    # sin2_2th, y = 1.0e-12, 2.012150324187745e-5
+    # sin2_2th, y = 1.0e-11, 5.262386444647646e-6
+    sin2_2th, y = 1.0e-11, 0.0006571249647028438
 
     th = asin(sqrt(sin2_2th)) / 2.
     mp = ModelParams{Float64}(y, th)
@@ -49,7 +54,6 @@ function test_pandemolator()
         mp,
         N1, N2, A, nu,
         tT_rel,
-        dw
     )
 
     sol = pandemolate(tT_rel, dw, pan)

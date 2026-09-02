@@ -33,10 +33,13 @@ mutable struct Pandemolator{T<:Real, FT, FdT, FEnt, FH}
     # C_rho::Function   # rhs of Boltzmann-eq. for rho_N1 +rho_N2 + rho_A
     # C_xi0::Function   # part of rhs of Boltzmann-eq. for n setting xi = 0
 
-    dw::DodelsonWidrow{T}
-
     # Factor for number of A particles in effective number density (always 2)
     fac_n_A::Int64
+
+    # Guard for the per-evaluation debug prints below (default off; a scan
+    # calls pandemolate hundreds/thousands of times, so this must stay quiet
+    # unless explicitly requested).
+    verbose::Bool
 
     # TODO: [13.08.26] These interpolations are not used. Probably incorrect as well, so test if they are needed.
     # # Interpolation functions in t space
@@ -59,7 +62,7 @@ mutable struct Pandemolator{T<:Real, FT, FdT, FEnt, FH}
         nu::Particle{T},
         # C_n::Function, C_rho::Function, C_xi0::Function,
         tT_rel::TimeTempRelation{T},
-        dw::DodelsonWidrow{T}
+        verbose::Bool=false,
     ) where T <: Real
         # TODO: [01.07.26] Ask Anton: Why this factor?
         # Calculate factor for A' particle contribution
@@ -86,10 +89,10 @@ mutable struct Pandemolator{T<:Real, FT, FdT, FEnt, FH}
             model_params,
             N1, N2, A, nu,
             # C_n, C_rho, C_xi0,
-            dw,
             fac_n_A_val,
+            verbose,
             # T_nu_interp, dT_nu_dt_interp, ent_interp, H_interp,
-            t_interp_T_nu, dT_nu_dt_interp_T_nu, ent_interp_T_nu, 
+            t_interp_T_nu, dT_nu_dt_interp_T_nu, ent_interp_T_nu,
             H_interp_T_nu,
         )
     end
@@ -121,16 +124,20 @@ function pandemolate(
     res.H = tT_rel.hubble_grid[dw.i_ic:dw.i_end+1]
 
     u0 = initial_conditions(tT_rel, dw, pan)
-    println("u0 = ", u0)
-    println("exp(u0) = ", exp.(u0))
+    if pan.verbose
+        println("u0 = ", u0)
+        println("exp(u0) = ", exp.(u0))
+    end
 
     # TODO: [10.08.26] Remove! Only for testing.
     # u0[4] = 0.0
 
     log_x_lim = (log_x_pts[1], log_x_pts[end])
-    println("log_x_lim = ", log_x_lim)
     temp_lim = pan.N1.m ./ exp.(log_x_lim)
-    println("temp_lim = ", temp_lim)
+    if pan.verbose
+        println("log_x_lim = ", log_x_lim)
+        println("temp_lim = ", temp_lim)
+    end
 
     ode_params = pan
 
@@ -144,33 +151,29 @@ function pandemolate(
     )
     # abstol > 1.3e-15. Initial conditions not consistent with smaller abstol.
     # For small reltol: "Warning: Verbosity toggle: dt_epsilon" at t = log(x) = -7.101953893976883
-    # Rodas4
+    # Rodas4/4P
     reltol = 1e-4
     abstol = 1e-14
-    # Rodas4P
+    # Rodas5P - Error from T = Inf
     # reltol = 1e-4
     # abstol = 1e-14
-    # Rodas5P
-    # reltol = 1e-4
-    # abstol = 1e-14
-    # Rosenbrock23
-    # reltol = 1e-3
-    # abstol = 1e-6
-
-
-    @time sol = DE.solve(
+    # Rosenbrock23 - Same error as for Rodas with small reltol
+    timed_sol = @timed DE.solve(
         prob,
         # Rosenbrock23(autodiff=AutoFiniteDiff()),
         # ODER.Rodas4(autodiff=AutoFiniteDiff()),
-        # ODER.Rodas4P(autodiff=AutoFiniteDiff()),
-        ODER.Rodas5P(autodiff=AutoFiniteDiff()),
+        ODER.Rodas4P(autodiff=AutoFiniteDiff()),
+        # ODER.Rodas5P(autodiff=AutoFiniteDiff()),
         # ODEF.RadauIIA5(autodiff=AutoFiniteDiff()),
         # ODEF.RadauIIA5(),
         # reltol=reltol,
         # abstol=abstol,
         # force_dtmin=true,
     )
-    return sol
+    if pan.verbose
+        println("solve time: ", timed_sol.time, " s")
+    end
+    return timed_sol.value
 end
 
 function initial_conditions(
@@ -184,19 +187,20 @@ function initial_conditions(
 
     n0 = dw.n_ic
     T_0 = tT_rel.T_nu_grid[dw.i_ic]
-    println("T_0 = ", T_0)
-    println("x_0 = m_N1 / T_dw = ", pan.N1.m / T_0)
     ent0 = pan.ent_interp_T_nu(T_0)
     rho0 = dw.rho_ic
-
-    println("rho_dw = ", rho0)
 
     # y0[1]: Y_n=n/s (Yield)
     # y0[2]: Y_rho = rho/s^(4/3) (Energy density scaled with entropy)
 
     ln_y_n_0 = log(n0/ent0)
-    println("y_n_0 = ", exp(ln_y_n_0))
     ln_y_rho_0 = log(rho0 / ent0^(4. / 3.))
+    if pan.verbose
+        println("T_0 = ", T_0)
+        println("x_0 = m_N1 / T_dw = ", pan.N1.m / T_0)
+        println("rho_dw = ", rho0)
+        println("y_n_0 = ", exp(ln_y_n_0))
+    end
 
     ln_x_N_guess = log(pan.N1.m / T_0)
     eta_guess = 0.0
@@ -290,16 +294,18 @@ function mm_func!(
         pan::Pandemolator{T},
         log_x
     ) where {T<:Real}
-    println("u = ", u)
-    println("du = ", du)
+    if pan.verbose
+        println("u = ", u)
+        println("du = ", du)
+    end
     x = exp(log_x)
     T_nu = pan.N1.m / x
     H = pan.H_interp_T_nu(T_nu)
     ent = pan.ent_interp_T_nu(T_nu)
 
-    println("log_x = ", log_x, ", x = ", x)
-    # println("u = ", u)
-    # println("du = ", du)
+    if pan.verbose
+        println("log_x = ", log_x, ", x = ", x)
+    end
     ln_y_n = u[1]
     n = exp(ln_y_n) * ent
     ln_y_rho = u[2]
@@ -309,7 +315,8 @@ function mm_func!(
     eta = u[4]
     xi_N = xi_from_eta(pan, eta, ln_x_N)
 
-    println("T_nu = ", T_nu, ", T_N = ", T_N, ", xi_N = ", xi_N)
+    # ("T_nu = ", T_nu, ", T_N = ", T_N, ", xi_N = ", xi_N)
+    # ("x_N = ", exp(ln_x_N))
     # Newton stages can temporarily leave the physical algebraic domain.
     # if !(isfinite(T_N) && T_N > zero(T) && isfinite(xi_N))
     #     du .= zero(eltype(du))
@@ -318,8 +325,10 @@ function mm_func!(
 
     # TODO: [26.08.26] Move or remove collision_terms.
     coll_n, coll_rho = collision_terms(pan, T_nu, T_N, xi_N)
-    println("coll_n = ", coll_n)
-    println("coll_rho = ", coll_rho)
+    if pan.verbose
+        println("coll_n = ", coll_n)
+        println("coll_rho = ", coll_rho)
+    end
 
     dx_dt = dx_dt_interp(pan, x)
 
@@ -404,16 +413,19 @@ function n_rho_root(u, params)
     n = num_dens(pan, T_N, xi_N)
     rho = energy_dens(pan, T_N, xi_N)
     if n / n_ic < 0
-        println("n/n_ic < 0 in n_rho_root")
-        println("n/n_ic = ", n / n_ic)
-        println("n = ", n)
-        num_dens(pan, T_N, xi_N, debug=true)
-        error()
+        if pan.verbose
+            println("n/n_ic < 0 in n_rho_root")
+            println("n/n_ic = ", n / n_ic)
+            println("n = ", n)
+            num_dens(pan, T_N, xi_N, debug=true)
+        end
         return [log(1e-100), log(rho/rho_ic)]
     end
     if rho / rho_ic < 0
-        println("rho/rho_ic < 0 in n_rho_root")
-        println("rho/rho_ic = ", rho / rho_ic)
+        if pan.verbose
+            println("rho/rho_ic < 0 in n_rho_root")
+            println("rho/rho_ic = ", rho / rho_ic)
+        end
         return [log(n/n_ic), log(1e-100)]
     end
     return [log(n/n_ic), log(rho/rho_ic)]

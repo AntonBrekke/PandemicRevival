@@ -6,7 +6,6 @@ import Integrals
 include(joinpath(@__DIR__, "utils.jl"))
 
 mutable struct Params_12_34{T<:Real, R<:Real}
-    model_params::ModelParams{T}
     p1::Particle{T}
     p2::Particle{T}
     p3::Particle{T}
@@ -28,7 +27,6 @@ mutable struct Params_12_34{T<:Real, R<:Real}
     a::Union{R, Nothing}
 
     function Params_12_34{T, R}(
-            model_params::ModelParams{T},
             p1::Particle{T},
             p2::Particle{T},
             p3::Particle{T},
@@ -37,7 +35,6 @@ mutable struct Params_12_34{T<:Real, R<:Real}
             xis::NTuple{4, R}, # = Vector{R}(undef, 4),
         ) where {T<:Real, R<:Real}
         new{T, R}(
-            model_params,
             p1, p2, p3, p4,
             temps,
             xis,
@@ -150,15 +147,15 @@ function s_max(p::Params_12_34{T, R}) where {T<:Real, R<:Real}
     )
 end
 
+# Coupling y^4 is moved out of the integral.
 function coll_12_34_sq_amp(
         t::R,
         p::Params_12_34{T, R}
     ) where {T <: Real, R <: Real}
     mN = p.p3.m
     mA = p.p1.m
-    pre = 8. * p.model_params.y^4
     denom = (mN^2 - t)^2 * (p.s + t - mN^2 - 2. * mA^2)^2
-    nom = (
+    nom = 8. * (
         - 2. * mN^8
         - 8. * mN^6 * (
             mA^2
@@ -181,7 +178,7 @@ function coll_12_34_sq_amp(
         + 2. * mA^2 * t * (p.s + 2. * t)^2
         - t * (p.s + t) * (p.s^2 + 2. * p.s * t + 2. * t^2)
     )
-    res = pre * nom / denom
+    res = nom / denom
     # max = 5e-13
     # if res > max
     #     return max
@@ -211,9 +208,8 @@ function coll_12_34_sq_amp_no_pole(
     ) where {T <: Real, R <: Real}
     mN = p.p3.m
     mA = p.p1.m
-    pre = 8. * p.model_params.y^4
     denom = (mN^2 - t)^2
-    nom = (
+    nom = 8. * (
         - 2. * mN^8
         - 8. * mN^6 * (
             mA^2
@@ -470,7 +466,6 @@ function coll_12_34(
     ) where {T<:Real, R<:Real}
     # return 0.
     params = Params_12_34{T, R}(
-        model_params,
         p1,
         p2,
         p3,
@@ -478,7 +473,7 @@ function coll_12_34(
         temps,
         xis,
     )
-    integral = coll_12_34_int_e1(params)
+    integral = model_params.y^4 *coll_12_34_int_e1(params)
     return integral
 end # function
 
@@ -494,11 +489,10 @@ function coll_12_34_int_t_anal(
     # println("a = ", a)
     tm = t_lim(-1, p)
     tp = t_lim(1, p)
-    pre = -8. * p.model_params.y^4
     # println(mN^2 - tm)
     # println(mN^2 - tp)
 
-    num1 = (
+    num1 = - 8. *(
         - 16 * mN^8
         + 16 * (tp+tm) * mN^6
         + 2 * mN^4 * (12*mA^4 + 4*(-s+tm+tp)*mA^2 + s^2 - 8*tm*tp - 2*s*(tm+tp))
@@ -679,7 +673,7 @@ function coll_12_34_int_t_new(
             )
         )
     end
-    return p.model_params.y^4 * (term1 + term2 + term3)
+    return term1 + term2 + term3
 
 end
 

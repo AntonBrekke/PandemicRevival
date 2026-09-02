@@ -57,7 +57,7 @@ def plot_y_n(jul, pyt):
     ax_n.legend()
 
     # fig_n.suptitle(fr"$m_N={md_str},\ m_A={mX_str}\, m_N,\ y={y_str},\ \sin^2(2\theta)={sin22th_str}$")
-    fig_n.suptitle(fr"$m_N=1\cdot 10^{{-5}}\, \textrm{{GeV}},\ m_A=2.5\, m_N,\ y=1\cdot 10^{{-5}},\ \sin^2(2\theta)=1.65\cdot 10^{{-11}}$")
+    # fig_n.suptitle(fr"$m_N=1\cdot 10^{{-5}}\, \textrm{{GeV}},\ m_A=2.5\, m_N,\ y=2\sqrt{{3}}\cdot 10^{{-5}},\ \sin^2(2\theta)=5.3\cdot 10^{{-13}}$")
     fig_n.savefig("figures/y_n.pdf")
 
 def plot_rho(jul, pyt):
@@ -114,7 +114,7 @@ def plot_hubble_coll(jul):
     ax_hubble.set_ylabel(r"Rate [GeV]")
     ax_hubble.grid()
     ax_hubble.legend()
-    fig_hubble.suptitle(fr"$m_N=1\cdot 10^{{-5}}\, \textrm{{GeV}},\ m_A=2.5\, m_N,\ y=1\cdot 10^{{-5}},\ \sin^2(2\theta)=1.65\cdot 10^{{-11}}$")
+    # fig_hubble.suptitle(fr"$m_N=1\cdot 10^{{-5}}\, \textrm{{GeV}},\ m_A=2.5\, m_N,\ y=2\sqrt{{3}}\cdot 10^{{-5}},\ \sin^2(2\theta)=5.3\cdot 10^{{-13}}$")
     fig_hubble.savefig("figures/hubble.pdf")
 
 def plot_coll_n(jul, pyt):

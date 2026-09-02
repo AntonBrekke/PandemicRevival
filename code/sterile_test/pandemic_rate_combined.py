@@ -90,7 +90,8 @@ BP = None
 # BP2 (in draft)
 # load_str = "./md_1e-05;mX_2.5e-05;sin22th_5e-16;y_2.522e-03;full_new.dat"
 # load_str = "./md_1e-05;mX_2.5e-05;sin22th_1e-11;y_1e-05;full_new.dat"
-load_str = "./md_1e-05;mX_2.5e-05;sin22th_2.65e-11;y_1e-05;full_new.dat"
+# load_str = "./md_1e-05;mX_2.5e-05;sin22th_2.65e-11;y_1e-05;full_new.dat"
+load_str = "./md_1e-05;mX_2.5e-05;sin22th_5.3e-13;y_1e-04;full_new.dat"
 
 
 data = np.loadtxt(load_str)

@@ -505,20 +505,23 @@ if __name__ == '__main__':
     # y = 2.522e-3
     # sin2_2th = 5e-16
 
-    # Compare with julia
-    # m_d = 1e-5
-    # m_N1 = m_d
-    # m_N2 = m_d
-    # m_X = 2.5*m_d
-    # y = 1e-4
-    # sin2_2th = 5e-16
-    # Compare with Julia (new) [26.08.26]
+    # Compare with Julia [26.08.26]
     m_d = 1e-5
     m_N1 = m_d
     m_N2 = m_d
     m_X = 2.5*m_d
     y = 1e-5
     sin2_2th = 2.65e-11
+
+    # Compare with Julia [26.08.26]
+    m_d = 1e-5
+    m_N1 = m_d
+    m_N2 = m_d
+    m_X = 2.5*m_d
+    y = 1e-4
+    sin2_2th = 5.3e-13
+
+
 
     m12 = m_d
     # Anton: Need m0 >> mi, m12 >> mi^2 / m0, i = a,1,2,(12), m1 = 0

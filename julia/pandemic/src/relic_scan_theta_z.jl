@@ -85,12 +85,30 @@ end
 
 _theta_of(log10s) = asin(sqrt(10.0^log10s)) / 2
 
+# Fallback integration lengths (x = m_N/T_nu) tried, in order, when the
+# default x_end = 100 (DodelsonWidrow's default) genuinely has not let Omega
+# h^2 settle by the end of the solve -- see the comment in `theta_point`.
+# Each step is markedly more expensive (measured ~1.3-5x per step for a
+# typical point), so it is only paid when needed.
+const PLATEAU_XENDS = (300.0, 1000.0)
+
 """
     theta_point(pan, tT_rel, y, log10s, cfg, counts; reltol=cfg.ode_reltol)
 
 Solves at (y, sin^2 2theta = 10^log10s). Returns (residual, omega_h2,
 converged, plateau_ok, retcode) with residual = log10(Omega h^2 / omega_d0),
-NaN if the solve failed. `counts.solves` and `counts.failed` are incremented.
+NaN if the solve failed. `counts.solves` and `counts.failed` are incremented
+once per ODE solve actually performed (including any retries below).
+
+If the solve succeeds (retcode) but `check_plateau_z` reports Omega h^2 has
+not yet settled by x = 100, this most often used to be a false alarm from the
+old Y_n-based plateau check (fixed directly in `check_plateau_z`); on the
+rare points where Omega h^2 genuinely has not settled by x = 100 (dark sector
+thermalizes/relaxes late), the solve is retried with a longer integration
+(`PLATEAU_XENDS`) before being counted as failed. Without this, a single such
+point returns NaN and can silently remove an entire sign change from the
+coarse grid or the predicted-root march (both require two adjacent *finite*
+residuals to see a crossing), producing a spurious "no root".
 """
 function theta_point(pan, tT_rel, y, log10s, cfg::ScanConfigThetaZ, counts; reltol::Float64=cfg.ode_reltol)
     theta = _theta_of(log10s)
@@ -103,6 +121,14 @@ function theta_point(pan, tT_rel, y, log10s, cfg::ScanConfigThetaZ, counts; relt
     )
     counts.solves[] += 1
     omega_h2, converged, plateau_ok, retcode = solve_point_z(pan, tT_rel, dw, y, theta, cfg_z)
+    if retcode == :Success && !plateau_ok
+        for x_end in PLATEAU_XENDS
+            dw_x = DodelsonWidrow{Float64}(pan.N1.m, theta, tT_rel; x_end=x_end)
+            counts.solves[] += 1
+            omega_h2, converged, plateau_ok, retcode = solve_point_z(pan, tT_rel, dw_x, y, theta, cfg_z)
+            (retcode == :Success && plateau_ok) && break
+        end
+    end
     ok = converged && isfinite(omega_h2) && omega_h2 > 0
     ok || (counts.failed[] += 1)
     return (ok ? log10(omega_h2) - log10(OMEGA_H2_TARGET_Z) : NaN, omega_h2, converged, plateau_ok, retcode)

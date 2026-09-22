@@ -14,15 +14,13 @@ are broken where no root was found for a mass in the grid.
 Run from julia/pandemic:
     conda run -n pandemic python plot/relic_scan_theta.py [scan_dir] [output_path_without_extension] [--debug]
 
---debug marks the scanned roots on the lines and writes <output>_debug.pdf/.png,
+--debug marks the scanned roots on the lines and writes <output>_debug.pdf,
 so the production figure is not overwritten.
 """
 
 import argparse
 import glob
 import os
-import shutil
-import subprocess
 
 import numpy as np
 import matplotlib
@@ -201,11 +199,7 @@ def main():
     fig.tight_layout()
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     fig.savefig(out + ".pdf")
-    if shutil.which("dvipng"):
-        fig.savefig(out + ".png", dpi=300)
-    elif shutil.which("pdftoppm"):  # usetex needs dvipng for raster output
-        subprocess.run(["pdftoppm", "-png", "-r", "300", "-singlefile", out + ".pdf", out], check=True)
-    print(f"wrote {out}.pdf/.png with {len(roots)} points, "
+    print(f"wrote {out}.pdf with {len(roots)} points, "
           f"{len({k[0] for k in roots})} masses, {len({k[1] for k in roots})} values of y")
 
 

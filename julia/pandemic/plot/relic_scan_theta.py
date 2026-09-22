@@ -313,7 +313,10 @@ def plot_contours(ax, roots, excluded, debug):
         inside = np.nonzero(s_line < S_LIM[1] / 10)[0]
         if len(inside) and y >= LABEL_Y_MIN * (1 - 1e-6):
             j = inside[0]
-            m_t, s_t, va = place_label(m_line[j] * 1.14, s_line[j] * 1.6, m_pad=1.12)
+            # The 2.6 clears the line itself: the anchor is offset to the right
+            # as well, and the contours rise with m_N, so a smaller lift left
+            # the text sitting on its own curve.
+            m_t, s_t, va = place_label(m_line[j] * 1.14, s_line[j] * 2.6, m_pad=1.12)
             # Above the bands: the smallest couplings only enter the frame
             # inside the Dodelson-Widrow band, which the lines run under.
             ax.text(m_t, s_t, y_label(y, first=first[0]), color=c,
@@ -351,10 +354,12 @@ def main():
     # its boundary, clear of the ragged X-ray curve.
     n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
                        r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28)
-    # 0.66 lifts the r_s label off the point where the lambda_fs boundary
-    # crosses its own, which is almost exactly its midpoint.
+    # The r_s label is put low on its boundary. Around its midpoint the
+    # lambda_fs boundary cuts diagonally across the same area and the g = 1e-3
+    # contour label sits on top of it, while higher up the excluded region is
+    # too narrow for the text to fit between the boundary and the left edge.
     plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS,
-               r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.66)
+               r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.22)
     plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"])
 
     excluded = {k: (lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC or r_s.get(k, 0.0) > R_S_MAX_MPC

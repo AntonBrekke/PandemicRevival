@@ -44,7 +44,6 @@ C_TEMP = "0.4"
 C_H = "crimson"
 C_A_N2NU = "#1aa7ec"  # sky blue
 C_AA_NN = "#4adede"   # turquoise
-C_TOTAL = "0.3"
 
 
 def parse_args():
@@ -95,13 +94,16 @@ def style_axis(ax):
         spine.set_linewidth(0.5)
 
 
-def decade_ticks(axis, lo, hi, label_every=1, skip=()):
+def decade_ticks(axis, lo, hi, label_every=1, skip=(), minor=True):
     """A tick at every decade in [lo, hi], labelled every `label_every` decades
-    except for the decades in `skip`."""
+    except for the decades in `skip`. `minor` adds the ticks between decades,
+    which are dropped on the axes spanning many decades, where they crowd
+    together into a solid line."""
     decades = np.arange(np.floor(np.log10(lo)), np.ceil(np.log10(hi)) + 1).astype(int)
     labelled = {d for d in decades if d % label_every == 0 and d not in skip}
     axis.set_major_locator(FixedLocator(10.0**decades))
-    axis.set_minor_locator(FixedLocator([k * 10.0**d for d in decades for k in range(2, 10)]))
+    axis.set_minor_locator(FixedLocator(
+        [k * 10.0**d for d in decades for k in range(2, 10)] if minor else []))
     axis.set_major_formatter(FuncFormatter(
         lambda v, _: rf"$10^{{{round(np.log10(v))}}}$" if round(np.log10(v)) in labelled else ""))
     axis.set_minor_formatter(NullFormatter())
@@ -124,8 +126,9 @@ def curve(ax, x, y, debug, **kw):
 def label_curves(ax, curves, xlim, ylim):
     """Label curves in their own colour, just above or below them, where the
     label's box is furthest (in log y) from the other curves and from the
-    labels already placed. `curves` is a list of (x, y, text, color); curves
-    with text None are only obstacles."""
+    labels already placed. `curves` is a list of (x, y, text, color) with an
+    optional fifth entry (x_lo, x_hi) restricting where along the curve its
+    label may sit; curves with text None are only obstacles."""
     lx = np.linspace(np.log10(xlim[0]), np.log10(xlim[1]), 400)
     ly_lo, ly_hi = np.log10(ylim[0]), np.log10(ylim[1])
     half_w = int(0.06 * len(lx))              # half width of a label, in grid points
@@ -140,13 +143,17 @@ def label_curves(ax, curves, xlim, ylim):
     def distance(v, lo, hi):
         return np.where(v > hi, v - hi, np.where(v < lo, lo - v, 0.0))
 
-    grids = [on_grid(x, y) for x, y, _, _ in curves]
+    grids = [on_grid(c[0], c[1]) for c in curves]
     placed = []  # (k, lo, hi) of the labels so far
-    for i, (_, _, text, color) in enumerate(curves):
+    for i, c in enumerate(curves):
+        text, color = c[2], c[3]
+        x_rng = c[4] if len(c) > 4 else None
         if text is None:
             continue
         best = (0.0, None, None)
         for k in range(2 * half_w, len(lx) - 2 * half_w):
+            if x_rng is not None and not x_rng[0] <= 10**lx[k] <= x_rng[1]:
+                continue
             sl = slice(k - half_w, k + half_w + 1)
             own = grids[i][sl]
             if np.isnan(own).any():
@@ -207,7 +214,7 @@ def plot_history(path, out_dir, debug=False):
     xN, yN = curve(ax_n, x, my_N, debug, color=C_N, zorder=-1)
     xA, yA = curve(ax_n, x, my_A, debug, color=C_A, zorder=-1)
     ax_n.set_ylim(*n_lim)
-    decade_ticks(ax_n.yaxis, *n_lim, label_every=2)
+    decade_ticks(ax_n.yaxis, *n_lim, label_every=2, minor=False)
     label_curves(ax_n, [(xN, yN, r"$N_1 + N_2$", C_N), (xA, yA, r"$A'$", C_A),
                         (np.array(xlim), np.full(2, MY_RELIC), None, None)], xlim, n_lim)
     ax_n.set_ylabel(r"$m\, n / s\;\;[\mathrm{keV}]$")
@@ -218,30 +225,33 @@ def plot_history(path, out_dir, debug=False):
     t_lim = (np.nanmin(ratio) * 0.5, np.nanmax(ratio) * 2)
     ax_t.set_ylim(*t_lim)
     decade_ticks(ax_t.yaxis, *t_lim)
-    ax_t.set_xlabel(r"$m_{N_1} / T_\nu$")
+    ax_t.set_xlabel(r"$x = m_{N_1} / T_\nu$")
     ax_t.set_ylabel(r"$T_N/T_\nu$")
 
     # Rates [keV]: collision terms per dark-sector number density n = s Y_n.
     n = h["ent"] * h["y_n"]
+    # The last entry of each is where along the curve its label may sit. The
+    # A'A' <-> NN label is kept to the left of the fall-off, which is steep
+    # enough that the label is placed on top of the curve rather than beside it.
     rates = [
-        (1e6 * h["hubble"], r"$H$", C_H, "-"),
-        (1e6 * np.abs(h["coll_A_N2nu"]) / n, r"$A' \leftrightarrow N_2 \nu$", C_A_N2NU, "-"),
-        (1e6 * np.abs(h["coll_AA_NN"]) / n, r"$A'A' \leftrightarrow NN$", C_AA_NN, "-"),
-        (1e6 * np.abs(h["coll_n"]) / n, r"total", C_TOTAL, "--"),
+        (1e6 * h["hubble"], r"$H$", C_H, "-", None),
+        (1e6 * np.abs(h["coll_A_N2nu"]) / n, r"$A' \leftrightarrow N_2 \nu$", C_A_N2NU, "-", None),
+        (1e6 * np.abs(h["coll_AA_NN"]) / n, r"$A'A' \leftrightarrow NN$", C_AA_NN, "-",
+         (xlim[0], 0.2)),
     ]
     r_max = max(np.nanmax(r[0]) for r in rates)
     r_lim = (np.nanmin(rates[0][0]) * 1e-4, r_max * 1e2)
     labelled = []
-    for r, text, color, ls in rates:
+    for r, text, color, ls, x_rng in rates:
         xr, yr = curve(ax_r, x, r, debug, color=color, ls=ls, zorder=-1, lw=1.0 if ls == "-" else 0.8)
-        labelled.append((xr, yr, text, color))
+        labelled.append((xr, yr, text, color, x_rng))
     ax_r.set_ylim(*r_lim)
-    decade_ticks(ax_r.yaxis, *r_lim, label_every=2)
+    decade_ticks(ax_r.yaxis, *r_lim, label_every=2, minor=False)
     label_curves(ax_r, labelled, xlim, r_lim)
     ax_r.yaxis.set_label_position("right")
     ax_r.yaxis.set_ticks_position("both")
     ax_r.tick_params(axis="y", which="both", labelleft=False, labelright=True)
-    ax_r.set_xlabel(r"$m_{N_1} / T_\nu$")
+    ax_r.set_xlabel(r"$x = m_{N_1} / T_\nu$")
     ax_r.set_ylabel(r"$\mathrm{Rate}\;\;[\mathrm{keV}]$")
 
     fig.suptitle(fr"$m_{{N_1}}={m_keV:g}\ \mathrm{{keV}},\ m_{{A'}}={M_A_OVER_M_N}\, m_{{N_1}},\ "

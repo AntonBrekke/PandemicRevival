@@ -221,10 +221,37 @@ def extend_boundary(m_c, s_c):
             np.concatenate(([lo[1]], s_c, [hi[1]])))
 
 
-def plot_bound(ax, roots, vals, limit, color, label, zorder, frac=0.5):
+def m_at(crossings, s):
+    """m_N on a boundary at height s, by log interpolation of its crossings.
+    NaN outside the range of sin^2 2theta that they span."""
+    ls = np.log([c[1] for c in crossings])
+    lm = np.log([c[0] for c in crossings])
+    if not ls[0] <= np.log(s) <= ls[-1]:
+        return np.nan
+    return float(np.exp(np.interp(np.log(s), ls, lm)))
+
+
+def gap_label_anchor(cross):
+    """Middle of the corridor that only the sound horizon excludes, taken at
+    the height where the self-interaction bound gives out -- which is where
+    that corridor is widest, since below it the self-interaction region
+    overtakes the r_s one and above it the lambda_fs region does. Returns
+    (m_N, sin^2 2theta), or None if there is no such corridor."""
+    if not (cross["r_s"] and cross["si"]):
+        return None
+    m_si, s = cross["si"][-1]           # top end of the self-interaction bound
+    m_left = np.nanmax([m_at(cross["lya"], s), m_si]) if cross["lya"] else m_si
+    m_right = m_at(cross["r_s"], s)
+    if not (np.isfinite(m_left) and np.isfinite(m_right) and m_right > m_left):
+        return None
+    return float(np.sqrt(m_left * m_right)), s
+
+
+def plot_bound(ax, roots, vals, limit, color, label, zorder, frac=0.5, label_at=None):
     """Shade the region of smaller m_N than the crossings of `limit` and label
     the boundary inside the shaded side, `frac` of the way up its visible part
-    (0.5 is halfway; lower it to dodge a busy part of the figure)."""
+    (0.5 is halfway; lower it to dodge a busy part of the figure). `label_at`
+    overrides that with an explicit (m_N, sin^2 2theta), centred on it."""
     crossings = sorted(bound_crossings(roots, vals, limit), key=lambda c: c[1])
     if len(crossings) < 2:
         return False
@@ -239,6 +266,10 @@ def plot_bound(ax, roots, vals, limit, color, label, zorder, frac=0.5):
     # Label offset into the excluded (left) side and below the anchor, so it
     # clears the boundary line instead of sitting on it. The text is above
     # everything, since the shading is drawn under the X-ray region.
+    if label_at is not None:
+        ax.text(label_at[0], label_at[1], label, color=color,
+                fontsize=BOUND_LABEL_SIZE, ha="center", va="center", zorder=Z_LABEL)
+        return True
     vis = np.nonzero((s_c > S_LIM[0]) & (s_c < S_LIM[1]))[0]
     mid = vis[min(int(frac * len(vis)), len(vis) - 1)] if len(vis) else int(np.argmax(m_c))
     m_t = float(np.clip(m_c[mid] * 0.88, M_LIM[0] * 1.06, M_LIM[1] / 1.06))
@@ -354,12 +385,15 @@ def main():
     # its boundary, clear of the ragged X-ray curve.
     n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
                        r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28)
-    # The r_s label is put low on its boundary. Around its midpoint the
-    # lambda_fs boundary cuts diagonally across the same area and the g = 1e-3
-    # contour label sits on top of it, while higher up the excluded region is
-    # too narrow for the text to fit between the boundary and the left edge.
+    # The r_s label goes in the corridor between the lambda_fs and
+    # self-interaction bounds -- the only part of the figure that r_s alone
+    # excludes, and the only place near its boundary with room for the text.
+    cross = {n: sorted(bound_crossings(roots, v, l), key=lambda c: c[1])
+             for n, (v, l) in (("lya", (lam, LAMBDA_FS_MAX_MPC)),
+                               ("r_s", (r_s, R_S_MAX_MPC)),
+                               ("si", (sig_m, SIGMA_M_MAX)))}
     plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS,
-               r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.22)
+               r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], label_at=gap_label_anchor(cross))
     plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"])
 
     excluded = {k: (lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC or r_s.get(k, 0.0) > R_S_MAX_MPC

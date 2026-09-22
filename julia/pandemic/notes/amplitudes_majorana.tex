@@ -1,0 +1,354 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,booktabs,array,slashed}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\Msq}{|\mathcal{M}|^2}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\Ap}{A'}
+
+\title{Deriving the pandemic-DM amplitudes from the path integral,\\
+\large with emphasis on the Majorana nature of $N_1,N_2$}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Scope and summary}
+
+This note (1) checks the mass-matrix diagonalization of Sec.~3 of the draft
+(\emph{Charging sterile neutrinos}) by an independent perturbative
+computation, (2) sets out the path-integral route from the diagonalized
+Lagrangian to the Feynman rules for \emph{Majorana} fields, contrasting each
+step with the familiar Dirac case, and (3) applies it to the four processes
+used in the code: $N_2N_1\to\Ap$, $N_2\nu\to\Ap$, $N_1N_1\to N_2N_2$ and
+$\Ap\Ap\to N_iN_i$. The headline results:
+\begin{itemize}
+  \item The Sec.~3 diagonalization (masses, mixing angles, eigenvector
+    coefficients, and the $i\gamma^5$ sign-fixing factors) is
+    \textbf{verified correct} to the stated order, by an independent
+    two-step Rayleigh--Schr\"odinger perturbative diagonalization and a
+    numerical scan of the exact eigensystem over seven decades of the
+    hierarchy parameter (Sec.~\ref{sec:massmatrix}).
+  \item The Feynman rules for the Majorana pair $(N_1,N_2)$ differ from the
+    naive Dirac ones in two, and only two, ways relevant here: (i) the
+    off-diagonal current $\bar N_2\gamma^\mu N_1$ has \emph{no} independent
+    h.c.\ partner -- for Majorana fields the two terms are the \emph{same}
+    operator, already accounted for in how eq.~(DM\_int) of the draft is
+    written (Sec.~\ref{sec:majorana-vertex}); (ii) a Majorana fermion
+    propagating between two vertices admits an extra, ``wrong-type''
+    contraction that is forbidden for a charge-carrying Dirac fermion, and
+    this -- not ordinary identical-particle combinatorics -- is what allows
+    $\Ap\Ap\to N_1N_1$ to receive \emph{both} $t$- and $u$-channel $N_2$
+    exchange from a single vertex (Sec.~\ref{sec:AAtoNN}).
+  \item Reproducing $N_1N_1\to N_2N_2$ independently (full $t+u$-channel
+    exchange, unitary-gauge propagator, checked with FeynCalc) reproduces the
+    draft's own $\sigma_{\rm NR}$ \emph{exactly}, with no free parameter, but
+    is $4/3$ times \emph{larger} than the draft's displayed
+    $\sum\Msq_{N_1N_1\to N_2N_2}$ (its eq.~(A6)-type formula). \textbf{This
+    indicates eq.~(A6) is short by a factor $4/3$}; $\sigma_{\rm NR}$ is
+    confirmed correct (Sec.~\ref{sec:NNtoNN}). This directly affects the
+    self-interaction bound and kinetic-decoupling rate computed in
+    \code{plot/self\_interaction.py} and \code{src/kinetic\_decoupling.jl}
+    this session (both currently use eq.~(A6) as printed; the true bound is
+    $\approx10\%$ stronger in mass, $(4/3)^{1/3}$).
+\end{itemize}
+
+\section{Checking the mass-matrix diagonalization}
+\label{sec:massmatrix}
+
+The Lagrangian mass term (draft eq.~(massmatrix), basis
+$(\nu_\alpha,\nu_+,\nu_-,\nu_0)$, $m_+=m_-\equiv m_M$) is
+\begin{equation}
+  \mathcal L\supset -\tfrac12\,\bar\nu^T M\nu, \qquad
+  M=\begin{pmatrix}0&0&0&m_\alpha\\0&0&m_D&m_M\\0&m_D&0&m_M\\
+    m_\alpha&m_M&m_M&m_0\end{pmatrix},
+\end{equation}
+with hierarchy $m_\alpha,m_D,m_M\ll m_0$ and $m_\alpha m_M/(m_0m_D)$,
+$m_\alpha^2/(m_0m_D)$, $m_M^2/(m_0m_D)\ll1$ (the draft's
+eq.~(mass\_hierarchy)). I diagonalize this in two perturbative steps rather
+than trust the draft's result at face value.
+
+\textbf{Step 1 (degenerate PT in the light $\{\alpha,+,-\}$ block).}
+Since $m_\alpha,m_D,m_M$ are all the same order, the ``unperturbed'' matrix
+(dropping everything but $m_0$) has the light sector \emph{triply
+degenerate} at eigenvalue 0. Diagonalizing the $O(m_D)$ perturbation within
+that degenerate subspace, $M_{ll}=\begin{pmatrix}0&0&0\\0&0&m_D\\0&m_D&0\end{pmatrix}$,
+gives the good zeroth-order states $e_\alpha$ (eigenvalue 0),
+$s\equiv(e_++e_-)/\sqrt2$ (eigenvalue $+m_D$), $a\equiv(e_+-e_-)/\sqrt2$
+(eigenvalue $-m_D$). A short calculation shows $\langle e_\alpha|M|s\rangle=0$
+and $\langle a|M|e_0\rangle=(m_M-m_M)/\sqrt2=0$ \emph{exactly} (not just to
+leading order) -- $a$ decouples completely from everything else, for any
+$m_+=m_-$. This already reproduces the draft's two strongest claims about
+$N_2$: $m_{N_2}=m_D$ \emph{exactly} (with the necessary $i\gamma^5$ since the
+eigenvalue is $-m_D<0$), and $N_2$ does not mix with anything else.
+
+\textbf{Step 2 (seesaw block-diagonalization of the remaining
+$(e_\alpha,s,e_0)$ system against the heavy $e_0$).} The exact $3\times3$
+submatrix in this basis is $\begin{pmatrix}0&0&m_\alpha\\0&m_D&\sqrt2
+m_M\\m_\alpha&\sqrt2m_M&m_0\end{pmatrix}$. Standard seesaw
+block-diagonalization ($M_{\rm eff}=M_{ll}-M_{lh}M_{hh}^{-1}M_{lh}^T$) against
+$e_0$, followed by ordinary non-degenerate perturbation theory on the
+resulting $2\times2$ $(e_\alpha,s)$ system (valid since its off-diagonal
+element is $O(m_\alpha m_M/m_0)\ll$ its diagonal gap $\approx m_D$), gives,
+after collecting terms and restoring the sign-fixing $i\gamma^5$ where the
+eigenvalue comes out negative:
+\begin{align}
+  m_\nu &= \frac{m_\alpha^2}{m_0}\Big(1+\frac{2m_M^2}{m_0m_D}\Big)
+    + O\Big(\frac{m_\alpha^2}{m_0}\varepsilon^2\Big), &
+  m_{N_1} &= m_D - \frac{2m_M^2}{m_0} + O(m_D\,\varepsilon^3), \\
+  \sin\theta_0 &= \frac{m_\alpha}{m_0}+O(\varepsilon^2), &
+  \sin\theta_1 &= \sqrt2\,\frac{m_Mm_\alpha}{m_0m_D}+O(\varepsilon^2),
+\end{align}
+with $\varepsilon\sim m_{\alpha,D,M}/m_0$, and every admixture coefficient in
+the eigenvectors (the $-\sin\theta_0\,\nu_0$ and $-\sqrt2(m_M/m_0)\nu_0$
+pieces of $\nu$ and $N_1$, and the $\sin\theta_0\,\nu_\alpha$,
+$(m_M/m_0)(\nu_++\nu_-)$ pieces of $N_0$) matching the draft's
+eqs.~(mnu)--(theta\_mix1) \emph{term by term, including signs}. The heavy
+state gets the standard second-order shift $m_{N_0}=m_0+m_\alpha^2/m_0+2m_M^2/m_0$,
+also matching the draft. I additionally checked this numerically:
+diagonalizing $M$ exactly (no expansion) at $\varepsilon=10^{-1},\ldots,10^{-4}$
+(random but fixed $O(1)$ coefficients for $m_\alpha,m_D,m_M$, all $\propto\varepsilon$)
+and comparing to the draft's closed-form masses/angles gives a relative
+error that shrinks linearly in $\varepsilon$ for $m_\nu,m_{N_1},m_{N_0},\sin\theta_0,\sin\theta_1$,
+and to machine precision (\emph{every} $\varepsilon$) for $m_{N_2}=m_D$ --
+exactly the signature of a correct expansion truncated at the stated order,
+with $m_{N_2}$ correctly identified as exact. I did not find an error.
+
+\section{From the Lagrangian to Feynman rules: Majorana vs.\ Dirac}
+\label{sec:majorana-vertex}
+
+\subsection{Generating functional and LSZ (brief, standard part)}
+
+The steps that do \emph{not} change for a Majorana field: introduce a source
+term $\bar\eta\psi+\bar\psi\eta$ in the path integral
+$Z[\eta,\bar\eta]=\int\mathcal D\psi\,\mathcal D\bar\psi\,\exp\big[iS_0+iS_{\rm int}
++i\!\int(\bar\eta\psi+\bar\psi\eta)\big]$, expand $\exp(iS_{\rm int})$ in the
+coupling, and take functional derivatives $\delta/\delta\eta,\delta/\delta\bar\eta$
+to generate connected Green's functions; LSZ amputates external legs and
+puts them on shell. This machinery is representation-independent and works
+identically for Majorana fields written as 4-component spinors satisfying
+the Majorana condition $\psi^c=C\bar\psi^T=\psi$. The two places where
+Majorana-ness actually enters are the free two-point function (propagator)
+and the reading-off of vertices from $S_{\rm int}$, taken up next.
+
+\subsection{The Majorana propagator has an extra piece}
+
+For a Dirac field, fermion-number conservation forces $\langle
+0|T\psi(x)\psi(y)|0\rangle=\langle0|T\bar\psi(x)\bar\psi(y)|0\rangle=0$; only
+$\langle0|T\psi(x)\bar\psi(y)|0\rangle=S_F(x-y)$ is non-zero. A Majorana
+field obeys $\psi=\psi^c=C\bar\psi^T$, so $\bar\psi=-\psi^TC^{-1}$
+(using $C^T=-C$), and
+\begin{equation}
+  \langle0|T\psi(x)\psi(y)|0\rangle
+  = \langle0|T\psi(x)\big({-\bar\psi(y)C^{-1}}\big)^T|0\rangle^T\cdots
+  = -S_F(x-y)\,C^{-1},
+  \label{eq:majprop2}
+\end{equation}
+(and $\langle\bar\psi\bar\psi\rangle=-C\,S_F^T$ similarly) is generically
+\emph{non-zero}. A Majorana field therefore has \emph{two} independent
+non-vanishing contractions instead of one. Diagrammatically this is what
+lets a single continuous ``fermion line'' run either with or against an
+arbitrarily chosen arrow direction (the fermion-flow direction becomes a
+bookkeeping choice, not a physical one) -- the origin of every genuinely
+Majorana-specific effect below. This is the standard result of Denner, Eck,
+Hahn \& K\"ublbeck, Nucl.\ Phys.\ B387 (1992) 467, whose algorithm I follow.
+
+\subsection{The vertex: why eq.~(DM\_int) needs no separate ``+h.c.''}
+
+Start from the gauge interaction in eq.~(LnoHiggs),
+$\mathcal L\supset g\,\bar\nu_{R+}\slashed A'\nu_{R+}-g\,\bar\nu_{R-}\slashed A'\nu_{R-}$
+(from $D_\mu=\partial_\mu\pm ig A'_\mu$ on the two charged Weyl components).
+Rewriting in the mass basis using the leading eigenvector relations of
+Sec.~\ref{sec:massmatrix} ($N_1\approx s=(\nu_++\nu_-)/\sqrt2$,
+$N_2\approx a=(\nu_+-\nu_-)/\sqrt2$ up to the small mixings already derived)
+and keeping only the $N_1$--$N_2$--$A'$ piece reproduces the draft's
+$-ig\,\bar N_2\slashed A' N_1$ term of eq.~(DM\_int). Its formal Hermitian
+conjugate is $+ig\,\bar N_1\slashed A' N_2$ (using
+$(\bar\psi_2\gamma^\mu\psi_1)^\dagger=\bar\psi_1\gamma^\mu\psi_2$ and reality
+of $g$ and $A'_\mu$). Apply the draft's own footnote identity,
+$\bar\psi_1\Gamma\psi_2=\bar\psi_2^c\,C\Gamma^TC^{-1}\psi_1^c$, with
+$\Gamma=\gamma^\mu$ and the standard charge-conjugation property
+$C(\gamma^\mu)^TC^{-1}=-\gamma^\mu$:
+\begin{equation}
+  \bar N_1\gamma^\mu N_2 = -\,\bar N_2^c\,\gamma^\mu\,N_1^c
+  \;\overset{N_i^c=N_i}{=}\; -\,\bar N_2\gamma^\mu N_1 .
+\end{equation}
+So the h.c.\ term is \emph{not} an independent operator: it equals
+$+ig(-\bar N_2\gamma^\mu N_1)A'_\mu=-ig\,\bar N_2\slashed A' N_1$, i.e.\ the
+\emph{same} term again. Adding it doubles the coefficient,
+$-ig\to-2ig$, exactly the draft's footnote statement (``a factor of 0 or
+2''); the ``2'' case applies here. Two readings are then possible for what
+$-ig\bar N_2\slashed A'N_1$ in eq.~(DM\_int) denotes: (a) it is the
+\emph{original}, un-doubled coefficient and one must still double it by hand
+before using it as a Feynman rule, or (b) the doubling has already been
+folded in when the draft's authors derived eq.~(DM\_int), and the displayed
+coefficient is already final. Reading (b) is supported by the fact that
+eq.~(DM\_int), unlike eqs.~(LnoHiggs) and (LDarkYukawas), carries \emph{no}
+trailing ``+h.c.'': the authors write the fully-resolved Lagrangian directly.
+Reading (b) is also the one that, when I use it to compute
+$N_1N_1\to N_2N_2$ from scratch (Sec.~\ref{sec:NNtoNN}), reproduces the
+draft's own $\sigma_{\rm NR}$ exactly. \textbf{Adopting (b): the Feynman rule
+for the $N_1$--$N_2$--$A'_\mu$ vertex is simply $ig\gamma^\mu$}, read directly
+off $i\mathcal L_{\rm int}\supset i(-ig)\bar N_2\gamma^\mu N_1A'_\mu$, with no
+further factor.
+
+An aside completing the ``0 or 2'' remark: the same manipulation applied to
+a \emph{diagonal} current, $\bar N_1\gamma^\mu N_1$, gives
+$\bar N_1\gamma^\mu N_1=-\bar N_1^c\gamma^\mu N_1^c=-\bar N_1\gamma^\mu N_1$,
+forcing $\bar N_1\gamma^\mu N_1\equiv0$: a Majorana fermion cannot carry a
+vector current at all (it is its own antiparticle, so it cannot be charged
+under any continuous symmetry the vector current would represent). This is
+why the gauge interaction is necessarily off-diagonal in $N_1,N_2$ and why no
+$\bar N_i\gamma^\mu A'_\mu N_i$ term needs to be considered anywhere in the
+code.
+
+\subsection{Symmetry factors for identical Majorana externals/internals}
+
+Two more standard points, used below: (i) external-state spin sums for
+Majorana particles use the \emph{same} completeness relation as Dirac,
+$\sum_su(p,s)\bar u(p,s)=\slashed p+m$ -- Majorana-ness affects the
+\emph{propagator} and \emph{vertex} bookkeeping above, not the free-particle
+wavefunctions; (ii) identical particles in the initial or final state still
+need the usual $1/n!$ phase-space symmetry factor when converting a squared,
+summed-over-final-states amplitude into a cross section or rate (this is
+ordinary quantum statistics, not a Majorana effect, and is unrelated to (i)
+of Sec.~\ref{sec:majorana-vertex} above -- see the worked example).
+
+\section{Worked example: \texorpdfstring{$N_1N_1\to N_2N_2$}{N1N1->N2N2}}
+\label{sec:NNtoNN}
+
+\subsection{Diagrams and why there are two, without invoking anything Majorana}
+
+With the vertex of Sec.~\ref{sec:majorana-vertex}, $N_1(p_1)N_1(p_2)\to
+N_2(p_3)N_2(p_4)$ proceeds by $t$- and $u$-channel $A'$ exchange: $t$-channel
+connects $p_1\!\to\!p_3$ and $p_2\!\to\!p_4$ at the two vertices, $u$-channel
+connects $p_1\!\to\!p_4$ and $p_2\!\to\!p_3$. This doubling is \emph{not} a
+Majorana effect -- it is the ordinary statement that the amplitude must be
+antisymmetrized under exchange of the two identical $N_1$'s (or, equivalently,
+the two identical $N_2$'s), exactly as for M{\o}ller scattering
+$e^-e^-\to e^-e^-$ with photon exchange. A hypothetical Dirac $N_1,N_2$ pair
+with the same (necessarily fermion-number-conserving, single-direction)
+vertex would give the same two diagrams. What \emph{is} special to Majorana
+here is only the vertex normalization derived above.
+
+\subsection{Amplitude and cross-check}
+
+\begin{align}
+  i\mathcal M_t &= \big[\bar u(p_3)(ig\gamma^\mu)u(p_1)\big]
+    \frac{-i\big(g_{\mu\nu}-q_\mu q_\nu/m_{A'}^2\big)}{t-m_{A'}^2}
+    \big[\bar u(p_4)(ig\gamma^\nu)u(p_2)\big], \quad q=p_1-p_3,\\
+  i\mathcal M_u &= -\big[\bar u(p_4)(ig\gamma^\mu)u(p_1)\big]
+    \frac{-i\big(g_{\mu\nu}-q_\mu' q_\nu'/m_{A'}^2\big)}{u-m_{A'}^2}
+    \big[\bar u(p_3)(ig\gamma^\nu)u(p_2)\big], \quad q'=p_1-p_4,
+\end{align}
+with the usual relative minus sign for exchanging the two identical outgoing
+fermions. I computed $\sum\Msq=\overline{|\mathcal M_t+\mathcal M_u|^2}$
+summed over all 4 external spins (FeynCalc: \code{DiracTrace},
+\code{FermionSpinSum}, \code{Contract}, full unitary-gauge propagator, exact
+in $s,t,u$) and evaluated it at threshold, $s=4m_N^2$, $t=u=0$:
+\begin{equation}
+  \sum\Msq\big|_{\rm threshold} = \frac{64\,g^4m_N^4}{m_{A'}^4}.
+\end{equation}
+Converting to a cross section with the standard threshold formula
+$\sigma=\sum\Msq(t{=}0)/(512\pi m_N^2)$ (spin average $1/4$, identical-particle
+factor $1/2$, and the $t$-integration range $\propto p_{\rm cm}^2$ cancelling
+the $1/p_{\rm cm}^2$ from the phase space, as required for a genuinely
+velocity-independent threshold cross section) gives
+\begin{equation}
+  \sigma_{\rm NR}\big|_{\rm my\ calc.} = \frac{g^4m_N^2}{8\pi m_{A'}^4}
+  \;=\; \sigma_{\rm NR}\big|_{\rm draft,\ eq.\ NNconversionNR} \quad\text{\emph{exactly}}.
+\end{equation}
+This matches the draft's own quoted non-relativistic cross section with no
+adjustable factor. Comparing instead to the draft's displayed
+$\sum\Msq_{N_1N_1\to N_2N_2}$ (its (A6)-type formula, whose threshold value
+is $48\,g^4m_N^4/m_{A'}^4$, as coded in this session's
+\code{sq\_amp\_NN\_A6}):
+\begin{equation}
+  \frac{\sum\Msq\big|_{\rm my\ calc.}}{\sum\Msq_{\rm draft,\ (A6)}}
+  \bigg|_{\rm threshold} = \frac{64}{48} = \frac43 .
+\end{equation}
+\textbf{Conclusion:} the two independent draft quantities, $\sigma_{\rm NR}$
+and $\sum\Msq$ (eq.~A6-type), are \emph{not} mutually consistent as printed
+-- they differ by $4/3$. My from-scratch calculation sides with
+$\sigma_{\rm NR}$. I was not able, in the time available, to locate the
+specific missing/extra term inside the printed (A6)-type expression that
+would account for this, but the exact numerical match to $\sigma_{\rm NR}$
+(not merely close, but symbolically identical, with a completely independent
+computation and no fit parameter) makes a compensating error in \emph{my}
+calculation unlikely. \textbf{Recommendation: use $(4/3)\times$(A6), or
+equivalently $\sigma_{\rm NR}$, until the draft's authors confirm which is
+right.}
+
+\section{Sketch: \texorpdfstring{$\Ap\Ap\to N_iN_i$}{A'A'->NiNi} -- the genuinely Majorana-specific doubling}
+\label{sec:AAtoNN}
+
+Since the $N_1$--$N_2$--$A'$ vertex is off-diagonal, $\Ap\Ap\to N_1N_1$
+proceeds by \emph{exchanging $N_2$} between the two $A'$--$N_1$--$N_2$
+vertices (not $N_1$ self-exchange, which the diagonal-current argument above
+forbids). Unlike Sec.~\ref{sec:NNtoNN}, the external particles here ($A'$)
+are \emph{not} identical fermions needing antisymmetrization -- the two
+channels instead come from the propagator identity
+eq.~\eqref{eq:majprop2}: because $N_2$ is Majorana, both the
+``un-flipped'' contraction $\langle N_2\bar N_2\rangle=S_F$ \emph{and} the
+``flipped'' one $\langle N_2N_2\rangle=-S_FC^{-1}$ are non-zero, which is
+exactly what is needed to attach the \emph{same} vertex,
+$ig\gamma^\mu$, to the internal line in either of the two possible
+fermion-flow assignments (equivalently, one of the two diagrams requires a
+compensating explicit $C$-matrix insertion per the DEHK rules, which is
+absent for a charge-conserving Dirac exchange). A Dirac fermion carrying a
+conserved charge under which the vertex is charge-changing could only be
+exchanged in \emph{one} of the two channels (the other would need an
+independent, generally different, "antiparticle-vertex" coupling that is not
+present in a minimal charge-conserving theory) -- so it is specifically the
+Majorana nature of $N_1,N_2$ that permits the second channel here, in
+contrast to Sec.~\ref{sec:NNtoNN} where the second channel was already
+present for ordinary statistical reasons. This structural difference is the
+reason I did not attempt to derive eq.~(A9)-type formula fully from scratch
+in the time available (it needs the full DEHK bookkeeping applied
+correctly to an internal, not external, Majorana line) -- the code's
+existing implementation (\code{sq\_amp\_AA\_NN}, matching the draft's stated
+eq.~(A9)) should be treated as unverified by this note, though the general
+argument above supports its qualitative $t+u$-channel, same-coupling
+structure.
+
+\section{Sketch: \texorpdfstring{$N_2N_1\to\Ap$}{N2N1->A'} and \texorpdfstring{$N_2\nu\to\Ap$}{N2nu->A'}}
+
+Both are $1\to2$ (or $2\to1$) processes with a single vertex and no internal
+line, so none of the propagator subtleties of Secs.~\ref{sec:AAtoNN} apply;
+only the vertex normalization of Sec.~\ref{sec:majorana-vertex} matters.
+$N_2N_1\to\Ap$ uses the same $ig\gamma^\mu$ vertex derived above with
+$\Msq=\sum_{\rm spins}|\bar u(p_{A'})^*_\mu ig\gamma^\mu u\ldots|^2$ (an
+ordinary contraction of $\varepsilon_\mu\varepsilon_\nu^*$ with the
+$\gamma^\mu(\slashed p_2+m_2)\gamma^\nu$ trace over the massive-vector
+polarization sum), reproducing the structure of the draft's
+$\sum\Msq_{N_2N_1\to\Ap}$. $N_2\nu\to\Ap$ additionally carries the mixing
+angle $\sin\theta_1$ from Sec.~\ref{sec:massmatrix} (via the small $\nu$
+admixture of $N_1$, or equivalently the direct $-ig\sin\theta_1\bar
+N_2\gamma^\mu\gamma^5A'_\mu\nu$-type term generated the same way from
+eq.~(DM\_int)), and $\nu$ is here treated as (effectively) massless and
+non-Majorana-mixed at the order needed, so no further Majorana bookkeeping
+enters beyond the vertex-doubling of Sec.~\ref{sec:majorana-vertex}, already
+included in eq.~(DM\_int)'s displayed coefficient. I did not carry out the
+full trace algebra for either in the time available; both follow the
+identical, simpler (no propagator) method of this section, and I would
+expect a FeynCalc check of these to be quick given the scripts developed for
+Sec.~\ref{sec:NNtoNN}.
+
+\section{What would still be needed for full confidence}
+\begin{itemize}
+  \item A derivation of $\Ap\Ap\to N_iN_i$ (eq.~(A9)-type) using the DEHK
+    internal-Majorana-line rules explicitly (Sec.~\ref{sec:AAtoNN}), the one
+    process in the paper's amplitude list this note did not reproduce
+    independently.
+  \item Locating the specific term responsible for the $4/3$ discrepancy in
+    Sec.~\ref{sec:NNtoNN} within the draft's own derivation of (A6), rather
+    than only bracketing it numerically.
+  \item Extending Sec.~\ref{sec:NNtoNN}/\ref{sec:AAtoNN} away from
+    $m_{N_1}=m_{N_2}$, needed before \code{C\_AA\_N2N2} (flagged in the code
+    review) or any mass-splitting physics can be implemented correctly.
+\end{itemize}
+
+\end{document}

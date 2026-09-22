@@ -2,13 +2,8 @@ import BenchmarkTools as BT
 
 include(joinpath(@__DIR__, "../src/coll_12_34.jl"))
 
-
+"""Not up to date [15.09.26]"""
 function test_int_e1()
-    y = 1e-4
-    sin2_2th = 1e-4
-    theta = asin(sqrt(sin2_2th))/2
-    model_params = ModelParams(y, theta)
-
     m_N = 1e-5
     m_A = 2.5 * m_N
 
@@ -28,12 +23,12 @@ function test_int_e1()
     p4 = Array{Particle{Float64}}(undef, n)
 
     for i in 1:n
-        p1[i] = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp[i])
-        p2[i] = Particle{Float64}(m_N, 1., xi=xi_N, temp=temp[i])
-        p3[i] = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp[i])
-        p4[i] = Particle{Float64}(m_A, -1., xi=xi_A, temp=temp[i])
+        p1[i] = Particle{Float64}(m_N, 1, dof=2)
+        p2[i] = Particle{Float64}(m_N, 1, dof=2)
+        p3[i] = Particle{Float64}(m_A, -1, dof=3)
+        p4[i] = Particle{Float64}(m_A, -1, dof=3)
     end
-    params = Params_12_34{Float64}.(Ref(model_params), p1, p2, p3, p4)
+    params = Params_12_34{Float64}.(p1, p2, p3, p4)
 
     sol = coll_12_34_int_e1.(params)
     println("sol = ", sol)
@@ -57,21 +52,15 @@ function test_int_e1()
 end
 
 function fix_params()
-    y = 1e-4
-    sin2_2th = 1e-11
-    theta = asin(sqrt(sin2_2th))/2
-    model_params = ModelParams{Float64}(y, theta)
-
     m_N = 1e-5
     m_A = 2.5 * m_N
-    # m_A = m_N
     xi_N = -10.
     xi_A = 2. * xi_N
 
     x = 1e0
     temp = m_N / x
-    temps = [temp, temp, temp, temp]
-    xis = [xi_A, xi_A, xi_N, xi_N]
+    temps = (temp, temp, temp, temp)
+    xis = (xi_A, xi_A, xi_N, xi_N)
 
     p1 = Particle{Float64}(m_A, -1, dof=3)
     p2 = Particle{Float64}(m_A, -1, dof=3)
@@ -90,7 +79,6 @@ function fix_params()
     end # if
 
     params = Params_12_34{Float64, Float64}(
-        model_params,
         p1,
         p2,
         p3,
@@ -131,27 +119,27 @@ function test_ker()
     p.s = (smin + smax) / 2.
     println("s = ", p.s)
 
-    p.t_min = t_lim(-1., p)
-    p.t_max = t_lim(1., p)
+    p.t_min = t_lim(1, p)
+    p.t_max = t_lim(-1, p)
     p.a = a_theta(p)
     println("t_min = ", p.t_min, ", t_max = ", p.t_max)
 
-    t_pole = 2*p.p1.m^2 + p.p3.m^2 - p.s
-    println("Pole in t: ", t_pole)
-    println("Amp at pole: ", coll_12_34_sq_amp_no_pole(t_pole, p))
+    # t_pole = 2*p.p1.m^2 + p.p3.m^2 - p.s
+    # println("Pole in t: ", t_pole)
+    # println("Amp at pole: ", coll_12_34_sq_amp_no_pole(t_pole, p))
 
     n = 20000
     t = range(p.t_min, p.t_max, length=n)
     sq_amp = coll_12_34_sq_amp.(t, Ref(p))
     ker_vals = coll_12_34_ker.(t, Ref(p))
 
-    t_less_pole = range(p.t_min, t_pole, length=n)
-    ker_less_pole = coll_12_34_ker.(t_less_pole, Ref(p))
+    # t_less_pole = range(p.t_min, t_pole, length=n)
+    # ker_less_pole = coll_12_34_ker.(t_less_pole, Ref(p))
 
-    sq_amp_pole = coll_12_34_sq_amp_pole.(t, Ref(p))
-    ker_pole = coll_12_34_ker_pole.(t, Ref(p))
+    # sq_amp_pole = coll_12_34_sq_amp_pole.(t, Ref(p))
+    # ker_pole = coll_12_34_ker_pole.(t, Ref(p))
 
-    sq_amp_no_pole = coll_12_34_sq_amp_no_pole.(t, Ref(p))
+    # sq_amp_no_pole = coll_12_34_sq_amp_no_pole.(t, Ref(p))
 
     # println("sq_amp = ", sq_amp)
     # println("ker_vals = ", ker_vals)
@@ -159,9 +147,9 @@ function test_ker()
         minorgrid=true,
         xlabel=L"$t$",
         ylabel=L"\textrm{Squared amplitude}",
-        # xlims=(t_min, t_max),
+        xlims=(p.t_min, p.t_max),
         # ylims=(1e-20, 1e-5),
-        ylims=(-1e-13, 4e-13),
+        # ylims=(-1e-13, 4e-13),
         # xscale=:log10,
         # yscale=:log10,
     )
@@ -171,12 +159,12 @@ function test_ker()
         sq_amp,
         # ms=.4,
     )
-    Plt.plot!(
-        amp_plot,
-        t,
-        sq_amp_pole,
-        ls=:dash,
-    )
+    # Plt.plot!(
+    #     amp_plot,
+    #     t,
+    #     sq_amp_pole,
+    #     ls=:dash,
+    # )
 
     Plt.savefig(amp_plot, "figures/coll_12_34_sq_amp.pdf")
 
@@ -189,7 +177,7 @@ function test_ker()
         ylabel=L"Kernel",
         xlims=(p.t_min, p.t_max),
         # x_lims=(t_pole - 1e-3 * t_len, t_pole + 1e-3 * t_len),
-        ylims=(-1e4, 1e4),
+        # ylims=(-1e4, 1e4),
         # xscale=:log10,
         # yscale=:log10,
     )
@@ -199,53 +187,22 @@ function test_ker()
         ker_vals,
         ms=.4,
     )
-    Plt.plot!(
-        ker_plot,
-        t_less_pole,
-        ker_less_pole,
-        ls=:dash,
-    )
-    Plt.plot!(
-        ker_plot,
-        t,
-        ker_pole,
-        ls=:dash,
-    )
+    # Plt.plot!(
+    #     ker_plot,
+    #     t_less_pole,
+    #     ker_less_pole,
+    #     ls=:dash,
+    # )
+    # Plt.plot!(
+    #     ker_plot,
+    #     t,
+    #     ker_pole,
+    #     ls=:dash,
+    # )
     Plt.savefig(ker_plot, "figures/coll_12_34_ker.pdf")
-
-
-
-    no_pole_plot = Plt.plot(
-        minorgrid=true,
-        xlabel=L"$t$",
-        ylabel=L"\textrm{Squared amplitude without pole}",
-        # xlims=(t_min, t_max),
-        ylims=(1e-20, 1e-5),
-        # ylims=(-5e-31, 5e-31),
-        # xscale=:log10,
-        yscale=:log10,
-    )
-    Plt.plot!(
-        no_pole_plot,
-        t,
-        sq_amp_no_pole,
-        # ms=.4,
-    )
-    Plt.plot!(
-        no_pole_plot,
-        t,
-        sq_amp,
-        # ms=.4,
-    )
-    Plt.plot!(
-        no_pole_plot,
-        t,
-        sq_amp_pole,
-        ls=:dash
-    )
-    Plt.savefig(no_pole_plot, "figures/coll_12_34_sq_amp_no_pole.pdf")
 end
 
+"""Not up to date [15.09.26]"""
 function test_rescale_ker()
     p = fix_params()
 
@@ -356,10 +313,10 @@ function test_int_t()
     s = range(smin + reg, smax - reg, length=n)
 
 
-    s0 = (smax + smin) / 2.
-    int_t0 = coll_12_34_int_t_anal(s0, p)
-    println("s0 = ", s0)
-    println("Integral at s0 = ", int_t0)
+    # s0 = (smax + smin) / 2.
+    # int_t0 = coll_12_34_int_t_anal(s0, p)
+    # println("s0 = ", s0)
+    # println("Integral at s0 = ", int_t0)
 
     # sol = Array{Float64}(undef, n)
     # for i in 1:n
@@ -373,7 +330,7 @@ function test_int_t()
     # end
     # sol = coll_12_34_int_t.(s, Ref(p))
 
-    anal_sol = coll_12_34_int_t_anal.(s, Ref(p))
+    # anal_sol = coll_12_34_int_t_anal.(s, Ref(p))
     new_sol = coll_12_34_int_t_new.(s, Ref(p))
 
     # println(anal_sol)
@@ -384,33 +341,28 @@ function test_int_t()
         minorgrid=true,
         xlabel=L"$s$",
         ylabel=L"Kernel",
-        xlims=(1e-9, 1e-7),
-        ylims=(-1e-5, 1e-5),
+        # xlims=(1e-9, 1e-7),
+        # ylims=(-1e-5, 1e-5),
         # xscale=:log10,
-        # yscale=:log10,
+        yscale=:log10,
     )
     # Plt.plot!(
     #     plot,
     #     s,
     #     sol
     # )
-    Plt.plot!(
-        plot,
-        s,
-        anal_sol,
-        # ls=:dash
-    )
+    # Plt.plot!(
+    #     plot,
+    #     s,
+    #     anal_sol,
+    #     # ls=:dash
+    # )
     Plt.plot!(
         plot,
         s,
         new_sol,
         ls=:dashdot
     )
-    # Plt.plot!(
-    #     plot,
-    #     s,
-    #     qr_sol,
-    # )
     Plt.savefig(plot, "figures/test_t_int.pdf")
     return nothing
 end
@@ -452,50 +404,55 @@ end
 function test_int_e3()
     p = fix_params()
 
-    p.p1.e = 3. * p.p1.m
-    p.p1.mom = momentum(p.p1)
+    p.e1 = 3. * p.p1.m
+    p.mom1 = momentum(p.p1, p.e1)
 
     max_mult = 1e2
     e2 = range(
-        max(p.p2.m, p.p3.m + p.p4.m - p.p1.e),
-        max(max_mult * p.p2.temp, max_mult * p.p2.m),
-        length=1000,
+        max(p.p2.m, p.p3.m + p.p4.m - p.e1),
+        max(max_mult * p.temps[2], max_mult * p.p2.m),
+        length=100,
     )
 
     sol = coll_12_34_int_e3.(e2, Ref(p))
-    # println("Integral over e3 = ", sol)
+    println("Integral over e3 = ", sol)
 
     plot = Plt.plot(
         minorgrid=true,
         xlabel=L"$e2$",
         ylabel=L"Kernel",
         # xlims=(t_min, t_max),
-        ylims=(1e-70, 1e-35),
+        # ylims=(1e-70, 1e-35),
         # xscale=:log10,
-        yscale=:log10,
+        # yscale=:log10,
     )
     Plt.plot!(
         plot,
         e2,
-        -sol
+        sol
     )
     Plt.savefig(plot, "figures/test_e3_int.pdf")
 end # function
 
 
 function test_int()
+    y = 1e-4
+    sin2_2th = 1e-11
+    theta = asin(sqrt(sin2_2th))/2
+    model_params = ModelParams{Float64}(y, theta)
+
     p = fix_params()
 
-    @time sol = coll_12_34(p.model_params, p.p1, p.p2, p.p3, p.p4)
+    @time sol = coll_12_34(model_params, p.p1, p.p2, p.p3, p.p4, p.temps, p.xis)
 
     println("Integral = ", sol)
 end
 
 
 # test_ker()
-test_int_t()
+# test_int_t()
 # test_int_e1()
 # test_rescale_ker()
 # test_int_s()
 # @time test_int_e3()
-# test_int()
+test_int()

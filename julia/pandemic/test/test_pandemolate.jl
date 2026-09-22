@@ -10,7 +10,15 @@ include(joinpath(@__DIR__, "../src/dodelson_widrow.jl"))
 include(joinpath(@__DIR__, "../src/pandemolator.jl"))
 
 function test_pandemolator()
-    m_N = 1e-5
+    # m_N, sin2_2th, y = 1e-5, 2.658e-11, 1e-5
+    # m_N, sin2_2th, y = 1e-5, 5.274e-13, 1e-4
+    # m_N, sin2_2th, y = 1e-5, 3.569e-15, 1e-3
+    # m_N, sin2_2th, y = 1e-5, 3.554e-15, 1e-3
+    # m_N, sin2_2th, y = 1e-5, 1e-12, 6.972167025619468e-5
+    # m_N, sin2_2th, y = 1e-5, 1e-13, 2.467570683555198e-4
+    # m_N, sin2_2th, y = 1e-5, 1e-14, 6.88724071027876e-4
+    m_N, sin2_2th, y = 1e-4, 1.306e-14, 1e-3
+
     k_N = 1
     dof_N = 2
 
@@ -27,22 +35,6 @@ function test_pandemolator()
     A = Particle{Float64}(m_A, k_A, dof=dof_A)
     nu = Particle{Float64}(m_nu, k_nu, dof=dof_nu)
 
-    # TODO: Remember that y is rescaled below! Remove rescaling when we don't have to compare to Python code.
-    # y_pyt = 1e-5
-    # sin2_2th = 2.65e-11
-    # y_pyt = 1e-4
-    # sin2_2th = 5.3e-13
-    # Rescale to compare with python code. 
-    # D.o.f. was forgotten in Python code for collision term
-    # y = y_pyt / sqrt(dof_N * dof_A * dof_nu)
-    # Data points from scan
-    # sin2_2th, y = 1.0e-15, 0.0008850401528296398
-    # sin2_2th, y = 1.0e-14, 0.000256953440417192
-    # sin2_2th, y = 1.0e-13, 7.298381120002216e-5
-    # sin2_2th, y = 1.0e-12, 2.012150324187745e-5
-    # sin2_2th, y = 1.0e-11, 5.262386444647646e-6
-    sin2_2th, y = 1.0e-11, 0.0006571249647028438
-
     th = asin(sqrt(sin2_2th)) / 2.
     mp = ModelParams{Float64}(y, th)
 
@@ -56,7 +48,7 @@ function test_pandemolator()
         tT_rel,
     )
 
-    sol = pandemolate(tT_rel, dw, pan)
+    @time sol = pandemolate(tT_rel, dw, pan)
 
     results = transform_sol(pan, sol)
 

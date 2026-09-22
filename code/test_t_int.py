@@ -66,16 +66,16 @@ def test_t_int():
         vert
     )
 
-    sol_new = C_res_vector.ker_C_n_XX_dd_s_t_integral_revival_new(
-        ct_min, ct_max,
-        ct_p, ct_m,
-        a,
-        s,
-        e1, e3,
-        p1, p3,
-        m_N, m_A,
-        vert
-    )
+    # sol_new = C_res_vector.ker_C_n_XX_dd_s_t_integral_revival_new(
+    #     ct_min, ct_max,
+    #     ct_p, ct_m,
+    #     a,
+    #     s,
+    #     e1, e3,
+    #     p1, p3,
+    #     m_N, m_A,
+    #     vert
+    # )
 
     # print("Integral result:", sol)
     fig, ax = plt.subplots()
@@ -84,7 +84,7 @@ def test_t_int():
     ax.set_xlim(1e-9, 1e-7)
     ax.set_ylim(1e-8, 1e-2)
     ax.scatter(s, sol)
-    ax.scatter(s, sol_new)
+    # ax.scatter(s, sol_new)
     fig.savefig("figures/test_t_int.pdf")
 
 

@@ -1,0 +1,384 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,booktabs,array}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\Msq}{|\mathcal{M}|^2}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{\texorpdfstring{Integration algorithms for the $2\leftrightarrow2$ collision integral\\
+\large \code{coll\_12\_34} and \code{coll\_12\_34\_legendre}}{Integration algorithms for the 2-2 collision integral}}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{The quantity computed}
+
+Both functions compute, for a process $1\,2\leftrightarrow3\,4$ (set up for
+$A'A'\leftrightarrow NN$, i.e.\ $m_1=m_2=m_{A'}$, $m_3=m_4=m_N$),
+\begin{equation}
+  \mathcal{C} = \int \dd\Pi_1\,\dd\Pi_2\,\dd\Pi_3\,\dd\Pi_4\,
+  (2\pi)^4\delta^4(p_1+p_2-p_3-p_4)\,\Msq\,F ,
+  \qquad \dd\Pi_i = \frac{\dd^3p_i}{(2\pi)^3 2E_i},
+  \label{eq:C}
+\end{equation}
+with
+\begin{equation}
+  F = f_1 f_2 (1-k_3 f_3)(1-k_4 f_4) - f_3 f_4 (1-k_1 f_1)(1-k_2 f_2),
+  \qquad
+  f_i = \frac{1}{e^{E_i/T_i-\xi_i}+k_i},
+\end{equation}
+$k_i=+1$ ($-1$) for fermions (bosons), and $\Msq$ summed over all degrees of
+freedom (eq.~(A9) of the paper, including $g^4$). No symmetry factors for
+identical particles are included. Throughout,
+\begin{gather}
+  E \equiv E_1+E_2 = E_3+E_4,\qquad
+  p_i\equiv|\mathbf{p}_i| = \sqrt{E_i^2-m_i^2},\qquad
+  P\equiv|\mathbf{p}_1+\mathbf{p}_2| = \sqrt{E^2-s},\\
+  \lambda_{ab}\equiv\lambda(s,m_a^2,m_b^2)
+  = \big(s-(m_a+m_b)^2\big)\big(s-(m_a-m_b)^2\big).
+\end{gather}
+
+\paragraph{Common reduction.}
+Integrating $\mathbf{p}_4$ against $\delta^3$, writing
+$\dd^3p_i = p_iE_i\,\dd E_i\,\dd\Omega_i$, trading the angle between
+$\mathbf{p}_1$ and $\mathbf{p}_2$ for $s$, the polar angle of $\mathbf{p}_3$
+around $\mathbf{P}$ for the energy $\delta$-function, and keeping the azimuth
+$\phi$ of $\mathbf{p}_3$ around $\mathbf{P}$ (measured from the
+$(\mathbf{p}_1,\mathbf{P})$ plane) gives
+\begin{equation}
+  \mathcal{C} = \frac{1}{512\pi^6}\int\dd E_1\,\dd E_2\,\dd E_3\;F
+  \int\dd s\;\frac{1}{P}\int_0^\pi\dd\phi\;\Msq(s,t).
+  \label{eq:reduced}
+\end{equation}
+The domain is $E_i\ge m_i$ and $s$ such that both triangles
+$\mathbf{P}=\mathbf{p}_1+\mathbf{p}_2=\mathbf{p}_3+\mathbf{p}_4$ close. The
+two algorithms differ in how they parametrize and integrate this domain.
+
+%------------------------------------------------------------------------------
+\section{\texorpdfstring{Algorithm 1: nested adaptive quadrature (\code{coll\_12\_34})}{Algorithm 1: nested adaptive quadrature}}
+
+\subsection{Integration variables and order}
+
+The integration order, from outermost to innermost, is
+$E_1\to E_2\to E_3\to s\to t$, with $E_4=E_1+E_2-E_3$. Here $t=(p_1-p_3)^2$
+replaces $\phi$ in \eqref{eq:reduced}. The formula implemented is
+\begin{equation}
+  \mathcal{C} = \frac{g^4}{256\pi^6}
+  \int_{E_1^-}^{E_1^+}\!\dd E_1
+  \int_{E_2^-}^{E_2^+}\!\dd E_2
+  \int_{E_3^-}^{E_3^+}\!\dd E_3\;p_3\,F
+  \int_{s^-}^{s^+}\!\dd s
+  \int_{t^-}^{t^+}\!\dd t\;
+  \frac{\Msq/g^4}{\sqrt{-a\,(t-t^-)(t^+-t)}} ,
+  \label{eq:alg1}
+\end{equation}
+where $a<0$ is defined in Sec.~\ref{sec:alg1-limits}. This agrees with
+\eqref{eq:reduced}: with $t=\bar t+h\cos\phi$ the $t$-integral equals
+$(-a)^{-1/2}\int_0^\pi\dd\phi\,\Msq$, and $p_3/\sqrt{-a}=1/(2P)$.
+
+\subsection{Limits}
+\label{sec:alg1-limits}
+
+This parametrisation (integration order $E_1,E_2,E_3,s$, then the angle
+$\theta$ or equivalently $t$) and its limits are those of
+Ref.~\cite{Bringmann:2022aim}; see the appendix ``Collision operators'',
+Eqs.~(17)--(24) of the arXiv version. The authors there state that they
+follow an approach similar to Ref.~\cite{Ala-Mattinen:2022nuj}. The code
+uses the sign conventions of Ref.~\cite{Bringmann:2022aim} for the quadratic
+in $\cos\theta$: the coefficients $a<0$, $b$, $c$ and the root labels
+$c_{\theta,\pm}$ below are identical to theirs. Two differences remain:
+\begin{itemize}
+\item The inner integral runs over $t$ rather than $\cos\theta$.
+\item The energy integrals end at the cutoffs given below rather than at $\infty$.
+\end{itemize}
+The prefactor $1/(4(2\pi)^6)=1/(256\pi^6)$ agrees with \eqref{eq:alg1}; the
+symmetry factor $\kappa$ that appears there is not included in \code{coll\_12\_34}.
+
+\begin{description}
+\item[$E_1$:] $E_1^- = m_1$, $\;E_1^+ = \max(100\,T_1,\,100\,m_1)$.
+  The upper limit is a cutoff.
+\item[$E_2$:] $E_2^- = \max(m_2,\; m_3+m_4-E_1)$,
+  $\;E_2^+ = \max(100\,T_2,\,100\,m_2)$. The upper limit is a cutoff; the
+  result is $0$ if $E_2^-\ge E_2^+$.
+\item[$E_3$:] $E_3^- = m_3$, $\;E_3^+ = E_1+E_2-m_4$. Both are exact;
+  $E_4 = E_1+E_2-E_3$.
+\item[$s$:] Both limits are exact. With
+  $s_{ab}^{\pm} = (E_a+E_b)^2-(p_a\mp p_b)^2$ (code: \code{s\_lim}),
+  \begin{equation}
+    s^- = \max\big(s_{12}^-,\,s_{34}^-\big),\qquad
+    s^+ = \min\big(s_{12}^+,\,s_{34}^+\big),
+  \end{equation}
+  i.e.\ $|p_1-p_2|\le P\le p_1+p_2$ and $|p_3-p_4|\le P\le p_3+p_4$. The
+  result is $0$ if $s^-\ge s^+$.
+\item[$t$:] Here $\theta$ is the lab angle between $\mathbf{p}_1$ and
+  $\mathbf{p}_3$, so that $t = m_1^2+m_3^2-2E_1E_3+2p_1p_3\cos\theta$. The
+  limits of $\cos\theta$ are the roots $c_{\theta,\pm}$ of
+  $a\cos^2\theta+b\cos\theta+c=0$, with (Ref.~\cite{Bringmann:2022aim},
+  Eqs.~(17)--(20))
+  \begin{gather}
+    a = -4p_3^2(E^2-s),\qquad
+    b = 2\,\frac{p_3}{p_1}\,\delta_{12}\delta_{34},\qquad
+    c = -\delta_{34}^2-\frac{p_3^2}{p_1^2}\,(s-s_{12}^-)(s-s_{12}^+),\\
+    \delta_{ab} = s+m_a^2-m_b^2-2E_aE,\\
+    c_{\theta,\pm} = \frac{-b\pm\sqrt{D}}{2a},\qquad
+    D = b^2-4ac
+    = 4\frac{p_3^2}{p_1^2}\,(s-s_{12}^-)(s-s_{12}^+)(s-s_{34}^-)(s-s_{34}^+).
+  \end{gather}
+  Since $a<0$, $c_{\theta,+}\le c_{\theta,-}$, and
+  $a\cos^2\theta+b\cos\theta+c = -a\,(\cos\theta-c_{\theta,+})(c_{\theta,-}-\cos\theta)\ge0$
+  on the integration region $c_{\theta,+}\le\cos\theta\le c_{\theta,-}$. Hence
+  \begin{equation}
+    t^- = m_1^2+m_3^2-2E_1E_3+2p_1p_3\,c_{\theta,+},\qquad
+    t^+ = m_1^2+m_3^2-2E_1E_3+2p_1p_3\,c_{\theta,-}.
+  \end{equation}
+  In the code $c_{\theta,\pm}=$ \code{cos\_theta\_lim($\pm$1)}, so
+  \code{t\_lim(1)} $=t^-$ and \code{t\_lim(-1)} $=t^+$. $D$ is evaluated in
+  the factorized form, and $c_{\theta,\pm}$ is clamped to $[-1,1]$ against
+  round-off. Geometrically, $\cos\theta_{1P}=-\delta_{12}/(2p_1P)$ and
+  $\cos\theta_{3P}=-\delta_{34}/(2p_3P)$ are the fixed angles of
+  $\mathbf{p}_1$ and $\mathbf{p}_3$ with $\mathbf{P}$, so that
+  $c_{\theta,\pm}=\cos(\theta_{1P}\pm\theta_{3P})$.
+\end{description}
+
+\subsection{The $t$-integral (closed form)}
+
+For $m_1=m_2$ and $m_3=m_4$ one has $t,u\le0$ throughout the physical region,
+so the $N$-exchange poles at $t,u=m_N^2$ are never reached. Define the
+positive quantities
+\begin{equation}
+  D_t^\pm = m_N^2-t^\pm,\qquad D_u^\pm = s+t^\pm-2m_{A'}^2-m_N^2 = m_N^2-u(t^\pm).
+\end{equation}
+Substituting $t=\bar t+h\cos\phi$ with $\phi\in[0,\pi]$, and using
+$D_t(\phi)+D_u(\phi)=s-2m_{A'}^2$ together with
+$\int_0^\pi\dd\phi/(\alpha+\beta\cos\phi)=\pi/\sqrt{\alpha^2-\beta^2}$ and its
+derivative with respect to $\alpha$:
+\begin{multline}
+  \int_{t^-}^{t^+}\!\!\frac{\dd t\;\Msq/g^4}{\sqrt{-a(t-t^-)(t^+-t)}}
+  = \frac{8\pi}{\sqrt{-a}}\Bigg[
+    \frac{N_{tu}}{s-2m_{A'}^2}\Big(\frac{1}{\sqrt{D_t^+D_t^-}}+\frac{1}{\sqrt{D_u^+D_u^-}}\Big)\\
+    - C^2\,\frac{(D_t^++D_t^-)/2}{(D_t^+D_t^-)^{3/2}}
+    - C^2\,\frac{(D_u^++D_u^-)/2}{(D_u^+D_u^-)^{3/2}}
+    - 2\Bigg],
+\end{multline}
+with $N_{tu}=4(m_{A'}^2-m_N^2)^2-16m_N^4+(2m_N^2+s)^2$ and
+$C=m_{A'}^2+2m_N^2$.
+
+\subsection{Quadrature}
+
+Each of the four remaining integrals uses adaptive Gauss--Kronrod quadrature
+with 7/15 points (\code{QuadGKJL} from \code{Integrals.jl}) on the
+untransformed variable, with
+user-set \code{reltol} (default $10^{-6}$) and \code{abstol} (default $0$).
+Only interior nodes are used, so the vanishing of $a$ at $E_3=m_3$ ($p_3=0$)
+does no harm: the combination $p_3/\sqrt{-a}$ stays finite. The $s$-integrand is
+skipped (set to 0) if both terms of $F$ are $<10^{-30}$, or if they cancel to
+relative precision $10^{-13}$.
+
+%------------------------------------------------------------------------------
+\section{\texorpdfstring{Algorithm 2: CM-frame Legendre decomposition\\ (\code{coll\_12\_34\_legendre})}{Algorithm 2: CM-frame Legendre decomposition}}
+
+\subsection{Integration variables}
+
+Fix $s$ and $E$, and go to the CM frame, which moves with velocity
+$\beta=P/E$ ($\gamma=E/\sqrt s$) along $\hat{\mathbf{P}}$. CM quantities are
+\begin{gather}
+  E_1^*=\frac{s+m_1^2-m_2^2}{2\sqrt s},\qquad
+  E_3^*=\frac{s+m_3^2-m_4^2}{2\sqrt s},\qquad
+  E_4^*=\sqrt s-E_3^*,\\
+  k_1=|\mathbf{p}_1^*|=|\mathbf{p}_2^*|=\frac{\lambda_{12}^{1/2}}{2\sqrt s},\qquad
+  k_3=|\mathbf{p}_3^*|=|\mathbf{p}_4^*|=\frac{\lambda_{34}^{1/2}}{2\sqrt s}.
+\end{gather}
+The variables are:
+\begin{itemize}
+\item $c_1=\cos\angle(\mathbf{p}_1^*,\hat{\mathbf{P}})$ and
+  $c_3=\cos\angle(\mathbf{p}_3^*,\hat{\mathbf{P}})$, both in $[-1,1]$. The
+  lab energies are linear in them:
+  \begin{equation}
+    E_1 = \gamma(E_1^*+\beta k_1c_1) = \frac{E(s+m_1^2-m_2^2)+c_1P\lambda_{12}^{1/2}}{2s},
+    \qquad
+    E_3 = \frac{E(s+m_3^2-m_4^2)+c_3P\lambda_{34}^{1/2}}{2s},
+  \end{equation}
+  with $E_2=E-E_1$ and $E_4=E-E_3$. In the code each $E_i$ is clamped to
+  $\ge m_i$ against round-off.
+\item $\theta^*\in[0,\pi]$, $c^*=\cos\theta^*=\hat{\mathbf{p}}_1^*\cdot\hat{\mathbf{p}}_3^*$,
+  the CM scattering angle. In terms of it,
+  \begin{gather}
+    t = t_0-4k_1k_3\sin^2(\theta^*/2),\qquad u = u_0-4k_1k_3\cos^2(\theta^*/2),\\
+    t_0 = m_1^2+m_3^2-\frac{2(m_1^2E_3^{*2}+m_3^2k_1^2)}{E_1^*E_3^*+k_1k_3},\qquad
+    u_0 = m_1^2+m_4^2-\frac{2(m_1^2E_4^{*2}+m_4^2k_1^2)}{E_1^*E_4^*+k_1k_3},
+  \end{gather}
+  which avoids cancellation near the forward and backward peaks.
+\item $w=\sqrt s = w_{\rm th}+\sigma^2$, with $w_{\rm th}=\max(m_1+m_2,\,m_3+m_4)$
+  and $\sigma\ge0$. This makes the threshold factor $\lambda^{1/2}\propto\sigma$
+  smooth; $\dd s = 4w\sigma\,\dd\sigma$.
+\item $E = w+\tau^2$ with $\tau\ge0$. Then $P=\tau\sqrt{\tau^2+2w}$ and
+  $P\,\dd E = 2\tau P\,\dd\tau$, which removes the $\sqrt{E-\sqrt s}$ endpoint.
+\end{itemize}
+At fixed $(s,E)$, $\dd E_1\,\dd E_3 = P^2\lambda_{12}^{1/2}\lambda_{34}^{1/2}/(4s^2)\;\dd c_1\,\dd c_3$,
+and $(c_3,\phi)$ are spherical coordinates of $\hat{\mathbf{p}}_3^*$ about
+$\hat{\mathbf P}$, since boosts along $\hat{\mathbf P}$ preserve the azimuth.
+Equation \eqref{eq:reduced} becomes
+\begin{gather}
+  \mathcal{C} = \frac{1}{512\pi^6}\int\dd s\int\dd E\;
+  \frac{P\,\lambda_{12}^{1/2}\lambda_{34}^{1/2}}{4s^2}
+  \int_{-1}^1\!\dd c_1\int_{-1}^1\!\dd c_3\int_0^\pi\!\dd\phi\;\Msq(s,c^*)\,F,\\
+  c^*=c_1c_3+\sqrt{1-c_1^2}\sqrt{1-c_3^2}\cos\phi .
+\end{gather}
+
+\subsection{Angular integrals via Funk--Hecke}
+
+At fixed $(s,E)$ the distribution factor splits into products,
+$F=a(c_1)\,b(c_3)-a'(c_1)\,b'(c_3)$, with
+\begin{equation}
+  a = f_1f_2,\quad b=(1-k_3f_3)(1-k_4f_4),\quad
+  a'=(1-k_1f_1)(1-k_2f_2),\quad b' = f_3f_4 .
+\end{equation}
+Expanding in Legendre polynomials and applying the Funk--Hecke theorem (proven e.g.\ in
+Ref.~\cite{Mueller:1998}) twice gives
+\begin{gather}
+  \int_{-1}^1\!\dd c_1\int_{-1}^1\!\dd c_3\int_0^\pi\!\dd\phi\;\Msq\,a\,b
+  = \frac{\pi}{2}\sum_{l=0}^\infty(2l+1)\,M_l(s)\,\hat a_l\,\hat b_l,\\
+  M_l(s) = \int_{-1}^1\dd c^*\,\Msq(s,c^*)\,P_l(c^*),\qquad
+  \hat a_l = \int_{-1}^1\dd c\;a(c)\,P_l(c),\qquad
+  \hat b_l = \int_{-1}^1\dd c\;b(c)\,P_l(c).
+\end{gather}
+Expanding the angular dependence of a $2\leftrightarrow2$ collision kernel
+in Legendre polynomials and truncating the series is an established technique
+in neutrino transport. Ref.~\cite{Pons:1998} does this for the pair-annihilation
+kernel $\nu\bar\nu\leftrightarrow e^+e^-$ and studies how the result depends
+on the truncation order. There the Legendre moments are those of anisotropic
+neutrino distributions. Here the distributions are isotropic in the lab frame,
+and the angular structure instead comes from the dependence of the lab
+energies on the CM angles $c_1$, $c_3$.
+The result is
+\begin{equation}
+  \boxed{\;
+  \mathcal{C} = \frac{1}{4096\pi^5}\int_0^{\sigma_{\max}}\!\dd\sigma\;
+  4w\sigma\,\frac{\lambda_{12}^{1/2}\lambda_{34}^{1/2}}{s^2}
+  \sum_{l=0}^{L}(2l+1)\,M_l(s)
+  \int_0^{\tau_{\max}}\!\dd\tau\;2\tau P\,
+  \big[\hat a_l\hat b_l-\hat a'_l\hat b'_l\big]\;}
+  \label{eq:alg2}
+\end{equation}
+In the Maxwell--Boltzmann limit $a,b$ are constant, only $l=0$ survives, and
+\eqref{eq:alg2} reduces to
+$\frac{T}{512\pi^5}\int\dd s\,K_1(\sqrt s/T)\,s^{-1/2}\int\dd t\,\Msq$,
+up to the chemical-potential factors.
+
+\paragraph{Equal temperatures.}
+If $T_1=\dots=T_4$, energy conservation gives $a'b'=e^{\Delta\xi}\,ab$
+pointwise, with $\Delta\xi=\xi_3+\xi_4-\xi_1-\xi_2$. The bracket in
+\eqref{eq:alg2} is then evaluated as $-\mathrm{expm1}(\Delta\xi)\,\hat a_l\hat b_l$,
+which is free of cancellation near chemical equilibrium. Otherwise all four
+projections are computed.
+
+\subsection{Limits and quadrature rules}
+
+All rules are Gauss--Legendre (GL) with fixed numbers of nodes. Default
+values are given in brackets.
+
+\begin{description}
+\item[$\sigma$ (i.e.\ $s$):] $\sigma\in[0,\sigma_{\max}]$, $\sigma_{\max}=\sqrt{z_{\rm cut}}$, where
+  \begin{equation}
+    z_{\rm cut} = n_{\rm cut}\,T_{\max}+\mu_{\max},\quad
+    T_{\max}=\max_iT_i,\quad
+    \mu_{\max}=\max\big(0,\;\xi_1T_1+\xi_2T_2,\;\xi_3T_3+\xi_4T_4\big),
+  \end{equation}
+  with $n_{\rm cut}=50$. This truncates $\sqrt s\le w_{\rm th}+z_{\rm cut}$,
+  which is justified because $E\ge\sqrt s$ and $F\lesssim e^{-(E-\mu)/T}$.
+  The range is split into geometrically graded panels
+  \begin{equation}
+    [0,\;\sigma_{\max}2^{1-K}],\quad [\sigma_{\max}2^{-j},\;\sigma_{\max}2^{1-j}]\;\;(j=K-1,\dots,1),
+  \end{equation}
+  with $K=\max\big(1,\lceil\log_2(\sigma_{\max}/\sigma_{\rm lo})\rceil\big)$ and
+  $\sigma_{\rm lo}=\tfrac14\sqrt{\min(m_1,\dots,m_4,T_1,\dots,T_4)}$. This
+  resolves both the threshold scale and the thermal scale. Each panel uses
+  $n_s$ GL nodes [10].
+\item[$\tau$ (i.e.\ $E$):] $\tau\in[0,\tau_{\max}]$, $\tau_{\max}=\sqrt{z_{\rm cut}}$,
+  i.e.\ $\sqrt s\le E\le\sqrt s+z_{\rm cut}$. The range is split into two
+  equal panels with $n_E$ GL nodes each [16].
+\item[$c_1,\,c_3$:] $[-1,1]$ exactly. The same $n_c$ GL nodes $c_i$ with
+  weights $w_i$ [32] are used for both; the projections are
+  $\hat a_l=\sum_iw_iP_l(c_i)\,a(c_i)$ for $l=0,\dots,L$ [$L=24$].
+\item[$\theta^*$:] $[0,\pi]$ exactly. The integrand is folded onto
+  $[0,\pi/2]$ using $P_l(-x)=(-1)^lP_l(x)$:
+  \begin{equation}
+    M_l = \int_0^{\pi/2}\!\dd\theta\,\sin\theta\,P_l(\cos\theta)
+    \big[\Msq(\theta^*{=}\theta)+(-1)^l\,\Msq(\theta^*{=}\pi-\theta)\big].
+  \end{equation}
+  The panels are graded towards $\theta=0$, where the $t$-channel peak sits
+  (and, through the mirror term, the $u$-channel peak at $\theta^*=\pi$):
+  \begin{equation}
+    [0,\theta_p/8],\;[\theta_p/8,\theta_p/4],\;[\theta_p/4,\theta_p/2],\;\dots
+    \;\text{(doubling, last panel ending at $\pi/2$)},
+  \end{equation}
+  with $\theta_p=\min\big(\pi/2,\;m_{\min}/\sqrt{k_1k_3}\big)$, the angular
+  width of the exchange peak, and $m_{\min}=\max(\min_im_i,\,10^{-8}\sqrt s)$.
+  Each panel uses $n_\theta$ GL nodes [16].
+\item[$l$:] truncated at $L$.
+\end{description}
+
+\subsection{Accuracy}
+
+Against the Maxwell--Boltzmann reference built from eq.~(A10), and against
+runs with all node counts increased, the defaults give $\sim10^{-11}$
+relative accuracy for $10^{-3}\le x\le50$ ($m_{A'}=2.5\,m_N$,
+$\xi_{A'}=2\xi_N$). The exception is a boson close to condensation while
+relativistic ($m_{A'}/T-\xi_{A'}\lesssim10^{-2}$, $T\gg m_{A'}$). There
+$f_{A'}$ is sharply peaked in $c_1$ and the error is $\sim10^{-3}$;
+$n_c=128$ reduces it to $\sim10^{-5}$.
+
+%------------------------------------------------------------------------------
+\section{Summary of integration variables}
+
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}l>{$}l<{$}>{$}l<{$}l@{}}
+\toprule
+ & \text{variable} & \text{range} & rule \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Algorithm 1} (outer $\to$ inner)}\\
+ & E_1 & [m_1,\ \max(100T_1,100m_1)] & adaptive GK \\
+ & E_2 & [\max(m_2,m_3{+}m_4{-}E_1),\ \max(100T_2,100m_2)] & adaptive GK \\
+ & E_3 & [m_3,\ E_1{+}E_2{-}m_4] & adaptive GK \\
+ & s   & [\max(s_{12}^-,s_{34}^-),\ \min(s_{12}^+,s_{34}^+)] & adaptive GK \\
+ & t   & [t^-,\ t^+] & closed form \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Algorithm 2} (outer $\to$ inner)}\\
+ & \sigma=\sqrt{\sqrt s-w_{\rm th}} & [0,\ \sqrt{z_{\rm cut}}] & GL, graded panels \\
+ & \theta^* & [0,\ \pi] & GL, panels graded to $0,\pi$ \\
+ & \tau=\sqrt{E-\sqrt s} & [0,\ \sqrt{z_{\rm cut}}] & GL, 2 panels \\
+ & c_1,\ c_3 & [-1,\ 1] & GL \\
+ & \phi & [0,\ \pi] & Funk--Hecke (exact), sum to $L$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{thebibliography}{9}
+\bibitem{Bringmann:2022aim}
+T.~Bringmann, P.~F.~Depta, M.~Hufnagel, J.~Kersten, J.~T.~Ruderman and
+K.~Schmidt-Hoberg, \emph{Minimal sterile neutrino dark matter},
+Phys.\ Rev.\ D \textbf{107} (2023) L071702,
+\href{https://arxiv.org/abs/2206.10630}{arXiv:2206.10630 [hep-ph]}.
+\bibitem{Ala-Mattinen:2022nuj}
+K.~Ala-Mattinen, M.~Heikinheimo, K.~Kainulainen and K.~Tuominen,
+\emph{Momentum distributions of cosmic relics: Improved analysis},
+Phys.\ Rev.\ D \textbf{105} (2022) 123005,
+\href{https://arxiv.org/abs/2201.06456}{arXiv:2201.06456 [hep-ph]}.
+\bibitem{Pons:1998}
+J.~A.~Pons, J.~A.~Miralles and J.~M.~Ib\'a\~nez,
+\emph{Legendre expansion of the neutrino-antineutrino annihilation kernel:
+Influence of high order terms},
+Astron.\ Astrophys.\ Suppl.\ Ser.\ \textbf{129} (1998) 343,
+\href{https://arxiv.org/abs/astro-ph/9802333}{arXiv:astro-ph/9802333}.
+\bibitem{Mueller:1998}
+C.~M\"uller, \emph{Analysis of Spherical Symmetries in Euclidean Spaces},
+Springer (1998).
+\end{thebibliography}
+
+\end{document}

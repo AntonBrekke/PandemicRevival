@@ -20,7 +20,7 @@ nu = Particle{Float64}(0.0, 1, dof=2)
 
 # --- scanned parameters: y (internal ModelParams convention) and sin2_2theta ---
 # Bracket sized around the known-good benchmark point from test_pandemolate.jl:
-# y_pyt=1e-4, sin2_2th=5.3e-13 -> y = y_pyt/sqrt(dof_N*dof_A*dof_nu) ~ 2.9e-5.
+# y=1e-4, sin2_2th=5.3e-13.
 cfg = ScanConfig(
     sin2_2theta_min=1e-15,
     sin2_2theta_max=1e-11,

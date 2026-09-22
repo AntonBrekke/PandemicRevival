@@ -1,0 +1,4 @@
+m_N,y,sin2_2theta,omega_h2,converged,plateau_ok,retcode,branch,slope,n_failed
+9.999999999999999e-5,0.0316,1.7224962737462262e-17,0.11993073014635564,true,true,Success,1,1,0
+9.999999999999999e-5,0.1,NaN,NaN,false,false,NoRoot,0,0,2
+9.999999999999999e-5,0.2,NaN,NaN,false,false,NoRoot,0,0,3

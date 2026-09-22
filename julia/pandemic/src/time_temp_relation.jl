@@ -46,8 +46,6 @@ mutable struct TimeTempRelation{T<:Real}
     T_SM_grid::Vector{T}
     T_nu_grid::Vector{T}
     hubble_grid::Vector{T}
-    # hubble_cumsimp::Vector{Float64}
-    # sf_grid::Vector{Float64}
     nu_dec_grid::Vector{Bool}
     dT_SM_dt_grid::Vector{T}
     dT_nu_dt_grid::Vector{T}

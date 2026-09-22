@@ -90,21 +90,6 @@ include(joinpath(@__DIR__, "pandemolator.jl"))
 
 const OMEGA_H2_TARGET = omega_d0   # constants_functions.jl, Planck 2018 central value (0.12)
 
-"""
-    y_pyt_from_y(y, N1, A, nu)
-
-Converts the internal `ModelParams.y` to the convention used in the
-existing Python plots/scripts, `y_pyt = y * sqrt(N1.dof * A.dof * nu.dof)`.
-Assumes `N1.dof == N2.dof` (as in every benchmark point in the repo so far).
-"""
-y_pyt_from_y(y, N1::Particle, A::Particle, nu::Particle) = y * sqrt(N1.dof * A.dof * nu.dof)
-
-"""
-    y_from_y_pyt(y_pyt, N1, A, nu)
-
-Inverse of `y_pyt_from_y`.
-"""
-y_from_y_pyt(y_pyt, N1::Particle, A::Particle, nu::Particle) = y_pyt / sqrt(N1.dof * A.dof * nu.dof)
 
 """
     RelicPoint
@@ -117,7 +102,6 @@ struct RelicPoint
     sin2_2theta::Float64
     theta::Float64
     y::Float64
-    y_pyt::Float64
     omega_h2::Float64
     converged::Bool     # retcode success AND plateau reached AND omega_h2 finite & positive
     plateau_ok::Bool
@@ -187,7 +171,7 @@ function final_omega_h2(pan::Pandemolator, sol)
 
     y_N1_f = number_density(pan.N1, T_N_f, xi_N_f) / ent_f
     y_N2_f = number_density(pan.N2, T_N_f, xi_N_f) / ent_f
-    y_A_f = number_density(pan.A, T_N_f, pan.fac_n_A * xi_N_f) / ent_f
+    y_A_f = number_density(pan.A, T_N_f, pan.fac_n_A * xi_N_f; gap=gap_A_from_eta(eta_f)) / ent_f
 
     rho_dm0 = (pan.N1.m * y_N1_f + pan.N2.m * y_N2_f + pan.fac_n_A * pan.A.m * y_A_f) * s0
     return rho_dm0 / rho_crit0_h2
@@ -312,7 +296,7 @@ function scan_theta_column(
         else
             @warn "Root at sin2_2theta=$sin2_2theta, y=$y did not pass the convergence/plateau checks (retcode=$retcode)"
         end
-        push!(points, RelicPoint(sin2_2theta, theta, y, y_pyt_from_y(y, pan.N1, pan.A, pan.nu), omega_h2, converged, plateau_ok, retcode, branch))
+        push!(points, RelicPoint(sin2_2theta, theta, y, omega_h2, converged, plateau_ok, retcode, branch))
     end
     return points, roots
 end
@@ -358,9 +342,9 @@ Writes the scan result to a CSV for downstream plotting.
 """
 function save_results(points::Vector{RelicPoint}, path::String)
     open(path, "w") do io
-        println(io, "sin2_2theta,theta,y,y_pyt,omega_h2,converged,plateau_ok,retcode,branch")
+        println(io, "sin2_2theta,theta,y,omega_h2,converged,plateau_ok,retcode,branch")
         for p in points
-            println(io, "$(p.sin2_2theta),$(p.theta),$(p.y),$(p.y_pyt),$(p.omega_h2),$(p.converged),$(p.plateau_ok),$(p.retcode),$(p.branch)")
+            println(io, "$(p.sin2_2theta),$(p.theta),$(p.y),$(p.omega_h2),$(p.converged),$(p.plateau_ok),$(p.retcode),$(p.branch)")
         end
     end
     return nothing

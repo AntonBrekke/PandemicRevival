@@ -9,34 +9,50 @@ def plot_x_frac(jul, pyt):
     fig_x_N, ax_x_N = plt.subplots()
     fig_x_N.set_layout_engine('constrained')
     ax_x_N.set_xscale("log")
-    # ax_x_N.set_yscale("log")
+    ax_x_N.set_yscale("log")
     ax_x_N.set_xlim((x_min/2, x_max*2))
-    ax_x_N.set_ylim(0., 5.)
+    # ax_x_N.set_ylim(0., 5.)
     ax_x_N.plot(jul.x_nu, jul.x_N / jul.x_nu, label="Jul")
     ax_x_N.plot(pyt.x_nu, pyt.x_N / pyt.x_nu, ls='--', c='r', label="Pyt")
-    ax_x_N.set_xlabel("x")
-    ax_x_N.set_ylabel("x_N/x")
+    ax_x_N.set_xlabel(r"$x$")
+    ax_x_N.set_ylabel(r"$x_N/x$")
     ax_x_N.grid()
+    ax_x_N.grid(which='minor', ls=':', alpha=0.5)
     ax_x_N.legend()
+    fig_x_N.suptitle(fr"$m_N=1\cdot 10^{{-5}}\, \textrm{{GeV}},\ m_A=2.5\, m_N,\ y=2\sqrt{{3}}\cdot 10^{{-5}},\ \sin^2(2\theta)=2.65\cdot 10^{{-13}}$")
     fig_x_N.savefig("figures/x_N.pdf")
 
-def plot_y_n(jul, pyt):
-    x_min = min(jul.x_nu[0], pyt.x_nu[0])
-    x_max = max(jul.x_nu[-1], pyt.x_nu[-1])
-    y_min = 1e-20
+    m_N = 1e-5
+    T_nu_jul = m_N / jul.x_nu
+    T_nu_pyt = m_N / pyt.x_nu
+    T_N_jul = m_N / jul.x_N
+    T_N_pyt = m_N / pyt.x_N
+
+    # fig_T, ax_T = plt.subplots()
+    # fig_T.set_layout_engine('constrained')
+    # ax_T.set_xscale("log")
+    # ax_T.set_yscale("log")
+    # ax_T.plot(jul.x_nu, T_nu_jul, label=r"$T_\nu$")
+
+def plot_y_n(jul, pyt=None, m_N1=1e-5, m_A_over_m_N=2.5, path="figures/y_n.pdf", title=None, ax=None):
+    """Saves its own figure to `path`, or only draws onto `ax` if one is given."""
+    x_min = jul.x_nu[0] if pyt is None else min(jul.x_nu[0], pyt.x_nu[0])
+    x_max = jul.x_nu[-1] if pyt is None else max(jul.x_nu[-1], pyt.x_nu[-1])
+    y_min = 1e-30
     y_max = 1e-8
 
     # See constant_functions.jl
     # mY_relic = omega_d0 * rho_crit0_h2 * s0
     mY_relic = 4.354e-10
 
-    # TODO: [31.08.26] These numbers should be in imported results
-    m_N1 = 1e-5
     m_N2 = m_N1
-    m_A = 2.5 * m_N1
+    m_A = m_A_over_m_N * m_N1
 
-    fig_n, ax_n = plt.subplots()
-    fig_n.set_layout_engine('constrained')
+    if ax is None:
+        fig_n, ax_n = plt.subplots()
+        fig_n.set_layout_engine('constrained')
+    else:
+        fig_n, ax_n = None, ax
     ax_n.set_xscale("log")
     ax_n.set_yscale("log")
     ax_n.set_xlim((x_min/2, x_max*2))
@@ -58,7 +74,11 @@ def plot_y_n(jul, pyt):
 
     # fig_n.suptitle(fr"$m_N={md_str},\ m_A={mX_str}\, m_N,\ y={y_str},\ \sin^2(2\theta)={sin22th_str}$")
     # fig_n.suptitle(fr"$m_N=1\cdot 10^{{-5}}\, \textrm{{GeV}},\ m_A=2.5\, m_N,\ y=2\sqrt{{3}}\cdot 10^{{-5}},\ \sin^2(2\theta)=5.3\cdot 10^{{-13}}$")
-    fig_n.savefig("figures/y_n.pdf")
+    if fig_n is not None:
+        if title is not None:
+            fig_n.suptitle(title)
+        fig_n.savefig(path)
+        plt.close(fig_n)
 
 def plot_rho(jul, pyt):
     x_min = min(jul.x_nu[0], pyt.x_nu[0])
@@ -75,6 +95,8 @@ def plot_rho(jul, pyt):
     ax_rho.plot(pyt.x_nu, pyt.y_rho, ls='--')
     ax_rho.set_xlabel("x")
     ax_rho.set_ylabel("y_rho")
+    ax_rho.grid()
+    ax_rho.grid(which='minor', ls=':', alpha=0.5)
     fig_rho.savefig("figures/y_rho.pdf")
 
 def plot_xi_N(jul, pyt):
@@ -94,28 +116,41 @@ def plot_xi_N(jul, pyt):
     ax_xi_N.set_ylabel("xi_N")
     fig_xi_N.savefig("figures/xi_N.pdf")
 
-def plot_hubble_coll(jul):
+def plot_hubble_coll(jul, path="figures/hubble.pdf", title=None, ylim=(1e-32, 1e-20), ax=None):
+    """Saves its own figure to `path`, or only draws onto `ax` if one is given."""
     x_min = jul.x_nu[0]
     x_max = jul.x_nu[-1]
-    y_min = 1e-32
-    y_max = 1e-20
+    y_min, y_max = ylim
 
-    coll_over_n = jul.coll_n / (jul.ent * jul.y_n)
+    n = jul.ent * jul.y_n
 
-    fig_hubble, ax_hubble = plt.subplots()
-    fig_hubble.set_layout_engine('constrained')
+    coll_over_n = jul.coll_n / n
+    coll_over_A_N2nu = jul.coll_A_N2nu / n
+    coll_over_AA_NN = jul.coll_AA_NN / n
+
+    if ax is None:
+        fig_hubble, ax_hubble = plt.subplots()
+        fig_hubble.set_layout_engine('constrained')
+    else:
+        fig_hubble, ax_hubble = None, ax
     ax_hubble.set_xscale("log")
     ax_hubble.set_yscale("log")
     ax_hubble.set_xlim((x_min/2, x_max*2))
     ax_hubble.set_ylim((y_min, y_max))
     ax_hubble.plot(jul.x_nu, jul.hubble, label=r"$H$")
-    ax_hubble.plot(jul.x_nu, coll_over_n, label=r"$C_n/n$")
+    ax_hubble.plot(jul.x_nu, abs(coll_over_n), label=r"$|C_n|/n$")
+    ax_hubble.plot(jul.x_nu, abs(coll_over_A_N2nu), label=r"$|C_{N2\nu}|/n$")
+    ax_hubble.plot(jul.x_nu, abs(coll_over_AA_NN), label=r"$|C_{AA}|/n$")
     ax_hubble.set_xlabel(r"$x = m_N/T_\nu$")
     ax_hubble.set_ylabel(r"Rate [GeV]")
     ax_hubble.grid()
     ax_hubble.legend()
     # fig_hubble.suptitle(fr"$m_N=1\cdot 10^{{-5}}\, \textrm{{GeV}},\ m_A=2.5\, m_N,\ y=2\sqrt{{3}}\cdot 10^{{-5}},\ \sin^2(2\theta)=5.3\cdot 10^{{-13}}$")
-    fig_hubble.savefig("figures/hubble.pdf")
+    if fig_hubble is not None:
+        if title is not None:
+            fig_hubble.suptitle(title)
+        fig_hubble.savefig(path)
+        plt.close(fig_hubble)
 
 def plot_coll_n(jul, pyt):
     x_min = min(jul.x_nu[0], pyt.x_coll[0])
@@ -210,6 +245,8 @@ class JulRes:
             y_N1, y_N2, y_A,
             xi_N,
             coll_n,
+            coll_A_N2nu,
+            coll_AA_NN,
         ):
         self.x_nu = x_nu
         self.x_N = x_N
@@ -222,10 +259,11 @@ class JulRes:
         self.y_A = y_A
         self.xi_N = xi_N
         self.coll_n = coll_n
+        self.coll_A_N2nu = coll_A_N2nu
+        self.coll_AA_NN = coll_AA_NN
 
-
-def julia_results():
-    sol = np.genfromtxt("tmp/sol.csv", delimiter=',', skip_header=1)
+def julia_results(path="tmp/sol.csv"):
+    sol = np.genfromtxt(path, delimiter=',', skip_header=1)
 
     x_nu = sol[:, 0]
     x_N = sol[:, 1]
@@ -236,11 +274,13 @@ def julia_results():
     y_rho = sol[:, 5]
     xi_N = sol[:, 6]
 
-    coll_n = sol[:, 8]
+    y_N1 = sol[:, 8]
+    y_N2 = sol[:, 9]
+    y_A = sol[:, 10]
 
-    y_N1 = sol[:, 9]
-    y_N2 = sol[:, 10]
-    y_A = sol[:, 11]
+    coll_n = sol[:, 11]
+    coll_A_N2nu = sol[:, 12]
+    coll_AA_NN = sol[:, 13]
 
     return JulRes(
         x_nu, x_N,
@@ -249,6 +289,8 @@ def julia_results():
         y_N1, y_N2, y_A,
         xi_N,
         coll_n,
+        coll_A_N2nu,
+        coll_AA_NN,
     )
 
 
@@ -256,7 +298,7 @@ def main():
     plt.rcParams.update({
         "text.usetex": True,
         "font.family": "serif",
-        "lines.markersize": .8,
+        "lines.markersize": 2.,
         #"lines.linewidth": .3
     })
 
@@ -271,4 +313,5 @@ def main():
     plot_coll_n(jul_res, pyt_res)
     plot_hubble_coll(jul_res)
 
-main()
+if __name__ == "__main__":
+    main()

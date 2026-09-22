@@ -7,18 +7,26 @@ import OrdinaryDiffEqBDF as ODEB
 import OrdinaryDiffEqFIRK as ODEF
 import LinearAlgebra as LA
 
-include(joinpath(@__DIR__, "../src/utils.jl"))
 include(joinpath(@__DIR__, "../src/pandemic_result.jl"))
-include(joinpath(@__DIR__, "../src/densities.jl"))
-include(joinpath(@__DIR__, "../src/coll_3_12.jl"))
-include(joinpath(@__DIR__, "../src/coll_12_34.jl"))
-include(joinpath(@__DIR__, "../src/collision_table.jl"))
+include(joinpath(@__DIR__, "../src/pandemolator_common.jl"))
 
-# """
-#     Pandemolator
-# 
-# A struct representing the pandemolator solver for dark sector evolution.
-# """
+"""
+pandemolator.jl
+
+The original pandemolator: integrates in log(x) = log(m_N1/T_nu), with the
+background interpolants (`t_interp_T_nu`, `ent_interp_T_nu`, ...) keyed on
+T_nu. T is converted to/from log(x) on every RHS evaluation (`mm_func!`).
+
+The dark-sector physics shared with every other parameterization -- the
+algebraic constraint (T_N, xi_N from the state), number/energy densities,
+and the collision terms C_n/C_rho -- lives in pandemolator_common.jl, not
+here; only this file's own solver plumbing (the struct, `pandemolate`,
+`initial_conditions`, `mm_func!`, `transform_sol`) is T-specific.
+
+See pandemolator_z.jl for the z-native counterpart (same equation, same
+independent variable, interpolants keyed on z instead of T_nu) -- validated
+to agree with this file in test/test_pandemolator_z.jl.
+"""
 mutable struct Pandemolator{T<:Real, FT, FdT, FEnt, FH}
     mp::ModelParams{T}
 
@@ -41,6 +49,10 @@ mutable struct Pandemolator{T<:Real, FT, FdT, FEnt, FH}
     # unless explicitly requested).
     verbose::Bool
 
+    # Bounds on T_N/T_nu for trial states, see `in_physical_domain`.
+    T_ratio_min::Float64
+    T_ratio_max::Float64
+
     # TODO: [13.08.26] These interpolations are not used. Probably incorrect as well, so test if they are needed.
     # # Interpolation functions in t space
     # T_nu_interp::I
@@ -62,7 +74,10 @@ mutable struct Pandemolator{T<:Real, FT, FdT, FEnt, FH}
         nu::Particle{T},
         # C_n::Function, C_rho::Function, C_xi0::Function,
         tT_rel::TimeTempRelation{T},
-        verbose::Bool=false,
+        verbose::Bool=false;
+        # See PandemolatorZ in pandemolator_z.jl for how these were chosen.
+        T_ratio_min::Real=1e-6,
+        T_ratio_max::Real=1e3,
     ) where T <: Real
         # TODO: [01.07.26] Ask Anton: Why this factor?
         # Calculate factor for A' particle contribution
@@ -91,6 +106,7 @@ mutable struct Pandemolator{T<:Real, FT, FdT, FEnt, FH}
             # C_n, C_rho, C_xi0,
             fac_n_A_val,
             verbose,
+            T_ratio_min, T_ratio_max,
             # T_nu_interp, dT_nu_dt_interp, ent_interp, H_interp,
             t_interp_T_nu, dT_nu_dt_interp_T_nu, ent_interp_T_nu,
             H_interp_T_nu,
@@ -102,17 +118,19 @@ end
 function pandemolate(
         tT_rel::TimeTempRelation{T},
         dw::DodelsonWidrow{T},
-        pan::Pandemolator{T},
+        pan::Pandemolator{T};
+        reltol=nothing,
+        abstol=nothing,
     ) where T <: Real
     """
-    Anton: Not entirely clear how this works. We use the fact that the dark 
-    sector is in equilibrium to get T_d, xi_d. As we have to unknown variables, 
+    Anton: Not entirely clear how this works. We use the fact that the dark
+    sector is in equilibrium to get T_d, xi_d. As we have to unknown variables,
     we must solve two equations.
-    We solve for n, rho numerically to get n_num, rho_num. Using equilibirum, 
-    the analytical expression is known. Hence, we solve 
+    We solve for n, rho numerically to get n_num, rho_num. Using equilibirum,
+    the analytical expression is known. Hence, we solve
     n_an(T_d, xi_d) = n_num, rho_an(T_d, xi_d) = rho_num
-    using root-solvers to obtain T_d, xi_d. 
-    In the special case of xi_d = 0, the system simplifies to only one 
+    using root-solvers to obtain T_d, xi_d.
+    In the special case of xi_d = 0, the system simplifies to only one
     variable, in which we solve for rho.
     """
     log_x_pts = log.(pan.N1.m ./ tT_rel.T_nu_grid[dw.i_ic:dw.i_end+1])
@@ -128,9 +146,6 @@ function pandemolate(
         println("u0 = ", u0)
         println("exp(u0) = ", exp.(u0))
     end
-
-    # TODO: [10.08.26] Remove! Only for testing.
-    # u0[4] = 0.0
 
     log_x_lim = (log_x_pts[1], log_x_pts[end])
     temp_lim = pan.N1.m ./ exp.(log_x_lim)
@@ -152,23 +167,21 @@ function pandemolate(
     # abstol > 1.3e-15. Initial conditions not consistent with smaller abstol.
     # For small reltol: "Warning: Verbosity toggle: dt_epsilon" at t = log(x) = -7.101953893976883
     # Rodas4/4P
-    reltol = 1e-4
-    abstol = 1e-14
-    # Rodas5P - Error from T = Inf
-    # reltol = 1e-4
-    # abstol = 1e-14
     # Rosenbrock23 - Same error as for Rodas with small reltol
+    kw = Dict{Symbol,Any}()
+    reltol === nothing || (kw[:reltol] = reltol)
+    abstol === nothing || (kw[:abstol] = abstol)
     timed_sol = @timed DE.solve(
         prob,
         # Rosenbrock23(autodiff=AutoFiniteDiff()),
         # ODER.Rodas4(autodiff=AutoFiniteDiff()),
-        ODER.Rodas4P(autodiff=AutoFiniteDiff()),
+        ODER.Rodas4P(autodiff=AutoFiniteDiff());
         # ODER.Rodas5P(autodiff=AutoFiniteDiff()),
         # ODEF.RadauIIA5(autodiff=AutoFiniteDiff()),
         # ODEF.RadauIIA5(),
-        # reltol=reltol,
-        # abstol=abstol,
         # force_dtmin=true,
+        isoutofdomain=(u, p, t) -> !in_physical_domain(p, u, p.N1.m / exp(t)),
+        kw...,
     )
     if pan.verbose
         println("solve time: ", timed_sol.time, " s")
@@ -192,7 +205,6 @@ function initial_conditions(
 
     # y0[1]: Y_n=n/s (Yield)
     # y0[2]: Y_rho = rho/s^(4/3) (Energy density scaled with entropy)
-
     ln_y_n_0 = log(n0/ent0)
     ln_y_rho_0 = log(rho0 / ent0^(4. / 3.))
     if pan.verbose
@@ -253,33 +265,31 @@ function transform_sol(pan, sol)
     eta = sol[4, :]
     xi_N = xi_from_eta.(Ref(pan), eta, ln_x_N)
     xi_A = pan.fac_n_A .* xi_N
+    gap_A = gap_A_from_eta.(eta)
 
-    coll_n = C_n.(Ref(pan), T_nu, T_N, xi_N)
+    coll_n = map((a, b, c, g) -> C_n(pan, a, b, c; gap_A=g), T_nu, T_N, xi_N, gap_A)
+    coll_A_N2nu = map(
+        (a, b, c, g) -> - A_N2nu_moments(pan, a, b, c; gap_A=g)[1],
+        T_nu, T_N, xi_N, gap_A
+    )
+    coll_AA_NN = map(
+        (b, c, g) -> C_n_AA(pan, b, c; gap_A=g),
+        T_N, xi_N, gap_A
+    )
 
     y_N1 = number_density.(Ref(pan.N1), T_N, xi_N) ./ ent
     y_N2 = number_density.(Ref(pan.N2), T_N, xi_N) ./ ent
-    y_A = number_density.(Ref(pan.A), T_N, xi_A) ./ ent
+    y_A = map((b, c, g) -> number_density(pan.A, b, c; gap=g), T_N, xi_A, gap_A) ./ ent
 
     return [
         x_nu;; x_N;;
         hubble;; ent;;
         y_n;; y_rho;;
         xi_N;; xi_A;;
-        coll_n;;
-        y_N1;; y_N2;; y_A
+        y_N1;; y_N2;; y_A;;
+        coll_n;; coll_A_N2nu;; coll_AA_NN;;
     ]
 end
-
-function T_N_from_ln_x_N(pan, ln_x_N)
-    return pan.N1.m / exp(ln_x_N)
-end
-
-
-function xi_from_eta(pan, eta, ln_x_N)
-    exp_eta = max(exp(eta), 1e-300)
-    return (pan.A.m / pan.N1.m * exp(ln_x_N) - exp_eta) / pan.fac_n_A
-end
-
 
 function dx_dt_interp(pan, x)
     T_nu = pan.N1.m / x
@@ -314,17 +324,17 @@ function mm_func!(
     T_N = T_N_from_ln_x_N(pan, ln_x_N)
     eta = u[4]
     xi_N = xi_from_eta(pan, eta, ln_x_N)
+    gap_A = gap_A_from_eta(eta)
 
     # ("T_nu = ", T_nu, ", T_N = ", T_N, ", xi_N = ", xi_N)
     # ("x_N = ", exp(ln_x_N))
-    # Newton stages can temporarily leave the physical algebraic domain.
-    # if !(isfinite(T_N) && T_N > zero(T) && isfinite(xi_N))
-    #     du .= zero(eltype(du))
-    #     return nothing
-    # end
+    # Trial stages can leave the physical domain; reject them.
+    if !in_physical_domain(pan, u, T_nu)
+        reject_state!(du)
+        return nothing
+    end
 
-    # TODO: [26.08.26] Move or remove collision_terms.
-    coll_n, coll_rho = collision_terms(pan, T_nu, T_N, xi_N)
+    coll_n, coll_rho = collision_terms(pan, T_nu, T_N, xi_N; gap_A=gap_A)
     if pan.verbose
         println("coll_n = ", coll_n)
         println("coll_rho = ", coll_rho)
@@ -334,18 +344,18 @@ function mm_func!(
 
     # TODO: [13.08.26] Double-check the signs.
     der_ln_y_n = x / (n * dx_dt) * coll_n
-    der_ln_y_rho = x / (rho * dx_dt) * (H * rho_3P(pan, T_N, xi_N) + coll_rho)
+    der_ln_y_rho = x / (rho * dx_dt) * (H * rho_3P(pan, T_N, xi_N; gap_A=gap_A) + coll_rho)
 
     n_anal = try
-        num_dens(pan, T_N, xi_N)
-    catch XiError
+        num_dens(pan, T_N, xi_N; gap_A=gap_A)
+    catch err
         println("eta = ", eta)
         println("ln_x_N = ", ln_x_N)
-        println(pan.A.m / pan.N1.m * exp(ln_x_N) - pan.fac_n_A * xi_N)
+        println("m_A/T_N - xi_A = e^eta = ", gap_A)
         println("u = ", u)
-        error(XiError)
+        rethrow(err)
     end
-    rho_anal = energy_dens(pan, T_N, xi_N)
+    rho_anal = energy_dens(pan, T_N, xi_N; gap_A=gap_A)
 
     ln_y_n_anal = log(n_anal / ent)
     ln_y_rho_anal = log(rho_anal / ent^(4. / 3.))
@@ -355,258 +365,6 @@ function mm_func!(
     du[4] = ln_y_rho - ln_y_rho_anal
     return nothing
 end
-
-
-function rho_3P(pan, T_N, xi_N)
-    # Prepared for splitting N masses
-    return (
-        rho_3P_diff(pan.N1, T_N, xi_N)
-        + rho_3P_diff(pan.N2, T_N, xi_N)
-        + rho_3P_diff(pan.A, T_N, pan.fac_n_A * xi_N)
-    )
-end
-
-
-function num_dens(pan, T_N, xi_N; debug=false)
-    n_N1 = number_density(pan.N1, T_N, xi_N, debug=debug)
-    n_N2 = number_density(pan.N2, T_N, xi_N, debug=debug)
-    n_A = number_density(pan.A, T_N, pan.fac_n_A * xi_N, debug=debug)
-    if isnothing(n_A)
-        number_density(pan.A, T_N, pan.fac_n_A * xi_N, debug=true)
-    end
-    if debug
-        println("n_N1 = ", n_N1)
-        println("n_N2 = ", n_N2)
-        println("n_A = ", n_A)
-    end
-    return max(
-        n_N1 + n_N2 + pan.fac_n_A * n_A,
-        1e-300
-    )
-end
-
-function energy_dens(pan, T_N, xi_N)
-    return max(
-        (
-            energy_density(pan.N1, T_N, xi_N)
-            + energy_density(pan.N2, T_N, xi_N)
-            + energy_density(pan.A, T_N, pan.fac_n_A * xi_N)
-        ),
-        1e-300
-    )
-end
-
-
-function n_rho_root(u, params)
-    pan = params.pan
-    n_ic = params.n_ic
-    rho_ic = params.rho_ic
-    # T_N = exp(max(min(Txi_N[1], 10.), -100.))
-    # xi_N = min(
-    #     Txi_N[1] + pan.N1.m / T_N,
-    #     (1. - 1e-14) * pan.A.m / (pan.fac_n_A * T_N)
-    # )
-    ln_x_N = u[1]
-    eta = u[2]
-    T_N = T_N_from_ln_x_N(pan, ln_x_N)
-    xi_N = xi_from_eta(pan, eta, ln_x_N)
-    n = num_dens(pan, T_N, xi_N)
-    rho = energy_dens(pan, T_N, xi_N)
-    if n / n_ic < 0
-        if pan.verbose
-            println("n/n_ic < 0 in n_rho_root")
-            println("n/n_ic = ", n / n_ic)
-            println("n = ", n)
-            num_dens(pan, T_N, xi_N, debug=true)
-        end
-        return [log(1e-100), log(rho/rho_ic)]
-    end
-    if rho / rho_ic < 0
-        if pan.verbose
-            println("rho/rho_ic < 0 in n_rho_root")
-            println("rho/rho_ic = ", rho / rho_ic)
-        end
-        return [log(n/n_ic), log(1e-100)]
-    end
-    return [log(n/n_ic), log(rho/rho_ic)]
-end
-
-function n_root(xi_N, params)
-    pan = params.pan
-    n_ic = params.n_ic
-    T_N = params.T_N
-    n = num_dens(pan, T_N, xi_N)
-    if n / n_ic < 0
-        println("n/n_ic < 0 in n_root")
-        return log(1e-100)
-    end
-    return log(n / n_ic)
-end
-
-function rho_root(xi_N, params)
-    pan = params.pan
-    n_ic = params.n_ic
-    rho_ic = params.rho_ic
-    T_N = params.T_N
-    rho = energy_dens(pan, T_N, xi_N)
-    if rho / rho_ic < 0
-        println("rho/rho_ic < 0 in rho_root")
-        return log(1e-100)
-    end
-    return log(rho / rho_ic)
-end
-
-
-
-function C_n(pan, T_nu, T_N, xi_N)
-    """
-    Anton: A lot of processes do not contriubute due to equilibrium or no change in particle number. 
-
-    Collision operator describing particle alpha: 
-    Cn[alpha]_{I_r -> F_r} = eps^alpha_r int dPI |M|^2 prod_{i in I_r} f_i * prod_{j in F_r} (1+k_j*f_j) / kappa_r 
-
-    kappa_r : symmetry factor 
-    eps^alpha_r : = -1 if alpha in F_r, = 1 if alpha in I_r
-
-    From this, have Cn[alpha in I_r] = -Cn[beta in F_r], so 
-    Cn[alpha in I_r] + Cn[beta in F_r] = 0
-
-    Code: C_n_3_12(type=0) = C[3]_{3<->12} = int dPI |M|^2 * [f1*f2*(1+k3*f3) - f3*(1+k1*f1)*(1+k2*f2)]
-
-    n = n1 + n2 + 2*nX
-    Then for example the processes 
-    X -> 12:
-    Cn[1]_{X->12} + Cn[2]_{X->12} + 2*Cn[X]_{X->12} = 0
-    11 -> 22:
-    2*Cn[1]_{11->22} + 2*Cn[2]_{11->22} = 0 
-    But for 11 <-> XX, 
-    2*Cn[1]_{11<->XX} + 4*Cn[X]_{11<->XX} = 2*Cn[X]_{11<->XX}
-    and X <-> 1nu
-    C[1]_{X<->1nu} + 2*C[X]_{X<->1nu} = C[X]_{X<->1nu}
-
-    Thus in total, our Boltzmann equation is 
-    n + 3Hn = C[X]_{X<->1nu} + 2*C[X]_{11<->XX} + 2*C[X]_{22<->XX}
-    """
-    if T_nu < pan.A.m / 50
-        return 0.
-    end
-    # th, m_Gamma_h2 do not matter anymore
-    # as long as mN1 = mN2, xiN1 = xiN2, TN1 = TN2, do not need CX_XX_22 separately -- just add factor 2 
-    # TODO: [01.06.26] Why divide by 4 and multiply by 4 in return statement? Symmetry factor (2*2)
-    # TODO: [15.07.26] Double check sign of collision term
-    temps_AA_NN = (T_N, T_N, T_N, T_N)
-    xis_AA_NN = (
-        pan.fac_n_A * xi_N,
-        pan.fac_n_A * xi_N,
-        xi_N,
-        xi_N,
-    )
-    C_AA_N1N1 = 0.
-    # C_AA_N1N1 = coll_12_34(
-    #     pan.mp,
-    #     pan.A,
-    #     pan.A,
-    #     pan.N1,
-    #     pan.N1,
-    #     temps_AA_NN,
-    #     xis_AA_NN,
-    # ) / 4.
-    C_AA_N2N2 = 0.
-    # C_AA_N2N2 = coll_12_34(
-    #     pan.mp,
-    #     pan.A,
-    #     pan.A,
-    #     pan.N2,
-    #     pan.N2,
-    #     temps_AA_NN,
-    #     xis_AA_NN,
-    # ) / 4.
-    T_nu = oftype(T_N, T_nu)
-    temps_A_N2nu = (T_N, T_nu, T_N)
-    xis_A_N2nu = (
-        xi_N,
-        zero(xi_N),
-        pan.fac_n_A * xi_N,
-    )
-    C_A_N2nu = coll_3_12(
-        pan.mp,
-        pan.N2,
-        pan.nu,
-        pan.A,
-        temps_A_N2nu,
-        xis_A_N2nu;
-        sq_amp_func=coll_A_Nnu_sq_amp,
-        energy_type=Val(0),
-    )
-    # Factor 2 from number change in n_d = n_N1 + n_N2 + 2*n_A
-    res = - C_A_N2nu - 2. * C_AA_N1N1 - 2. * C_AA_N2N2
-    return res
-end
-
-# rho = rho_N1 + rho_N2 + rho_A
-function C_rho(pan, T_nu, T_N, xi_N)
-    """
-    Anton: Internal processes of the DS does not contribute due to energy conservation. 
-    C1_X->12 + C2_X->12 + CX_X->12 
-    = int dPi * (2pi)^4 delta(E1+E2+E3) (E1 + E2 - E3)*fX*(1+k1*f1)*(1+k2*f2) = 0 
-
-    Hence the only contributions come from energy transer between the SM and the DS
-
-    Code: C_rho_3_12(type) = int dPI E_type |M|^2 * [f1*f2*(1+k3*f3) - f3*(1+k1*f1)*(1+k2*f2)]
-
-    Trick to save calculation: 
-    C[1]_{3<->12} + C[3]_{3<->12}
-    = int dPI (E3 - E1) |M|^2 [f1*f2*(1+k3*f3) - f3*(1+k1*f1)*(1+k2*f2)]
-    = int dPI E_2 |M|^2 [f1*f2*(1+k3*f3) - f3*(1+k1*f1)*(1+k2*f2)]
-    = C_rho_3_12(type=2, ...)
-    """
-    if T_nu < pan.A.m / 50.
-        return 0.
-    end
-
-    T_nu = oftype(T_N, T_nu)
-    temps_A_N2nu = (T_N, T_nu, T_N)
-    xis_A_N2nu = (
-        xi_N,
-        zero(xi_N),
-        pan.fac_n_A * xi_N,
-    )
-    CA_A_N2nu = coll_3_12(
-        pan.mp,
-        pan.N2,
-        pan.nu,
-        pan.A,
-        temps_A_N2nu,
-        xis_A_N2nu;
-        sq_amp_func=coll_A_Nnu_sq_amp,
-        energy_type=Val(3)
-    )
-    CN2_A_N2nu = coll_3_12(
-        pan.mp,
-        pan.N2,
-        pan.nu,
-        pan.A,
-        temps_A_N2nu,
-        xis_A_N2nu;
-        sq_amp_func=coll_A_Nnu_sq_amp,
-        energy_type=Val(1)
-    )
-    # Cnu_A_N2nu = coll_3_12(
-    #     pan.mp,
-    #     pan.N2,
-    #     pan.nu,
-    #     pan.A,
-    #     temps_A_N2nu,
-    #     xis_A_N2nu;
-    #     sq_amp_func=coll_A_Nnu_sq_amp,
-    #     energy_type=Val(2)
-    # )
-    # TODO: [15.07.26] Double check sign
-    # return Cnu_A_N2nu
-    return - CA_A_N2nu + CN2_A_N2nu
-end
-
-
 
 """
 From old pandemolate:
@@ -688,7 +446,6 @@ From old pandemolate:
                 pan.i_end = pan.i_ic + i_xi_nonzero
                 n_pts = i_xi_nonzero + 1
         else:
-
 
 
 

@@ -346,10 +346,15 @@ def main():
     plot_dodelson_widrow(ax)
     plot_xrays(ax)
     # Both Lyman-alpha bounds are labelled by the length that sets them.
-    # Ly-alpha is labelled low on its boundary, clear of the ragged X-ray curve.
-    n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA, r"Ly-$\alpha$",
-                       Z_BOUND["lya"], frac=0.28)
-    plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS, r"$r_s$", Z_BOUND["r_s"])
+    # Both bounds are Lyman-alpha; the length in brackets says which one, as in
+    # Bringmann et al. (2206.10630). Ly-alpha (lambda_fs) is labelled low on
+    # its boundary, clear of the ragged X-ray curve.
+    n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
+                       r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28)
+    # 0.66 lifts the r_s label off the point where the lambda_fs boundary
+    # crosses its own, which is almost exactly its midpoint.
+    plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS,
+               r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.66)
     plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"])
 
     excluded = {k: (lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC or r_s.get(k, 0.0) > R_S_MAX_MPC

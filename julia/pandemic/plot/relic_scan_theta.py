@@ -52,6 +52,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
 from matplotlib.ticker import FixedLocator, LogFormatterMathtext, NullFormatter
 from scipy.interpolate import PchipInterpolator
 
@@ -82,8 +83,9 @@ LAMBDA_FS_MAX_MPC = 0.24
 R_S_MAX_MPC = 0.34
 SIGMA_M_MAX = 1.0        # cm^2/g
 C_LYA = "#D95F02"
-C_RS = "#E7969C"
+C_RS = "#C9184A"   # the shading is drawn at alpha, so the line/label carry the colour
 C_SI = "#A300CC"
+BOUND_LABEL_SIZE = 9
 
 # Contours below this coupling are drawn but not labelled: they only enter the
 # frame at m_N ~ 3 keV, inside the Dodelson-Widrow band, where there is no room.
@@ -194,28 +196,58 @@ def place_label(m, s, m_pad=1.03, s_pad=1.6):
     return m, max(s, S_LIM[0] * s_pad), "bottom"
 
 
-def plot_bound(ax, roots, vals, limit, color, label, zorder):
-    """Shade the region of smaller m_N than the crossings of `limit`, between
-    the lowest and highest line of constant y that is excluded anywhere, and
-    label the boundary at its widest point."""
+def extend_boundary(m_c, s_c):
+    """The boundary continued past its end points to beyond the top and bottom
+    of the frame, so the shaded region closes on the frame edge instead of on
+    the outermost line of constant y that happens to have been scanned.
+
+    The continuation is a straight line in (log m_N, log sin^2 2theta) through
+    the two outermost crossings. Where the bound really does run out -- the
+    self-interaction boundary leaves the frame on the left, because sigma/m
+    stops excluding anything above m_N = 1 keV once y is small enough -- the
+    extrapolation walks off the left edge on its own and nothing extra is
+    shaded, which is why it is done this way rather than by holding m_N fixed.
+    """
+    def step(m0, s0, m1, s1, s_target):
+        # (m, s) on the line through the two points, at s = s_target
+        if s1 == s0:
+            return m1, s_target
+        w = np.log(s_target / s1) / np.log(s1 / s0)
+        m = m1 * (m1 / m0)**w
+        return float(np.clip(m, M_LIM[0] * 0.01, M_LIM[1] * 100)), s_target
+
+    lo = step(m_c[1], s_c[1], m_c[0], s_c[0], S_LIM[0] * 0.5)
+    hi = step(m_c[-2], s_c[-2], m_c[-1], s_c[-1], S_LIM[1] * 2.0)
+    return (np.concatenate(([lo[0]], m_c, [hi[0]])),
+            np.concatenate(([lo[1]], s_c, [hi[1]])))
+
+
+def plot_bound(ax, roots, vals, limit, color, label, zorder, frac=0.5):
+    """Shade the region of smaller m_N than the crossings of `limit` and label
+    the boundary inside the shaded side, `frac` of the way up its visible part
+    (0.5 is halfway; lower it to dodge a busy part of the figure)."""
     crossings = sorted(bound_crossings(roots, vals, limit), key=lambda c: c[1])
     if len(crossings) < 2:
         return False
     m_c = np.array([c[0] for c in crossings])
     s_c = np.array([c[1] for c in crossings])
+    m_e, s_e = extend_boundary(m_c, s_c)
     m_lo = M_LIM[0] * 0.5   # off the left edge, so the shading is flush with it
-    ax.fill(np.concatenate(([m_lo], m_c, [m_lo])), np.concatenate(([s_c[0]], s_c, [s_c[-1]])),
+    ax.fill(np.concatenate(([m_lo], m_e, [m_lo])), np.concatenate(([s_e[0]], s_e, [s_e[-1]])),
             color=color, alpha=0.25, lw=0, zorder=zorder)
-    ax.plot(m_c, s_c, color=color, lw=1.3, zorder=zorder + 0.1)
-    # Label just inside the boundary, halfway up the part of it that is on the
-    # plot, where there is room however the curve runs.
+    ax.plot(m_e, s_e, color=color, lw=1.3, zorder=zorder + 0.1)
+
+    # Label offset into the excluded (left) side and below the anchor, so it
+    # clears the boundary line instead of sitting on it. A white outline keeps
+    # it readable over the shading it lies on; the text is above everything,
+    # since the shading is drawn under the X-ray region.
     vis = np.nonzero((s_c > S_LIM[0]) & (s_c < S_LIM[1]))[0]
-    mid = vis[len(vis) // 2] if len(vis) else int(np.argmax(m_c))
-    m_t, s_t, va = place_label(m_c[mid] * 0.94, s_c[mid])
-    # The text is kept above everything: the shading it belongs to is drawn
-    # under the X-ray region, which would otherwise paint over the label.
-    ax.text(m_t, s_t, label, color=color, fontsize=8, ha="right", va=va,
-            zorder=Z_LABEL)
+    mid = vis[min(int(frac * len(vis)), len(vis) - 1)] if len(vis) else int(np.argmax(m_c))
+    m_t = float(np.clip(m_c[mid] * 0.88, M_LIM[0] * 1.06, M_LIM[1] / 1.06))
+    s_t = float(np.clip(s_c[mid] * 0.70, S_LIM[0] * 4.0, S_LIM[1] / 2.0))
+    ax.text(m_t, s_t, label, color=color, fontsize=BOUND_LABEL_SIZE,
+            ha="right", va="top", zorder=Z_LABEL,
+            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")])
     return True
 
 
@@ -284,11 +316,12 @@ def plot_contours(ax, roots, excluded, debug):
         inside = np.nonzero(s_line < S_LIM[1] / 10)[0]
         if len(inside) and y >= LABEL_Y_MIN * (1 - 1e-6):
             j = inside[0]
-            m_t, s_t, va = place_label(m_line[j] * 1.05, s_line[j] * 1.6)
+            m_t, s_t, va = place_label(m_line[j] * 1.14, s_line[j] * 1.6, m_pad=1.12)
             # Above the bands: the smallest couplings only enter the frame
             # inside the Dodelson-Widrow band, which the lines run under.
             ax.text(m_t, s_t, y_label(y, first=first[0]), color=c,
-                    ha="left", va=va, zorder=2.5)
+                    ha="left", va=va, zorder=Z_LABEL,
+                    path_effects=[pe.withStroke(linewidth=2.0, foreground="white")])
             first[0] = False
 
 
@@ -317,7 +350,9 @@ def main():
     plot_dodelson_widrow(ax)
     plot_xrays(ax)
     # Both Lyman-alpha bounds are labelled by the length that sets them.
-    n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA, r"Ly-$\alpha$", Z_BOUND["lya"])
+    # Ly-alpha is labelled low on its boundary, clear of the ragged X-ray curve.
+    n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA, r"Ly-$\alpha$",
+                       Z_BOUND["lya"], frac=0.28)
     plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS, r"$r_s$", Z_BOUND["r_s"])
     plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"])
 

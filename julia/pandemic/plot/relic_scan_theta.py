@@ -329,8 +329,16 @@ def plot_contours(ax, roots, excluded, debug):
             if len(seg) > 1:
                 lm_fine = np.linspace(lm[0], lm[-1], 200)
                 ax.plot(np.exp(lm_fine), np.exp(PchipInterpolator(lm, ls)(lm_fine)), color=c, lw=1.0, zorder=-1)
-            if debug or len(seg) == 1:
-                # Open markers where a root is excluded by one of the constraints.
+            if debug:
+                # Open markers where a root is excluded by one of the
+                # constraints. Only in --debug: a segment of a single root
+                # used to be drawn as a marker here, since it cannot be drawn
+                # as a line, but in the production figure that puts a lone dot
+                # in the middle of nowhere. The one case in the current scan
+                # is m_N = 3.72 keV at g = 1e-8, whose neighbours in the mass
+                # grid both failed to converge, and which is excluded anyway
+                # (lambda_fs = 0.47 Mpc). Isolated roots are now visible only
+                # in --debug; the fix is to make those masses converge.
                 ex = np.array([excluded.get((m, y), False) for m in m_line[seg]])
                 ax.plot(m_line[seg][~ex], s_line[seg][~ex], ls="none", marker="o", ms=2.5, color=c, zorder=2)
                 ax.plot(m_line[seg][ex], s_line[seg][ex], ls="none", marker="o", ms=2.5, color=c,

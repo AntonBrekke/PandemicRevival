@@ -52,7 +52,6 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.patheffects as pe
 from matplotlib.ticker import FixedLocator, LogFormatterMathtext, NullFormatter
 from scipy.interpolate import PchipInterpolator
 
@@ -238,16 +237,14 @@ def plot_bound(ax, roots, vals, limit, color, label, zorder, frac=0.5):
     ax.plot(m_e, s_e, color=color, lw=1.3, zorder=zorder + 0.1)
 
     # Label offset into the excluded (left) side and below the anchor, so it
-    # clears the boundary line instead of sitting on it. A white outline keeps
-    # it readable over the shading it lies on; the text is above everything,
-    # since the shading is drawn under the X-ray region.
+    # clears the boundary line instead of sitting on it. The text is above
+    # everything, since the shading is drawn under the X-ray region.
     vis = np.nonzero((s_c > S_LIM[0]) & (s_c < S_LIM[1]))[0]
     mid = vis[min(int(frac * len(vis)), len(vis) - 1)] if len(vis) else int(np.argmax(m_c))
     m_t = float(np.clip(m_c[mid] * 0.88, M_LIM[0] * 1.06, M_LIM[1] / 1.06))
     s_t = float(np.clip(s_c[mid] * 0.70, S_LIM[0] * 4.0, S_LIM[1] / 2.0))
     ax.text(m_t, s_t, label, color=color, fontsize=BOUND_LABEL_SIZE,
-            ha="right", va="top", zorder=Z_LABEL,
-            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")])
+            ha="right", va="top", zorder=Z_LABEL)
     return True
 
 
@@ -320,8 +317,7 @@ def plot_contours(ax, roots, excluded, debug):
             # Above the bands: the smallest couplings only enter the frame
             # inside the Dodelson-Widrow band, which the lines run under.
             ax.text(m_t, s_t, y_label(y, first=first[0]), color=c,
-                    ha="left", va=va, zorder=Z_LABEL,
-                    path_effects=[pe.withStroke(linewidth=2.0, foreground="white")])
+                    ha="left", va=va, zorder=Z_LABEL)
             first[0] = False
 
 

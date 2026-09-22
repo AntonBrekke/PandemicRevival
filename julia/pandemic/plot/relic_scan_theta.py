@@ -1,45 +1,85 @@
 #! /usr/bin/env python3
 """
-Contours of the coupling y in the (m_N, sin^2 2theta) plane for which
-Omega h^2 = 0.12, from the scan in src/run_relic_scan_theta_z.jl
-(tmp/relic_scan_theta/m_N_*keV.csv), in the style of Fig. 3 of the paper.
+Contours of the coupling y (= g in the paper) in the (m_N, sin^2 2theta) plane
+for which Omega h^2 = 0.12, from the scan in src/run_relic_scan_theta_z.jl
+(tmp/relic_scan_theta/m_N_*keV.csv). Styled like the money plot of the paper
+(code/sterile_res/plotter_3.py): Dodelson-Widrow band, X-ray limits and
+projections, and the contours labelled on the plot.
 
 Only roots on the freeze-in branch are drawn: for each (m_N, y) the smallest
-converged sin^2 2theta at which Omega h^2 rises through the target. Contour
-lines are broken where no such root was found.
+converged sin^2 2theta at which Omega h^2 rises through the target. The lines
+are monotone (PCHIP) interpolations in log-log between the scanned masses and
+are broken where no root was found for a mass in the grid.
 
 Run from julia/pandemic:
-    conda run -n pandemic python plot/relic_scan_theta.py [scan_dir] [output_path_without_extension]
+    conda run -n pandemic python plot/relic_scan_theta.py [scan_dir] [output_path_without_extension] [--debug]
+
+--debug marks the scanned roots on the lines and writes <output>_debug.pdf/.png,
+so the production figure is not overwritten.
 """
 
+import argparse
 import glob
 import os
-import sys
+import shutil
+import subprocess
 
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
+from matplotlib.ticker import FixedLocator, LogFormatterMathtext, NullFormatter
+from scipy.interpolate import PchipInterpolator
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
-SCAN_DIR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "tmp", "relic_scan_theta")
-XRAY_FILE = os.path.join(ROOT, "..", "..", "xray_constraints", "overall_constraint.dat")
-DW_FILE = os.path.join(ROOT, "data", "dw", "0612182_dw_fig_4.dat")
-OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "figures", "relic_contours_y")
+XRAY_DIR = os.path.join(ROOT, "..", "..", "xray_constraints")
+DW_DIR = os.path.join(ROOT, "data", "dw")
 
 OMEGA_TARGET = 0.12
 M_A_OVER_M_N = 2.5
 
+COLUMNWIDTH = 418.25368  # pt, \showthe\textwidth in LaTeX, as for the paper figure
+M_LIM = (1.0, 300.0)     # keV
+S_LIM = (1e-18, 1e-8)
 
-def load_scan():
+C_DW = "#83781B"
+C_DW_BAND = "#EAE299"
+C_OVERPROD = "#92CBE2"   # skyblue at alpha 0.8 on white
+C_OVERPROD_TEXT = "#155D7A"
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("scan_dir", nargs="?", default=os.path.join(ROOT, "tmp", "relic_scan_theta"))
+    p.add_argument("out", nargs="?", default=os.path.join(ROOT, "figures", "relic_contours_y"),
+                   help="output path without extension")
+    p.add_argument("--debug", action="store_true", help="mark the scanned roots on the contour lines")
+    return p.parse_args()
+
+
+def set_style():
+    plt.rc("text", usetex=True)
+    plt.rc("font", family="serif")
+    plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
+    plt.rcParams.update({"axes.labelsize": 10, "xtick.labelsize": 10, "ytick.labelsize": 10,
+                         "axes.titlesize": 10, "font.size": 10})
+
+
+def get_figsize(columnwidth, wf=1.0, hf=(5.**0.5 - 1.0) / 2.0):
+    """[width, height] in inches for a fraction wf of the LaTeX column width
+    [pt] and aspect ratio hf (golden ratio by default)."""
+    fig_width = columnwidth * wf / 72.27
+    return [fig_width, fig_width * hf]
+
+
+def load_scan(scan_dir):
     rows = []
-    for path in sorted(glob.glob(os.path.join(SCAN_DIR, "m_N_*keV.csv"))):
+    for path in sorted(glob.glob(os.path.join(scan_dir, "m_N_*keV.csv"))):
         data = np.genfromtxt(path, delimiter=",", names=True, dtype=None, encoding="utf-8")
         rows.extend(np.atleast_1d(data).tolist())
     if not rows:
-        raise SystemExit(f"no scan results in {SCAN_DIR}")
+        raise SystemExit(f"no scan results in {scan_dir}")
     names = ["m_N", "y", "sin2_2theta", "omega_h2", "converged", "plateau_ok", "retcode", "branch", "slope", "n_failed"]
     return {n: np.array([r[i] for r in rows]) for i, n in enumerate(names)}
 
@@ -54,40 +94,56 @@ def freeze_in_roots(scan):
     return roots
 
 
-def dodelson_widrow_line(m_keV):
-    """sin^2 2theta for which DW production alone gives Omega h^2 = 0.12
-    (Omega h^2 = 0.11 C_e(m) (sin 2theta m / 2 / 0.1 eV)^2, hep-ph/0612182)."""
-    table = np.loadtxt(DW_FILE, comments="#")
-    m_GeV = m_keV * 1e-6
-    c_e = np.exp(np.interp(np.log(m_GeV), np.log(table[:, 0]), np.log(table[:, 1])))
-    return 4 * OMEGA_TARGET / (0.11 * c_e * (m_GeV * 1e10)**2)
+def y_label(y, first):
+    exp10 = np.log10(y)
+    exp_str = f"{exp10:.0f}" if abs(exp10 - round(exp10)) < 1e-6 else f"{exp10:.1f}"
+    return (r"$g = " if first else "$") + rf"10^{{{exp_str}}}$"
 
 
-def main():
-    scan = load_scan()
-    roots = freeze_in_roots(scan)
+def plot_dodelson_widrow(ax):
+    """Band of Omega h^2 = 0.12 from DW production (fig. 5 of hep-ph/0612182),
+    with the overproduction region above it."""
+    def load(name, omega_ref):
+        d = np.loadtxt(os.path.join(DW_DIR, name), skiprows=2)
+        return 1e6 * d[:, 0], (OMEGA_TARGET / omega_ref) * d[:, 1] * (1e-6 / d[:, 0])**2
+
+    m_mid, s_mid = load("0612182_dw_fig_5.dat", 0.11)
+    m_up, s_up = load("0612182_dw_fig_5_up.dat", 0.105)
+    m_low, s_low = load("0612182_dw_fig_5_low.dat", 0.105)
+    ax.plot(m_mid, s_mid, color=C_DW, ls="--", zorder=1)
+    ax.plot(m_low, s_low, color=C_DW, ls=":", zorder=1)
+    ax.plot(m_up, s_up, color=C_DW, ls=":", zorder=1)
+    ax.fill(np.concatenate((m_low, m_up[::-1])), np.concatenate((s_low, s_up[::-1])),
+            color=C_DW_BAND, lw=0, zorder=0)
+    for m, s in ((m_low, s_low), (m_up, s_up)):
+        ax.fill_between(m, s, 1.0, color=C_OVERPROD, lw=0, zorder=-1)
+    ax.text(10**1.5, 10**-10.25, "Dodelson-Widrow", color=C_DW, rotation=-22, ha="center")
+    ax.text(10**1.6, 10**-10.25, "overproduction", color=C_OVERPROD_TEXT, rotation=-24)
+
+
+def plot_xrays(ax):
+    xray = np.loadtxt(os.path.join(XRAY_DIR, "overall_constraint.dat"))
+    m, s = 1e6 * xray[:, 0], xray[:, 1]
+    ax.fill_between(m, s, 1.0, color="white", lw=0, zorder=-3)
+    ax.fill_between(m, s, 1.0, color="black", alpha=0.25, lw=0, zorder=-3)
+    ax.plot(m, s, color="black", lw=1.3, zorder=-2)
+    ax.text(10**1.45, 1e-13, "X-rays", color="black")
+
+    for name, ls in (("Athena_projection_2103.13242.dat", "-."),
+                     ("eROSITA_projection_2103.13241.dat", "--"),
+                     ("eXTP_projection_2001.07014.dat", ":")):
+        proj = np.loadtxt(os.path.join(XRAY_DIR, name), skiprows=2)
+        ax.plot(1e6 * proj[:, 0], proj[:, 1], color="black", lw=1.3, ls=ls, zorder=1)
+    ax.text(10**0.3, 10**-10.69, "eROSITA", color="black", rotation=-45)
+    ax.text(10**0.95, 10**-13.35, "Athena", color="black", rotation=-15)
+    ax.text(10**1.04, 1e-15, "eXTP", color="black")
+
+
+def plot_contours(ax, roots, debug):
     masses = np.array(sorted({k[0] for k in roots}))
     ys = np.array(sorted({k[1] for k in roots}))
-
-    fig, ax = plt.subplots(figsize=(4.8, 4.3))
-    m_lo = min(masses.min(), 1e0)
-    m_hi = max(masses.max(), 3e2)
-    s_lo, s_hi = 1e-18, 1e-8
-
-    # Constraints for orientation, as in Fig. 3.
-    m_band = np.logspace(np.log10(m_lo), np.log10(m_hi), 400)
-    s_dw = dodelson_widrow_line(m_band)
-    ax.fill_between(m_band, s_dw, s_hi, color="tab:blue", alpha=0.25, lw=0)
-    ax.plot(m_band, s_dw, color="tab:blue", ls=":", lw=1)
-    if os.path.exists(XRAY_FILE):
-        xray = np.loadtxt(XRAY_FILE)
-        m_x, s_x = xray[:, 0] * 1e6, xray[:, 1]
-        sel = (m_x >= m_lo) & (m_x <= m_hi)
-        ax.fill_between(m_x[sel], np.minimum(s_x[sel], s_hi), s_hi, color="0.6", alpha=0.6, lw=0)
-        ax.plot(m_x[sel], s_x[sel], color="k", lw=1)
-
     colors = plt.cm.viridis(np.linspace(0.0, 0.85, len(ys)))
-    for y, c in zip(ys, colors):
+    for i, (y, c) in enumerate(zip(ys, colors)):
         m_line = np.array([m for m in masses if (m, y) in roots])
         s_line = np.array([roots[(m, y)] for m in m_line])
         if len(m_line) == 0:
@@ -96,30 +152,61 @@ def main():
         idx = np.searchsorted(masses, m_line)
         segments = np.split(np.arange(len(m_line)), np.where(np.diff(idx) > 1)[0] + 1)
         for seg in segments:
-            ax.plot(m_line[seg], s_line[seg], color=c, lw=1.3, marker="o", ms=2.5)
-        exp10 = np.log10(y)
-        label = rf"$10^{{{exp10:.0f}}}$" if abs(exp10 - round(exp10)) < 1e-6 else rf"$10^{{{exp10:.1f}}}$"
-        ax.text(m_line[0] * 0.93, s_line[0], label, color=c, fontsize=7, ha="right", va="center")
+            lm, ls = np.log(m_line[seg]), np.log(s_line[seg])
+            if len(seg) > 1:
+                lm_fine = np.linspace(lm[0], lm[-1], 200)
+                ax.plot(np.exp(lm_fine), np.exp(PchipInterpolator(lm, ls)(lm_fine)), color=c, lw=1.0, zorder=-1)
+            if debug or len(seg) == 1:
+                ax.plot(m_line[seg], s_line[seg], ls="none", marker="o", ms=2.5, color=c, zorder=2)
+        # Label at the left edge, just above the start of the line, as in the paper figure.
+        ax.text(M_LIM[0] * 1.05, s_line[0] * 1.6, y_label(y, first=(i == 0)), color=c,
+                ha="left", va="bottom", zorder=-1)
+
+
+def main():
+    args = parse_args()
+    roots = freeze_in_roots(load_scan(args.scan_dir))
+    out = args.out + ("_debug" if args.debug else "")
+
+    set_style()
+    fig = plt.figure(figsize=get_figsize(COLUMNWIDTH, wf=1.0, hf=0.9), dpi=150)
+    ax = fig.add_subplot(1, 1, 1)
+    ax.tick_params(axis="both", which="both", direction="in", width=0.5)
+    ax.xaxis.set_ticks_position("both")
+    ax.yaxis.set_ticks_position("both")
+    for axis in ["top", "bottom", "left", "right"]:
+        ax.spines[axis].set_linewidth(0.5)
+
+    plot_dodelson_widrow(ax)
+    plot_xrays(ax)
+    plot_contours(ax, roots, args.debug)
 
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlim(m_lo * 0.6, m_hi)
-    ax.set_ylim(s_lo, s_hi)
-    ax.set_xlabel(r"$m_N$ [keV]")
-    ax.set_ylabel(r"$\sin^2(2\theta)$")
-    ax.text(0.97, 0.97, rf"$m_{{A'}} = {M_A_OVER_M_N}\,m_N$", transform=ax.transAxes, ha="right", va="top", fontsize=8,
-            bbox=dict(boxstyle="round", fc="white", ec="0.7"))
-    handles = [
-        Line2D([], [], color="0.3", lw=1.3, marker="o", ms=2.5, label=r"$\Omega h^2 = 0.12$ at fixed $y$"),
-        Line2D([], [], color="tab:blue", ls=":", label="Dodelson-Widrow"),
-        Line2D([], [], color="k", lw=1, label="X-rays"),
-    ]
-    ax.legend(handles=handles, loc="lower left", fontsize=7, frameon=True)
+    ax.set_xlim(*M_LIM)
+    ax.set_ylim(*S_LIM)
+    # Label every decade, as in the paper figure.
+    for axis, (lo, hi) in ((ax.xaxis, M_LIM), (ax.yaxis, S_LIM)):
+        decades = np.arange(np.floor(np.log10(lo)), np.ceil(np.log10(hi)) + 1)
+        axis.set_major_locator(FixedLocator(10**decades))
+        axis.set_minor_locator(FixedLocator([k * 10**d for d in decades for k in range(2, 10)]))
+        axis.set_major_formatter(LogFormatterMathtext())
+        axis.set_minor_formatter(NullFormatter())
+    ax.set_xlabel(r"$m_{N_1}\;\;[\mathrm{keV}]$")
+    ax.set_ylabel(r"$\sin^2 (2 \theta_1)$")
+    props = dict(boxstyle="round", facecolor="white", alpha=0.8, linewidth=1, edgecolor="0.8")
+    ax.text(0.97, 0.96, rf"$m_{{A'}} = {M_A_OVER_M_N}\,m_{{N_1}}$", transform=ax.transAxes,
+            ha="right", va="top", bbox=props)
+
     fig.tight_layout()
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    fig.savefig(OUT + ".pdf")
-    fig.savefig(OUT + ".png", dpi=200)
-    print(f"wrote {OUT}.pdf/.png with {len(roots)} points, {len(masses)} masses, {len(ys)} values of y")
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    fig.savefig(out + ".pdf")
+    if shutil.which("dvipng"):
+        fig.savefig(out + ".png", dpi=300)
+    elif shutil.which("pdftoppm"):  # usetex needs dvipng for raster output
+        subprocess.run(["pdftoppm", "-png", "-r", "300", "-singlefile", out + ".pdf", out], check=True)
+    print(f"wrote {out}.pdf/.png with {len(roots)} points, "
+          f"{len({k[0] for k in roots})} masses, {len({k[1] for k in roots})} values of y")
 
 
 if __name__ == "__main__":

@@ -9,18 +9,41 @@ projections, and the contours labelled on the plot.
 Only roots on the freeze-in branch are drawn: for each (m_N, y) the smallest
 converged sin^2 2theta at which Omega h^2 rises through the target. The lines
 are monotone (PCHIP) interpolations in log-log between the scanned masses and
-are broken where no root was found for a mass in the grid.
+are broken where no root was found for a mass in the grid. Only whole decades
+of y are drawn; a finer sub-decade grid, if scanned, still feeds the
+constraint boundaries below, which are what it is needed for.
+
+Three constraints are shaded, each bounding the region of small m_N:
+
+  Ly-alpha    free-streaming length after kinetic decoupling, lambda_fs >
+              0.24 Mpc, and sound horizon r_s > 0.34 Mpc, remapped from the
+              WDM limits as in Bringmann et al. (2206.10630). Needs
+              <scan_dir>/lyman_alpha.csv from src/run_lyman_alpha.jl; without
+              it the two are silently skipped.
+  self-int.   sigma/m > 1 cm^2/g from the draft's (A6), see
+              plot/self_interaction.py.
+
+On every line of constant y the crossing of each limit is interpolated (in
+log) between neighbouring roots and the crossings are joined. For sigma/m the
+interpolation is exact, since sigma/m ~ m^-3 at fixed y and m_A'/m_N.
+
+Environment: LYA_VARIANT=old plots the lengths as the old Python code computed
+them (its amplitude and its stray factor 1e3), LYA_VARIANT=nokd the
+free-streaming length without kinetic decoupling; SI_VARIANT=old the
+self-interaction cross section of plotter_3.py.
 
 Run from julia/pandemic:
     conda run -n pandemic python plot/relic_scan_theta.py [scan_dir] [output_path_without_extension] [--debug]
 
---debug marks the scanned roots on the lines and writes <output>_debug.pdf,
-so the production figure is not overwritten.
+--debug marks the scanned roots on the lines (open markers where a root is
+excluded by one of the constraints) and writes <output>_debug.pdf, so the
+production figure is not overwritten.
 """
 
 import argparse
 import glob
 import os
+import sys
 
 import numpy as np
 import matplotlib
@@ -28,6 +51,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, LogFormatterMathtext, NullFormatter
 from scipy.interpolate import PchipInterpolator
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from self_interaction import sigma_over_m
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
@@ -45,6 +71,22 @@ C_DW = "#83781B"
 C_DW_BAND = "#EAE299"
 C_OVERPROD = "#92CBE2"   # skyblue at alpha 0.8 on white
 C_OVERPROD_TEXT = "#155D7A"
+
+# Limits of the three constraints, and the colours they are drawn in.
+# LAMBDA_FS_MAX_MPC and R_S_MAX_MPC are LYA_LAMBDA_FS_MAX_MPC and
+# LYA_R_S_MAX_MPC of src/lyman_alpha.jl and src/kinetic_decoupling.jl.
+LAMBDA_FS_MAX_MPC = 0.24
+R_S_MAX_MPC = 0.34
+SIGMA_M_MAX = 1.0        # cm^2/g
+C_LYA = "#D95F02"
+C_RS = "#E7969C"
+C_SI = "#A300CC"
+
+SI_VARIANT = os.environ.get("SI_VARIANT", "A6")
+LYA_VARIANT = os.environ.get("LYA_VARIANT", "A6")
+LYA_COLUMNS = {"A6": ("lambda_fs_kd_Mpc", "r_s_Mpc"),
+               "old": ("lambda_fs_kd_old_Mpc", "r_s_old_Mpc"),
+               "nokd": ("lambda_fs_Mpc", None)}[LYA_VARIANT]
 
 
 def parse_args():
@@ -92,10 +134,74 @@ def freeze_in_roots(scan):
     return roots
 
 
-def y_label(y, first):
-    exp10 = np.log10(y)
-    exp_str = f"{exp10:.0f}" if abs(exp10 - round(exp10)) < 1e-6 else f"{exp10:.1f}"
-    return (r"$g = " if first else "$") + rf"10^{{{exp_str}}}$"
+def load_lyman_alpha(scan_dir):
+    """(m_N [keV], y) -> lambda_fs and r_s [Mpc] of LYA_VARIANT from
+    src/run_lyman_alpha.jl, or ({}, {}) if it has not been run."""
+    path = os.path.join(scan_dir, "lyman_alpha.csv")
+    if not os.path.exists(path):
+        return {}, {}
+    data = np.atleast_1d(np.genfromtxt(path, delimiter=",", names=True, dtype=None, encoding="utf-8"))
+    col_l, col_r = LYA_COLUMNS
+    key = lambda r: (round(r["m_N"] * 1e6, 10), r["y"])
+    lam = {key(r): r[col_l] for r in data if np.isfinite(r[col_l])}
+    r_s = {key(r): r[col_r] for r in data if np.isfinite(r[col_r])} if col_r else {}
+    return lam, r_s
+
+
+def bound_crossings(roots, vals, limit):
+    """For every y, the point (m_N, sin^2 2theta) on its Omega h^2 = 0.12 line
+    where the length crosses `limit` downwards for the last time with growing
+    m_N, interpolated linearly in log along the line (the lengths fall with
+    m_N, so smaller masses are excluded). Lines that are excluded at all their
+    masses give their largest mass, lines that are allowed everywhere none."""
+    crossings = []
+    for y in sorted({k[1] for k in roots}):
+        pts = sorted((k[0], roots[k], vals[k]) for k in roots if k[1] == y and k in vals)
+        if not pts or all(p[2] <= limit for p in pts):
+            continue
+        if pts[-1][2] > limit:
+            crossings.append(pts[-1][:2])
+            continue
+        for (m0, s0, l0), (m1, s1, l1) in reversed(list(zip(pts[:-1], pts[1:]))):
+            if l0 > limit >= l1:
+                w = np.log(l0 / limit) / np.log(l0 / l1)
+                crossings.append((m0 * (m1 / m0)**w, s0 * (s1 / s0)**w))
+                break
+    return crossings
+
+
+def place_label(m, s, m_pad=1.03, s_pad=1.6):
+    """(m, s, va) for a label anchored at (m, s): moved just inside the axes,
+    and hung below the anchor instead of above it when it had to be pulled
+    down from the top, so that it is drawn inside the frame however far off it
+    the curve it belongs to runs."""
+    m = min(max(m, M_LIM[0] * m_pad), M_LIM[1] / m_pad)
+    if s > S_LIM[1] / s_pad:
+        return m, S_LIM[1] / 1.15, "top"
+    return m, max(s, S_LIM[0] * s_pad), "bottom"
+
+
+def plot_bound(ax, roots, vals, limit, color, label, zorder):
+    """Shade the region of smaller m_N than the crossings of `limit`, between
+    the lowest and highest line of constant y that is excluded anywhere, and
+    label the boundary at its widest point."""
+    crossings = sorted(bound_crossings(roots, vals, limit), key=lambda c: c[1])
+    if len(crossings) < 2:
+        return False
+    m_c = np.array([c[0] for c in crossings])
+    s_c = np.array([c[1] for c in crossings])
+    m_lo = M_LIM[0] * 0.5   # off the left edge, so the shading is flush with it
+    ax.fill(np.concatenate(([m_lo], m_c, [m_lo])), np.concatenate(([s_c[0]], s_c, [s_c[-1]])),
+            color=color, alpha=0.25, lw=0, zorder=zorder)
+    ax.plot(m_c, s_c, color=color, lw=1.3, zorder=zorder + 0.1)
+    # Label just inside the boundary, halfway up the part of it that is on the
+    # plot, where there is room however the curve runs.
+    vis = np.nonzero((s_c > S_LIM[0]) & (s_c < S_LIM[1]))[0]
+    mid = vis[len(vis) // 2] if len(vis) else int(np.argmax(m_c))
+    m_t, s_t, va = place_label(m_c[mid] * 0.94, s_c[mid])
+    ax.text(m_t, s_t, label, color=color, fontsize=8, ha="right", va=va,
+            zorder=zorder + 0.1)
+    return True
 
 
 def plot_dodelson_widrow(ax):
@@ -137,11 +243,14 @@ def plot_xrays(ax):
     ax.text(10**1.04, 1e-15, "eXTP", color="black")
 
 
-def plot_contours(ax, roots, debug):
+def plot_contours(ax, roots, excluded, debug):
+    """The Omega h^2 = 0.12 lines, drawn for whole decades of y only."""
     masses = np.array(sorted({k[0] for k in roots}))
     ys = np.array(sorted({k[1] for k in roots}))
-    colors = plt.cm.viridis(np.linspace(0.0, 0.85, len(ys)))
-    for i, (y, c) in enumerate(zip(ys, colors)):
+    decade_ys = np.array([y for y in ys if abs(np.log10(y) - round(np.log10(y))) < 1e-6])
+    colors = plt.cm.viridis(np.linspace(0.0, 0.85, len(decade_ys)))
+    first = [True]   # the first line that gets a label carries the "g =" prefix
+    for y, c in zip(decade_ys, colors):
         m_line = np.array([m for m in masses if (m, y) in roots])
         s_line = np.array([roots[(m, y)] for m in m_line])
         if len(m_line) == 0:
@@ -155,15 +264,38 @@ def plot_contours(ax, roots, debug):
                 lm_fine = np.linspace(lm[0], lm[-1], 200)
                 ax.plot(np.exp(lm_fine), np.exp(PchipInterpolator(lm, ls)(lm_fine)), color=c, lw=1.0, zorder=-1)
             if debug or len(seg) == 1:
-                ax.plot(m_line[seg], s_line[seg], ls="none", marker="o", ms=2.5, color=c, zorder=2)
-        # Label at the left edge, just above the start of the line, as in the paper figure.
-        ax.text(M_LIM[0] * 1.05, s_line[0] * 1.6, y_label(y, first=(i == 0)), color=c,
-                ha="left", va="bottom", zorder=-1)
+                # Open markers where a root is excluded by one of the constraints.
+                ex = np.array([excluded.get((m, y), False) for m in m_line[seg]])
+                ax.plot(m_line[seg][~ex], s_line[seg][~ex], ls="none", marker="o", ms=2.5, color=c, zorder=2)
+                ax.plot(m_line[seg][ex], s_line[seg][ex], ls="none", marker="o", ms=2.5, color=c,
+                        mfc="white", zorder=2)
+        # Label at the left edge, just above the start of the line, as in the
+        # paper figure -- but anchored to the first point that is on the plot,
+        # since the smallest couplings leave the top of the frame well to the
+        # right of m_N = 1 keV. A line that enters within the top decade has no
+        # room for a label and is left unlabelled.
+        inside = np.nonzero(s_line < S_LIM[1] / 10)[0]
+        if len(inside):
+            j = inside[0]
+            m_t, s_t, va = place_label(m_line[j] * 1.05, s_line[j] * 1.6)
+            # Above the bands: the smallest couplings only enter the frame
+            # inside the Dodelson-Widrow band, which the lines run under.
+            ax.text(m_t, s_t, y_label(y, first=first[0]), color=c,
+                    ha="left", va=va, zorder=2.5)
+            first[0] = False
+
+
+def y_label(y, first):
+    exp10 = np.log10(y)
+    exp_str = f"{exp10:.0f}" if abs(exp10 - round(exp10)) < 1e-6 else f"{exp10:.1f}"
+    return (r"$g = " if first else "$") + rf"10^{{{exp_str}}}$"
 
 
 def main():
     args = parse_args()
     roots = freeze_in_roots(load_scan(args.scan_dir))
+    lam, r_s = load_lyman_alpha(args.scan_dir)
+    sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, SI_VARIANT) for k in roots}
     out = args.out + ("_debug" if args.debug else "")
 
     set_style()
@@ -177,7 +309,14 @@ def main():
 
     plot_dodelson_widrow(ax)
     plot_xrays(ax)
-    plot_contours(ax, roots, args.debug)
+    # Both Lyman-alpha bounds are labelled by the length that sets them.
+    n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA, r"Ly-$\alpha$", 0.5)
+    plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS, r"$r_s$", 0.3)
+    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", 0.2)
+
+    excluded = {k: (lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC or r_s.get(k, 0.0) > R_S_MAX_MPC
+                    or sig_m[k] > SIGMA_M_MAX) for k in roots}
+    plot_contours(ax, roots, excluded, args.debug)
 
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -200,7 +339,9 @@ def main():
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     fig.savefig(out + ".pdf")
     print(f"wrote {out}.pdf with {len(roots)} points, "
-          f"{len({k[0] for k in roots})} masses, {len({k[1] for k in roots})} values of y")
+          f"{len({k[0] for k in roots})} masses, {len({k[1] for k in roots})} values of y, "
+          f"Lyman-alpha lengths for {sum(k in lam for k in roots)} of them"
+          + ("" if n_lya else " (no lambda_fs bound drawn)"))
 
 
 if __name__ == "__main__":

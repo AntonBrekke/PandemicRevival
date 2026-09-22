@@ -3,15 +3,18 @@
 Contours of the coupling y (= g in the paper) in the (m_N, sin^2 2theta) plane
 for which Omega h^2 = 0.12, from the scan in src/run_relic_scan_theta_z.jl
 (tmp/relic_scan_theta/m_N_*keV.csv). Styled like the money plot of the paper
-(code/sterile_res/plotter_3.py): Dodelson-Widrow band, X-ray limits and
-projections, and the contours labelled on the plot.
+(code/sterile_res/plotter_3.py): Dodelson-Widrow band, current X-ray limits,
+and the contours labelled on the plot. The X-ray region is drawn over the
+constraint bounds below, and the projected sensitivities (Athena, eROSITA,
+eXTP) are deliberately left out to keep the figure readable.
 
 Only roots on the freeze-in branch are drawn: for each (m_N, y) the smallest
 converged sin^2 2theta at which Omega h^2 rises through the target. The lines
 are monotone (PCHIP) interpolations in log-log between the scanned masses and
 are broken where no root was found for a mass in the grid. Only whole decades
-of y are drawn; a finer sub-decade grid, if scanned, still feeds the
-constraint boundaries below, which are what it is needed for.
+of y are drawn, and only those at y >= LABEL_Y_MIN are labelled; a finer
+sub-decade grid, if scanned, still feeds the constraint boundaries below,
+which are what it is needed for.
 
 Three constraints are shaded, each bounding the region of small m_N:
 
@@ -81,6 +84,16 @@ SIGMA_M_MAX = 1.0        # cm^2/g
 C_LYA = "#D95F02"
 C_RS = "#E7969C"
 C_SI = "#A300CC"
+
+# Contours below this coupling are drawn but not labelled: they only enter the
+# frame at m_N ~ 3 keV, inside the Dodelson-Widrow band, where there is no room.
+LABEL_Y_MIN = 1e-6
+
+# Drawing order, bottom to top. The constraint bounds sit below the X-ray
+# region, so that its opaque white underlay covers them, and below the
+# Omega h^2 contour lines, so those stay readable over the shading.
+Z_BOUND = {"lya": -3.5, "r_s": -3.7, "si": -3.9}
+Z_LABEL = 2.5   # all on-plot text, above every shaded region
 
 SI_VARIANT = os.environ.get("SI_VARIANT", "A6")
 LYA_VARIANT = os.environ.get("LYA_VARIANT", "A6")
@@ -199,8 +212,10 @@ def plot_bound(ax, roots, vals, limit, color, label, zorder):
     vis = np.nonzero((s_c > S_LIM[0]) & (s_c < S_LIM[1]))[0]
     mid = vis[len(vis) // 2] if len(vis) else int(np.argmax(m_c))
     m_t, s_t, va = place_label(m_c[mid] * 0.94, s_c[mid])
+    # The text is kept above everything: the shading it belongs to is drawn
+    # under the X-ray region, which would otherwise paint over the label.
     ax.text(m_t, s_t, label, color=color, fontsize=8, ha="right", va=va,
-            zorder=zorder + 0.1)
+            zorder=Z_LABEL)
     return True
 
 
@@ -233,15 +248,6 @@ def plot_xrays(ax):
     ax.plot(m, s, color="black", lw=1.3, zorder=-2)
     ax.text(10**1.45, 1e-13, "X-rays", color="black")
 
-    for name, ls in (("Athena_projection_2103.13242.dat", "-."),
-                     ("eROSITA_projection_2103.13241.dat", "--"),
-                     ("eXTP_projection_2001.07014.dat", ":")):
-        proj = np.loadtxt(os.path.join(XRAY_DIR, name), skiprows=2)
-        ax.plot(1e6 * proj[:, 0], proj[:, 1], color="black", lw=1.3, ls=ls, zorder=1)
-    ax.text(10**0.3, 10**-10.69, "eROSITA", color="black", rotation=-45)
-    ax.text(10**0.95, 10**-13.35, "Athena", color="black", rotation=-15)
-    ax.text(10**1.04, 1e-15, "eXTP", color="black")
-
 
 def plot_contours(ax, roots, excluded, debug):
     """The Omega h^2 = 0.12 lines, drawn for whole decades of y only."""
@@ -272,10 +278,11 @@ def plot_contours(ax, roots, excluded, debug):
         # Label at the left edge, just above the start of the line, as in the
         # paper figure -- but anchored to the first point that is on the plot,
         # since the smallest couplings leave the top of the frame well to the
-        # right of m_N = 1 keV. A line that enters within the top decade has no
-        # room for a label and is left unlabelled.
+        # right of m_N = 1 keV. The couplings below LABEL_Y_MIN only appear in
+        # the top-right corner, crowded against the Dodelson-Widrow band, and
+        # are left unlabelled; their lines are still drawn.
         inside = np.nonzero(s_line < S_LIM[1] / 10)[0]
-        if len(inside):
+        if len(inside) and y >= LABEL_Y_MIN * (1 - 1e-6):
             j = inside[0]
             m_t, s_t, va = place_label(m_line[j] * 1.05, s_line[j] * 1.6)
             # Above the bands: the smallest couplings only enter the frame
@@ -310,9 +317,9 @@ def main():
     plot_dodelson_widrow(ax)
     plot_xrays(ax)
     # Both Lyman-alpha bounds are labelled by the length that sets them.
-    n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA, r"Ly-$\alpha$", 0.5)
-    plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS, r"$r_s$", 0.3)
-    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", 0.2)
+    n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA, r"Ly-$\alpha$", Z_BOUND["lya"])
+    plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS, r"$r_s$", Z_BOUND["r_s"])
+    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"])
 
     excluded = {k: (lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC or r_s.get(k, 0.0) > R_S_MAX_MPC
                     or sig_m[k] > SIGMA_M_MAX) for k in roots}

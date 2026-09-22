@@ -78,12 +78,51 @@ Base.@kwdef struct ScanConfigZ
     solve_wall_limit::Float64 = Inf
 end
 
-"""As `check_plateau` in relic_scan.jl (independent variable is z here, but
-the check only ever looks at Y_n = exp.(sol[1,:]), so it's identical)."""
-function check_plateau_z(sol; frac::Float64=0.05, tol::Float64=1e-3)
+"""
+    omega_h2_of(pan, u, z)
+
+Omega h^2 implied by the solver state `u` at z (shared by `final_omega_h2_z`
+and `check_plateau_z`).
+"""
+function omega_h2_of(pan::PandemolatorZ, u, z)
+    ln_x_N_f = u[3]
+    eta_f = u[4]
+    T_N_f = T_N_from_ln_x_N(pan, ln_x_N_f)
+    xi_N_f = xi_from_eta(pan, eta_f, ln_x_N_f)
+
+    ent_f = pan.ent_interp_z(z)
+
+    y_N1_f = number_density(pan.N1, T_N_f, xi_N_f) / ent_f
+    y_N2_f = number_density(pan.N2, T_N_f, xi_N_f) / ent_f
+    y_A_f = number_density(pan.A, T_N_f, pan.fac_n_A * xi_N_f; gap=gap_A_from_eta(eta_f)) / ent_f
+
+    rho_dm0 = (pan.N1.m * y_N1_f + pan.N2.m * y_N2_f + pan.fac_n_A * pan.A.m * y_A_f) * s0
+    return rho_dm0 / rho_crit0_h2
+end
+
+"""
+    check_plateau_z(pan, sol; frac=0.05, tol=1e-3)
+
+Whether the *physical* target quantity, Omega h^2(z) (`omega_h2_of`), has
+settled over the last `frac` of the solution, to relative spread `tol`.
+
+Differs from the older Y_n-based check (`exp.(sol[1,:])`, n = n_N1 + n_N2 +
+2 n_A): right after pandemic thermalization at large y (or generally whenever
+A' is a non-negligible fraction of n right up to x = 100), Y_n and Y_rho can
+still visibly move as the N/A' split relaxes towards its late-time value,
+while the mass-weighted, physically relevant Omega h^2 is already frozen (A'
+contributes little to it once `fac_n_A * m_A * Y_A << m_N1 Y_N1`). The old
+check therefore flagged many well-converged points as not-plateaued, which
+`theta_point` then had to treat as failed solves -- see run_relic_scan's
+"no root" cases at large y. Checking the target quantity directly removes
+that false-alarm, and is at least as strict for genuine non-convergence
+(Omega h^2 cannot plateau if its ingredients, including any dominant
+component, are still evolving)."""
+function check_plateau_z(pan::PandemolatorZ, sol; frac::Float64=0.05, tol::Float64=1e-3)
     n_pts = length(sol.t)
     n_tail = min(n_pts, max(3, ceil(Int, frac * n_pts)))
-    tail = exp.(sol[1, end-n_tail+1:end])
+    idx = (n_pts - n_tail + 1):n_pts
+    tail = [omega_h2_of(pan, sol.u[i], sol.t[i]) for i in idx]
     mean_tail = sum(tail) / length(tail)
     return (maximum(tail) - minimum(tail)) / abs(mean_tail) < tol
 end
@@ -95,22 +134,7 @@ As `final_omega_h2` in relic_scan.jl, but `sol.t[end]` IS z directly (no
 inversion to T_nu needed before the interpolant lookup, since PandemolatorZ's
 interpolants are keyed on z natively).
 """
-function final_omega_h2_z(pan::PandemolatorZ, sol)
-    u_f = sol.u[end]
-    ln_x_N_f = u_f[3]
-    eta_f = u_f[4]
-    T_N_f = T_N_from_ln_x_N(pan, ln_x_N_f)
-    xi_N_f = xi_from_eta(pan, eta_f, ln_x_N_f)
-
-    ent_f = pan.ent_interp_z(sol.t[end])
-
-    y_N1_f = number_density(pan.N1, T_N_f, xi_N_f) / ent_f
-    y_N2_f = number_density(pan.N2, T_N_f, xi_N_f) / ent_f
-    y_A_f = number_density(pan.A, T_N_f, pan.fac_n_A * xi_N_f; gap=gap_A_from_eta(eta_f)) / ent_f
-
-    rho_dm0 = (pan.N1.m * y_N1_f + pan.N2.m * y_N2_f + pan.fac_n_A * pan.A.m * y_A_f) * s0
-    return rho_dm0 / rho_crit0_h2
-end
+final_omega_h2_z(pan::PandemolatorZ, sol) = omega_h2_of(pan, sol.u[end], sol.t[end])
 
 """As `solve_point` in relic_scan.jl, calling `pandemolate_z`."""
 function solve_point_z(
@@ -125,7 +149,7 @@ function solve_point_z(
     try
         sol = pandemolate_z(tT_rel, dw, pan; reltol=cfg.ode_reltol, abstol=cfg.ode_abstol)
         ok_retcode = DE.successful_retcode(sol)
-        ok_plateau = ok_retcode && check_plateau_z(sol; frac=cfg.plateau_frac, tol=cfg.plateau_tol)
+        ok_plateau = ok_retcode && check_plateau_z(pan, sol; frac=cfg.plateau_frac, tol=cfg.plateau_tol)
         omega_h2 = ok_retcode ? final_omega_h2_z(pan, sol) : NaN
         converged = ok_retcode && ok_plateau && isfinite(omega_h2) && omega_h2 > 0
         return (converged ? omega_h2 : NaN), converged, ok_plateau, Symbol(sol.retcode)

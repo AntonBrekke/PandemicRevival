@@ -1,6 +1,4 @@
 using Interpolations
-ENV["GKSwstype"] = "nul"
-import Plots as Plt
 
 """
 One-dimensional piecewise-linear interpolation with configurable constant

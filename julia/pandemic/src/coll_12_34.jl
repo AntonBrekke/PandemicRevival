@@ -1,6 +1,3 @@
-using LaTeXStrings
-ENV["GKSwstype"] = "nul"
-import Plots as Plt
 import Integrals
 
 include(joinpath(@__DIR__, "utils.jl"))

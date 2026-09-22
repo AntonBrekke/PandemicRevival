@@ -1,3 +1,6 @@
+using LaTeXStrings
+ENV["GKSwstype"] = "nul"
+import Plots as Plt
 import BenchmarkTools as BT
 
 include(joinpath(@__DIR__, "../src/coll_12_34.jl"))

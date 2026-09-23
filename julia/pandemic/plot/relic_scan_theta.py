@@ -104,11 +104,26 @@ LYA_COLUMNS = {"A6": ("lambda_fs_kd_Mpc", "r_s_Mpc"),
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("scan_dir", nargs="?", default=os.path.join(ROOT, "tmp", "relic_scan_theta"))
-    p.add_argument("out", nargs="?", default=os.path.join(ROOT, "figures", "relic_contours_y"),
-                   help="output path without extension")
-    p.add_argument("--debug", action="store_true", help="mark the scanned roots on the contour lines")
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "scan_dir",
+        nargs="?",
+        default=os.path.join(ROOT, "tmp", "relic_scan_theta")
+    )
+    p.add_argument(
+        "out",
+        nargs="?",
+        default=os.path.join(ROOT, "figures", "relic_contours_y"),
+        help="output path without extension"
+    )
+    p.add_argument(
+        "--debug",
+        action="store_true",
+        help="mark the scanned roots on the contour lines"
+    )
     return p.parse_args()
 
 
@@ -116,8 +131,13 @@ def set_style():
     plt.rc("text", usetex=True)
     plt.rc("font", family="serif")
     plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
-    plt.rcParams.update({"axes.labelsize": 10, "xtick.labelsize": 10, "ytick.labelsize": 10,
-                         "axes.titlesize": 10, "font.size": 10})
+    plt.rcParams.update({
+        "axes.labelsize": 10,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "axes.titlesize": 10,
+        "font.size": 10
+    })
 
 
 def get_figsize(columnwidth, wf=1.0, hf=(5.**0.5 - 1.0) / 2.0):
@@ -130,11 +150,28 @@ def get_figsize(columnwidth, wf=1.0, hf=(5.**0.5 - 1.0) / 2.0):
 def load_scan(scan_dir):
     rows = []
     for path in sorted(glob.glob(os.path.join(scan_dir, "m_N_*keV.csv"))):
-        data = np.genfromtxt(path, delimiter=",", names=True, dtype=None, encoding="utf-8")
+        data = np.genfromtxt(
+            path,
+            delimiter=",",
+            names=True,
+            dtype=None,
+            encoding="utf-8"
+        )
         rows.extend(np.atleast_1d(data).tolist())
     if not rows:
         raise SystemExit(f"no scan results in {scan_dir}")
-    names = ["m_N", "y", "sin2_2theta", "omega_h2", "converged", "plateau_ok", "retcode", "branch", "slope", "n_failed"]
+    names = [
+        "m_N",
+        "y",
+        "sin2_2theta",
+        "omega_h2",
+        "converged",
+        "plateau_ok",
+        "retcode",
+        "branch",
+        "slope",
+        "n_failed"
+    ]
     return {n: np.array([r[i] for r in rows]) for i, n in enumerate(names)}
 
 
@@ -154,11 +191,20 @@ def load_lyman_alpha(scan_dir):
     path = os.path.join(scan_dir, "lyman_alpha.csv")
     if not os.path.exists(path):
         return {}, {}
-    data = np.atleast_1d(np.genfromtxt(path, delimiter=",", names=True, dtype=None, encoding="utf-8"))
+    data = np.atleast_1d(np.genfromtxt(
+        path,
+        delimiter=",",
+        names=True,
+        dtype=None,
+        encoding="utf-8"
+    ))
     col_l, col_r = LYA_COLUMNS
     key = lambda r: (round(r["m_N"] * 1e6, 10), r["y"])
     lam = {key(r): r[col_l] for r in data if np.isfinite(r[col_l])}
-    r_s = {key(r): r[col_r] for r in data if np.isfinite(r[col_r])} if col_r else {}
+    if col_r:
+        r_s = {key(r): r[col_r] for r in data if np.isfinite(r[col_r])}
+    else:
+        r_s = {}
     return lam, r_s
 
 
@@ -170,7 +216,9 @@ def bound_crossings(roots, vals, limit):
     masses give their largest mass, lines that are allowed everywhere none."""
     crossings = []
     for y in sorted({k[1] for k in roots}):
-        pts = sorted((k[0], roots[k], vals[k]) for k in roots if k[1] == y and k in vals)
+        pts = sorted(
+            (k[0], roots[k], vals[k]) for k in roots if k[1] == y and k in vals
+        )
         if not pts or all(p[2] <= limit for p in pts):
             continue
         if pts[-1][2] > limit:
@@ -247,7 +295,17 @@ def gap_label_anchor(cross):
     return float(np.sqrt(m_left * m_right)), s
 
 
-def plot_bound(ax, roots, vals, limit, color, label, zorder, frac=0.5, label_at=None):
+def plot_bound(
+        ax,
+        roots,
+        vals,
+        limit,
+        color,
+        label,
+        zorder,
+        frac=0.5,
+        label_at=None
+    ):
     """Shade the region of smaller m_N than the crossings of `limit` and label
     the boundary inside the shaded side, `frac` of the way up its visible part
     (0.5 is halfway; lower it to dodge a busy part of the figure). `label_at`
@@ -259,19 +317,32 @@ def plot_bound(ax, roots, vals, limit, color, label, zorder, frac=0.5, label_at=
     s_c = np.array([c[1] for c in crossings])
     m_e, s_e = extend_boundary(m_c, s_c)
     m_lo = M_LIM[0] * 0.5   # off the left edge, so the shading is flush with it
-    ax.fill(np.concatenate(([m_lo], m_e, [m_lo])), np.concatenate(([s_e[0]], s_e, [s_e[-1]])),
-            color=color, alpha=0.25, lw=0, zorder=zorder)
+    ax.fill(
+        np.concatenate(([m_lo], m_e, [m_lo])),
+        np.concatenate(([s_e[0]], s_e, [s_e[-1]])),
+        color=color, alpha=0.25, lw=0,
+        zorder=zorder
+    )
     ax.plot(m_e, s_e, color=color, lw=1.3, zorder=zorder + 0.1)
 
     # Label offset into the excluded (left) side and below the anchor, so it
     # clears the boundary line instead of sitting on it. The text is above
     # everything, since the shading is drawn under the X-ray region.
     if label_at is not None:
-        ax.text(label_at[0], label_at[1], label, color=color,
-                fontsize=BOUND_LABEL_SIZE, ha="center", va="center", zorder=Z_LABEL)
+        ax.text(
+            label_at[0], label_at[1],
+            label,
+            color=color,
+            fontsize=BOUND_LABEL_SIZE,
+            ha="center", va="center",
+            zorder=Z_LABEL
+        )
         return True
     vis = np.nonzero((s_c > S_LIM[0]) & (s_c < S_LIM[1]))[0]
-    mid = vis[min(int(frac * len(vis)), len(vis) - 1)] if len(vis) else int(np.argmax(m_c))
+    if len(vis) == 0:
+        mid = vis[min(int(frac * len(vis)), len(vis) - 1)]
+    else:
+        mid = int(np.argmax(m_c))
     m_t = float(np.clip(m_c[mid] * 0.88, M_LIM[0] * 1.06, M_LIM[1] / 1.06))
     s_t = float(np.clip(s_c[mid] * 0.70, S_LIM[0] * 4.0, S_LIM[1] / 2.0))
     ax.text(m_t, s_t, label, color=color, fontsize=BOUND_LABEL_SIZE,
@@ -284,7 +355,10 @@ def plot_dodelson_widrow(ax):
     with the overproduction region above it."""
     def load(name, omega_ref):
         d = np.loadtxt(os.path.join(DW_DIR, name), skiprows=2)
-        return 1e6 * d[:, 0], (OMEGA_TARGET / omega_ref) * d[:, 1] * (1e-6 / d[:, 0])**2
+        return (
+            1e6 * d[:, 0],
+            (OMEGA_TARGET / omega_ref) * d[:, 1] * (1e-6 / d[:, 0])**2
+        )
 
     m_mid, s_mid = load("0612182_dw_fig_5.dat", 0.11)
     m_up, s_up = load("0612182_dw_fig_5_up.dat", 0.105)
@@ -292,12 +366,26 @@ def plot_dodelson_widrow(ax):
     ax.plot(m_mid, s_mid, color=C_DW, ls="--", zorder=1)
     ax.plot(m_low, s_low, color=C_DW, ls=":", zorder=1)
     ax.plot(m_up, s_up, color=C_DW, ls=":", zorder=1)
-    ax.fill(np.concatenate((m_low, m_up[::-1])), np.concatenate((s_low, s_up[::-1])),
-            color=C_DW_BAND, lw=0, zorder=0)
+    ax.fill(
+        np.concatenate((m_low, m_up[::-1])),
+        np.concatenate((s_low, s_up[::-1])),
+        color=C_DW_BAND,
+        lw=0,
+        zorder=0
+    )
     for m, s in ((m_low, s_low), (m_up, s_up)):
         ax.fill_between(m, s, 1.0, color=C_OVERPROD, lw=0, zorder=-1)
-    ax.text(10**1.5, 10**-10.25, "Dodelson-Widrow", color=C_DW, rotation=-22, ha="center")
-    ax.text(10**1.6, 10**-10.25, "overproduction", color=C_OVERPROD_TEXT, rotation=-24)
+    ax.text(
+        10**1.5, 10**-10.25,
+        "Dodelson-Widrow",
+        color=C_DW, rotation=-22, ha="center"
+    )
+    ax.text(
+        10**1.6, 10**-10.25,
+        "overproduction",
+        color=C_OVERPROD_TEXT,
+        rotation=-24
+    )
 
 
 def plot_xrays(ax):
@@ -313,7 +401,9 @@ def plot_contours(ax, roots, excluded, debug):
     """The Omega h^2 = 0.12 lines, drawn for whole decades of y only."""
     masses = np.array(sorted({k[0] for k in roots}))
     ys = np.array(sorted({k[1] for k in roots}))
-    decade_ys = np.array([y for y in ys if abs(np.log10(y) - round(np.log10(y))) < 1e-6])
+    decade_ys = np.array(
+        [y for y in ys if abs(np.log10(y) - round(np.log10(y))) < 1e-6]
+    )
     colors = plt.cm.viridis(np.linspace(0.0, 0.85, len(decade_ys)))
     first = [True]   # the first line that gets a label carries the "g =" prefix
     for y, c in zip(decade_ys, colors):
@@ -323,12 +413,21 @@ def plot_contours(ax, roots, excluded, debug):
             continue
         # Break the line where a mass in the grid has no root for this y.
         idx = np.searchsorted(masses, m_line)
-        segments = np.split(np.arange(len(m_line)), np.where(np.diff(idx) > 1)[0] + 1)
+        segments = np.split(
+            np.arange(len(m_line)),
+            np.where(np.diff(idx) > 1)[0] + 1
+        )
         for seg in segments:
             lm, ls = np.log(m_line[seg]), np.log(s_line[seg])
             if len(seg) > 1:
                 lm_fine = np.linspace(lm[0], lm[-1], 200)
-                ax.plot(np.exp(lm_fine), np.exp(PchipInterpolator(lm, ls)(lm_fine)), color=c, lw=1.0, zorder=-1)
+                ax.plot(
+                    np.exp(lm_fine),
+                    np.exp(PchipInterpolator(lm, ls)(lm_fine)),
+                    color=c,
+                    lw=1.0,
+                    zorder=-1
+                )
             if debug:
                 # Open markers where a root is excluded by one of the
                 # constraints. Only in --debug: a segment of a single root
@@ -339,10 +438,26 @@ def plot_contours(ax, roots, excluded, debug):
                 # grid both failed to converge, and which is excluded anyway
                 # (lambda_fs = 0.47 Mpc). Isolated roots are now visible only
                 # in --debug; the fix is to make those masses converge.
-                ex = np.array([excluded.get((m, y), False) for m in m_line[seg]])
-                ax.plot(m_line[seg][~ex], s_line[seg][~ex], ls="none", marker="o", ms=2.5, color=c, zorder=2)
-                ax.plot(m_line[seg][ex], s_line[seg][ex], ls="none", marker="o", ms=2.5, color=c,
-                        mfc="white", zorder=2)
+                ex = np.array(
+                    [excluded.get((m, y), False) for m in m_line[seg]]
+                )
+                ax.plot(
+                    m_line[seg][~ex],
+                    s_line[seg][~ex],
+                    ls="none",
+                    marker="o", ms=2.5,
+                    color=c,
+                    zorder=2
+                )
+                ax.plot(
+                    m_line[seg][ex],
+                    s_line[seg][ex],
+                    ls="none",
+                    marker="o", ms=2.5,
+                    color=c,
+                    mfc="white",
+                    zorder=2
+                )
         # Label at the left edge, just above the start of the line, as in the
         # paper figure -- but anchored to the first point that is on the plot,
         # since the smallest couplings leave the top of the frame well to the
@@ -355,17 +470,29 @@ def plot_contours(ax, roots, excluded, debug):
             # The 2.6 clears the line itself: the anchor is offset to the right
             # as well, and the contours rise with m_N, so a smaller lift left
             # the text sitting on its own curve.
-            m_t, s_t, va = place_label(m_line[j] * 1.14, s_line[j] * 2.6, m_pad=1.12)
+            m_t, s_t, va = place_label(
+                m_line[j] * 1.14,
+                s_line[j] * 2.6,
+                m_pad=1.12
+            )
             # Above the bands: the smallest couplings only enter the frame
             # inside the Dodelson-Widrow band, which the lines run under.
-            ax.text(m_t, s_t, y_label(y, first=first[0]), color=c,
-                    ha="left", va=va, zorder=Z_LABEL)
+            ax.text(
+                m_t, s_t,
+                y_label(y, first=first[0]),
+                color=c,
+                ha="left", va=va,
+                zorder=Z_LABEL
+            )
             first[0] = False
 
 
 def y_label(y, first):
     exp10 = np.log10(y)
-    exp_str = f"{exp10:.0f}" if abs(exp10 - round(exp10)) < 1e-6 else f"{exp10:.1f}"
+    if abs(exp10 - round(exp10)) < 1e-6:
+        exp_str = f"{exp10:.0f}"
+    else:
+        exp_str = f"{exp10:.1f}"
     return (r"$g = " if first else "$") + rf"10^{{{exp_str}}}$"
 
 
@@ -391,8 +518,10 @@ def main():
     # Both bounds are Lyman-alpha; the length in brackets says which one, as in
     # Bringmann et al. (2206.10630). Ly-alpha (lambda_fs) is labelled low on
     # its boundary, clear of the ragged X-ray curve.
-    n_lya = plot_bound(ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
-                       r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28)
+    n_lya = plot_bound(
+        ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
+        r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28
+    )
     # The r_s label goes in the corridor between the lambda_fs and
     # self-interaction bounds -- the only part of the figure that r_s alone
     # excludes, and the only place near its boundary with room for the text.
@@ -400,12 +529,20 @@ def main():
              for n, (v, l) in (("lya", (lam, LAMBDA_FS_MAX_MPC)),
                                ("r_s", (r_s, R_S_MAX_MPC)),
                                ("si", (sig_m, SIGMA_M_MAX)))}
-    plot_bound(ax, roots, r_s, R_S_MAX_MPC, C_RS,
-               r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], label_at=gap_label_anchor(cross))
+    plot_bound(
+        ax, roots, r_s, R_S_MAX_MPC, C_RS,
+        r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"],
+        label_at=gap_label_anchor(cross)
+    )
     plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"])
 
-    excluded = {k: (lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC or r_s.get(k, 0.0) > R_S_MAX_MPC
-                    or sig_m[k] > SIGMA_M_MAX) for k in roots}
+    excluded = {
+        k: (
+            lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC
+            or r_s.get(k, 0.0) > R_S_MAX_MPC
+            or sig_m[k] > SIGMA_M_MAX
+        ) for k in roots
+    }
     plot_contours(ax, roots, excluded, args.debug)
 
     ax.set_xscale("log")
@@ -416,14 +553,26 @@ def main():
     for axis, (lo, hi) in ((ax.xaxis, M_LIM), (ax.yaxis, S_LIM)):
         decades = np.arange(np.floor(np.log10(lo)), np.ceil(np.log10(hi)) + 1)
         axis.set_major_locator(FixedLocator(10**decades))
-        axis.set_minor_locator(FixedLocator([k * 10**d for d in decades for k in range(2, 10)]))
+        axis.set_minor_locator(
+            FixedLocator([k * 10**d for d in decades for k in range(2, 10)])
+        )
         axis.set_major_formatter(LogFormatterMathtext())
         axis.set_minor_formatter(NullFormatter())
     ax.set_xlabel(r"$m_{N_1}\;\;[\mathrm{keV}]$")
     ax.set_ylabel(r"$\sin^2 (2 \theta_1)$")
-    props = dict(boxstyle="round", facecolor="white", alpha=0.8, linewidth=1, edgecolor="0.8")
-    ax.text(0.97, 0.96, rf"$m_{{A'}} = {M_A_OVER_M_N}\,m_{{N_1}}$", transform=ax.transAxes,
-            ha="right", va="top", bbox=props)
+    props = dict(
+        boxstyle="round",
+        facecolor="white",
+        alpha=0.8,
+        linewidth=1,
+        edgecolor="0.8"
+    )
+    ax.text(
+        0.97, 0.96, 
+        rf"$m_{{A'}} = {M_A_OVER_M_N}\,m_{{N_1}}$",
+        transform=ax.transAxes,
+        ha="right", va="top", bbox=props
+    )
 
     fig.tight_layout()
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

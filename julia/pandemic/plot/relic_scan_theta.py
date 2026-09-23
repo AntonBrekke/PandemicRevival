@@ -348,7 +348,7 @@ def plot_bound(
         )
         return True
     vis = np.nonzero((s_c > S_LIM[0]) & (s_c < S_LIM[1]))[0]
-    if len(vis) == 0:
+    if len(vis):
         mid = vis[min(int(frac * len(vis)), len(vis) - 1)]
     else:
         mid = int(np.argmax(m_c))

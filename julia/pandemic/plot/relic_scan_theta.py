@@ -66,6 +66,15 @@ DW_DIR = os.path.join(ROOT, "data", "dw")
 OMEGA_TARGET = 0.12
 M_A_OVER_M_N = 2.5
 
+# The abundance the digitized Dodelson-Widrow curves of hep-ph/0612182 Fig. 5
+# were drawn for, the same for the central line and both band edges. Combining
+# data/dw/0612182_dw_fig_4.dat (C_e) with 0612182_dw_fig_5.dat through the
+# paper's Eq. (4.10), Omega h^2 = 0.11 C_e (theta m / 0.1 eV)^2, gives
+# 0.1100 +- 0.0002 over 0.1 keV to 1 MeV, which is what the .dat headers say.
+# Not the 0.105 of the paper's Eq. (4.11): that is the measured WMAP value the
+# paper compares to, not the abundance Fig. 5 is drawn at.
+OMEGA_DW_REF = 0.11
+
 COLUMNWIDTH = 418.25368  # pt, \showthe\textwidth in LaTeX, as for the paper figure
 M_LIM = (1.0, 300.0)     # keV
 S_LIM = (1e-18, 1e-8)
@@ -353,16 +362,16 @@ def plot_bound(
 def plot_dodelson_widrow(ax):
     """Band of Omega h^2 = 0.12 from DW production (fig. 5 of hep-ph/0612182),
     with the overproduction region above it."""
-    def load(name, omega_ref):
+    def load(name):
         d = np.loadtxt(os.path.join(DW_DIR, name), skiprows=2)
         return (
             1e6 * d[:, 0],
-            (OMEGA_TARGET / omega_ref) * d[:, 1] * (1e-6 / d[:, 0])**2
+            (OMEGA_TARGET / OMEGA_DW_REF) * d[:, 1] * (1e-6 / d[:, 0])**2
         )
 
-    m_mid, s_mid = load("0612182_dw_fig_5.dat", 0.11)
-    m_up, s_up = load("0612182_dw_fig_5_up.dat", 0.105)
-    m_low, s_low = load("0612182_dw_fig_5_low.dat", 0.105)
+    m_mid, s_mid = load("0612182_dw_fig_5.dat")
+    m_up, s_up = load("0612182_dw_fig_5_up.dat")
+    m_low, s_low = load("0612182_dw_fig_5_low.dat")
     ax.plot(m_mid, s_mid, color=C_DW, ls="--", zorder=1)
     ax.plot(m_low, s_low, color=C_DW, ls=":", zorder=1)
     ax.plot(m_up, s_up, color=C_DW, ls=":", zorder=1)

@@ -34,12 +34,29 @@ amplitude, agreeing with :fixed to rounding. `amp=:A6` is (A6) as printed in
 the draft, kept for comparison only: the cross section is 3/4 of :fixed at
 threshold, dips to ~0.11 of it near s = 20 m^2 and tends to 1/4 at large s.
 
+CHANNELS
+========
+`channels=:all` (default) adds N1 N2 -> N1 N2 (s-channel A' and t/u exchange;
+notes/tree_amplitudes.tex, process 2) to the momentum-exchange rate, with
+n_N1 = n_N2 as in the solver:
+    C_kd = T e^(2 xi)/(32 pi^4) ∫ ds [sigma_11/2 + sigma_12] (s - 4m^2) sqrt(s) K_1,
+i.e. Gamma_kd = C_kd/n_N1 = n_N1 <sigma v>_11->22 + n_N2 <sigma v>_12->12, with
+sigma_ij summed over all dof (the 1/2 is the identical-particle factor of
+11 -> 22). The A' propagator of the s-channel is a Breit-Wigner with the
+A' -> N1 N2 width: its pole at s = m_A'^2 lies inside the thermal integral, and
+the on-shell part (inverse decay N1 N2 -> A' and decay back) is genuine
+momentum exchange, since A' is not a separate species in this
+post-processing. `channels=:conversion` is N1 N1 -> N2 N2 alone, the rate
+used before 2026-10-03.
+
 The old code's `sigma_gen_new` returned 1e3 times the cross section (the 1e-3
 rescaling of its integrand had been commented out), so its C_kd was 1e3 times
 too large; `sigma_scale=1e3` together with `amp=:old` reproduces that.
 """
 
 include(joinpath(@__DIR__, "lyman_alpha.jl"))
+include(joinpath(@__DIR__, "tree_amplitudes.jl"))
+using .TreeAmplitudes: msq_A_N1N2, xyz_N1N2_N1N2, msq_bw
 
 # Lyman-alpha limit on the sound horizon in Mpc (code/sterile_res/plotter.py).
 const LYA_R_S_MAX_MPC = 0.34
@@ -122,6 +139,30 @@ function sigma_NN(s, m, m_A, g; amp::Symbol=:fixed)
     return val / (64 * pi * s * p2)
 end
 
+_kd_params(m, m_A, g) = (g=g, y=0.0, th0=0.0, th1=0.0, mu=0.0, m1=m, m2=m, mA=m_A, mphi=1.0, m0=1.0)
+
+"""
+    width_A(m, m_A, g)
+
+Width of A' -> N1 N2 for m_N1 = m_N2 = m (A' -> N2 nu is O(sin^2 theta_1) and
+dropped): sqrt(lambda) sum|M|^2 / (48 pi m_A^3), averaged over the 3 polarisations.
+"""
+width_A(m, m_A, g) = sqrt(m_A^2 * (m_A^2 - 4m^2)) * msq_A_N1N2(_kd_params(m, m_A, g)) / (48pi * m_A^3)
+
+"""
+    sigma_NN12(s, m, m_A, g, Gamma_A)
+
+∫ dt sum|M|^2 / (64 pi s p_cm^2) for N1 N2 -> N1 N2 with m_N1 = m_N2 = m, summed
+over all dof, Breit-Wigner A' of width Gamma_A in the s-channel.
+"""
+function sigma_NN12(s, m, m_A, g, Gamma_A)
+    p2 = s / 4 - m * m
+    p2 > 0 || return 0.0
+    p = _kd_params(m, m_A, g)
+    val = QuadGK.quadgk(t -> msq_bw(xyz_N1N2_N1N2(s, t, p), s, m_A, Gamma_A), -4 * p2, 0.0; rtol=1e-8)[1]
+    return val / (64 * pi * s * p2)
+end
+
 """
 e^x K_1(x). Asymptotic series for x > 1e4 (relative error < 1e-13), where
 the Amos routine behind `besselkx` refuses the argument.
@@ -129,22 +170,33 @@ the Amos routine behind `besselkx` refuses the argument.
 _besselk1x(x) = x < 1e4 ? SF.besselkx(1, x) : sqrt(pi / (2x)) * (1 + 3 / (8x) - 15 / (128x^2) + 315 / (3072x^3))
 
 """
-    C_kd(T, gap, m, m_A, g; amp=:fixed, sigma_scale=1.0)
+    C_kd(T, gap, m, m_A, g; amp=:fixed, sigma_scale=1.0, channels=:all)
 
-Momentum-exchange rate density of the old code (see the header), at dark
-temperature T and gap = (m - mu)/T. Integrated in w = (sqrt(s) - 2m)/T, with
-e^(2 xi) K_1(sqrt(s)/T) = e^(-w - 2 gap) besselkx(1, sqrt(s)/T).
+Momentum-exchange rate density at dark temperature T and gap = (m - mu)/T
+(see CHANNELS in the header). Integrated in w = (sqrt(s) - 2m)/T, with
+e^(2 xi) K_1(sqrt(s)/T) = e^(-w - 2 gap) besselkx(1, sqrt(s)/T); for
+`channels=:all` with breakpoints around the A' pole, w = (m_A - 2m)/T, on the
+scale of its width.
 """
-function C_kd(T, gap, m, m_A, g; amp::Symbol=:fixed, sigma_scale=1.0)
+function C_kd(T, gap, m, m_A, g; amp::Symbol=:fixed, sigma_scale=1.0, channels::Symbol=:all)
+    channels in (:all, :conversion) || error("unknown channels $channels")
+    Gamma_A = channels === :all ? width_A(m, m_A, g) : 0.0
+    sig(s) = sigma_NN(s, m, m_A, g; amp=amp) / 2 +
+             (channels === :all ? sigma_NN12(s, m, m_A, g, Gamma_A) : 0.0)
     integrand(w) = begin
         rs = 2 * m + w * T
         s = rs * rs
         # ds = 2 sqrt(s) T dw
-        2 * rs * T * sigma_NN(s, m, m_A, g; amp=amp) * (s - 4 * m * m) * rs *
-            _besselk1x(rs / T) * exp(-w)
+        2 * rs * T * sig(s) * (s - 4 * m * m) * rs * _besselk1x(rs / T) * exp(-w)
     end
-    val = QuadGK.quadgk(integrand, 0.0, 1.0, 5.0, 20.0, 80.0; rtol=1e-6)[1]
-    return sigma_scale * 2 / 4 * T / (32 * pi^4) * exp(-2 * gap) * val
+    pts = [0.0, 1.0, 5.0, 20.0, 80.0]
+    if channels === :all
+        w_res, dw = (m_A - 2m) / T, Gamma_A / (2T)
+        append!(pts, filter(>(0), w_res .+ dw .* (-1e4, -1e2, -10.0, -1.0, 0.0, 1.0, 10.0, 1e2, 1e4)))
+        sort!(unique!(pts))
+    end
+    val = QuadGK.quadgk(integrand, pts...; rtol=1e-6)[1]
+    return sigma_scale * T / (32 * pi^4) * exp(-2 * gap) * val
 end
 
 """
@@ -175,10 +227,10 @@ function temp_gap(h::DarkHistory, z)
 end
 
 """Gamma_kd / (crit H) with Gamma_kd = C_kd / n_N1, at z."""
-function kd_ratio(h::DarkHistory, z; crit=1.0, amp::Symbol=:fixed, sigma_scale=1.0)
+function kd_ratio(h::DarkHistory, z; crit=1.0, amp::Symbol=:fixed, sigma_scale=1.0, channels::Symbol=:all)
     pan = h.pan
     T, gap = temp_gap(h, z)
-    C = C_kd(T, gap, pan.N1.m, pan.A.m, pan.mp.y; amp=amp, sigma_scale=sigma_scale)
+    C = C_kd(T, gap, pan.N1.m, pan.A.m, pan.mp.y; amp=amp, sigma_scale=sigma_scale, channels=channels)
     return C / (crit * pan.H_interp_z(z) * number_density(pan.N1, T, 0.0; gap=gap))
 end
 
@@ -267,7 +319,7 @@ function sound_horizon(h::DarkHistory, z_hi; n_grid=2000)
 end
 
 """
-    lyman_alpha_lengths(pan, tT_rel, sol; amp=:fixed, sigma_scale=1.0, z_red_end=LYA_Z_RED_END)
+    lyman_alpha_lengths(pan, tT_rel, sol; amp=:fixed, sigma_scale=1.0, channels=:all, z_red_end=LYA_Z_RED_END)
 
 Lyman-alpha lengths of the old code for the solved point `sol`, for kinetic
 decoupling at Gamma_kd = H (and, with suffix 3, = 3H). NamedTuple with, in Mpc,
@@ -277,14 +329,14 @@ code), and `x_kd` = m_N/T_nu at decoupling (Inf if the dark sector is still
 coupled at the end of the time grid).
 """
 function lyman_alpha_lengths(pan::PandemolatorZ, tT_rel::TimeTempRelation, sol;
-        amp::Symbol=:fixed, sigma_scale=1.0, z_red_end=LYA_Z_RED_END)
+        amp::Symbol=:fixed, sigma_scale=1.0, channels::Symbol=:all, z_red_end=LYA_Z_RED_END)
     h = DarkHistory(pan, sol)
     m = pan.N1.m
     z_lo = max(log(m / (0.1 * pan.A.m)), sol.t[1])
     z_hi = log(m / tT_rel.T_nu_grid[end])
     z_end = z_at_redshift(m, tT_rel, z_red_end)
     res = map((1.0, 3.0)) do crit
-        z_kd = find_kd(h, z_lo, z_hi; crit=crit, amp=amp, sigma_scale=sigma_scale)
+        z_kd = find_kd(h, z_lo, z_hi; crit=crit, amp=amp, sigma_scale=sigma_scale, channels=channels)
         lam = 0.0
         if z_kd < z_end
             T_kd, gap_kd = temp_gap(h, z_kd)
@@ -296,4 +348,69 @@ function lyman_alpha_lengths(pan::PandemolatorZ, tT_rel::TimeTempRelation, sol;
     end
     return (x_kd=res[1].x_kd, lambda_fs=res[1].lambda_fs, r_s=res[1].r_s,
             x_kd3=res[2].x_kd, lambda_fs3=res[2].lambda_fs, r_s3=res[2].r_s)
+end
+
+# --------------------------------------------------------------------------
+# N2/N1 after N1 N1 <-> N2 N2 freeze-out, with the mass splitting the solver
+# ignores (draft, Eqs. (Nratio)-(finalNratio))
+
+"""m_nu used for the N1-N2 splitting delta_m = sin^2(theta_1) m_N/m_nu (BP1 value)."""
+const M_NU_SPLIT = 1e-10   # GeV
+
+"""
+    n2_fraction(h, delta; z_hi)
+
+N2/(N1 + N2) from N1 N1 <-> N2 N2 with m_N2 = (1 + delta) m_N1, integrated from
+the start of the solution to z_hi:
+    d f2/dt = n [(1 - f2)^2 <sigma v>_11->22 - f2^2 <sigma v>_22->11],
+n = n_N1 + n_N2 (the solver's, then conserved, ∝ a^-3), T_N from the solution
+and then ∝ a^-2. Non-relativistic cross sections (draft, eq. NNconversionNR):
+sigma_22->11 v = sigma_0 sqrt(v^2 + 8 delta), sigma_0 = g^4 m^2/(8 pi m_A^4), with
+v the relative velocity, Maxwell-Boltzmann averaged at T_N (reduced mass m/2);
+<sigma v>_11->22 = e^(-2 delta m/T) <sigma v>_22->11 (detailed balance), so that
+f2/(1 - f2) -> e^(-delta m/T) in equilibrium. Integrated in the log-odds
+ell = log(f2/(1 - f2)), starting in equilibrium; implicit (the rate is >> H early).
+
+Returns (f2, x_d_fo, delta_x_d_fo, delta_x_d_end): the final fraction; m/T_N
+and delta m/T_N where n <sigma v>_22->11 drops below H (Inf if never, NaN if
+it never exceeds H); and
+delta m/T_N at the end of the solution (x = 100), where m_N1 = m_N2 stops
+being assumed.
+"""
+function n2_fraction(h::DarkHistory, delta; z_hi)
+    pan = h.pan
+    m, m_A, g = pan.N1.m, pan.A.m, pan.mp.y
+    sigma0 = g^4 * m^2 / (8pi * m_A^4)
+    n_end = 2 * number_density(pan.N1, h.T_f, 0.0; gap=h.gap_f)
+    function n_T(z)
+        T, gap = temp_gap(h, z)
+        n = z <= h.z_f ? 2 * number_density(pan.N1, T, 0.0; gap=gap) :
+            n_end * (h.a_f / scale_factor_z(pan, z))^3
+        return n, T
+    end
+    # <sqrt(v^2 + 8 delta)> over the relative-velocity Maxwellian, y = v sqrt(m/(4T))
+    function sv22(T)
+        c = 4T / m
+        val = QuadGK.quadgk(y -> y^2 * exp(-y^2) * sqrt(c * y^2 + 8delta), 0.0, Inf; rtol=1e-8)[1]
+        return sigma0 * 4 / sqrt(pi) * val
+    end
+    function rhs(ell, _, z)
+        n, T = n_T(z)
+        s22 = sv22(T)
+        s11 = exp(-2 * delta * m / T) * s22
+        f2 = 1 / (1 + exp(-ell))
+        df2 = dt_dz(pan, z) * n * ((1 - f2)^2 * s11 - f2^2 * s22)
+        return df2 / (f2 * (1 - f2))
+    end
+    z0 = h.sol.t[1]
+    _, T0 = n_T(z0)
+    prob = DE.ODEProblem(rhs, -delta * m / T0, (z0, z_hi))
+    sol = DE.solve(prob, ODER.Rodas4P(autodiff=AutoFiniteDiff()); reltol=1e-7, abstol=1e-9)
+    f2 = 1 / (1 + exp(-sol.u[end]))
+    # freeze-out: last z at which n <sigma v>_22->11 > H, on a grid
+    zs = range(z0, z_hi, length=400)
+    ratio = [(nT = n_T(z); nT[1] * sv22(nT[2]) / pan.H_interp_z(z)) for z in zs]
+    i = findlast(>(1), ratio)
+    x_d_fo = i === nothing ? NaN : (i == length(zs) ? Inf : m / n_T(zs[i])[2])
+    return (f2=f2, x_d_fo=x_d_fo, delta_x_d_fo=delta * x_d_fo, delta_x_d_end=delta * m / h.T_f)
 end

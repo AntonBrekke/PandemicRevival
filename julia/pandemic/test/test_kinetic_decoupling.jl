@@ -39,9 +39,25 @@ end
            (1.0000000000000001e-07, 20.0, 1.6922053549806285e-50),
            (3.3333333333333334e-09, 20.0, 1.0673413519199331e-55)]
     for (T, gap, py) in ref
-        @test isapprox(C_kd(T, gap, M, MA, G; amp=:old, sigma_scale=1e3), py; rtol=1e-6)
+        @test isapprox(C_kd(T, gap, M, MA, G; amp=:old, sigma_scale=1e3, channels=:conversion), py; rtol=1e-6)
     end
     # asymptotic e^x K_1(x) beyond the Amos limit
     @test isapprox(_besselk1x(1e4 - 1), SF.besselkx(1, 1e4 - 1); rtol=1e-12)
     @test isfinite(C_kd(1e-16, 20.0, M, MA, G))
+end
+
+@testset "C_kd with N1 N2 -> N1 N2" begin
+    # far below the A' pole (T << m_A - 2m) the extra channel is off-shell
+    # scattering. sigma_NN has no identical-particle 1/2, so at threshold
+    # sigma_12/sigma_NN = 64.963/2 (notes/tree_amplitudes.tex, m_A = 2.5 m), and
+    # C_kd(:all)/C_kd(:conversion) = (sigma_NN/2 + sigma_12)/(sigma_NN/2) -> 1 + 2 * 32.48
+    # (up to O(T/m) velocity dependence: 2e-3 at T = 1e-3 m)
+    T, gap = 1e-3 * M, 15.0
+    r = C_kd(T, gap, M, MA, G) / C_kd(T, gap, M, MA, G; channels=:conversion)
+    s = 4M^2 * (1 + 1e-10)
+    ratio12 = sigma_NN12(s, M, MA, G, width_A(M, MA, G)) / sigma_NN(s, M, MA, G)
+    @test isapprox(ratio12, 64.963 / 2; rtol=1e-3)
+    @test isapprox(r, 1 + 2 * ratio12; rtol=5e-3)
+    # near the pole the on-shell part (inverse decay and decay) dominates
+    @test C_kd(0.3M, gap, M, MA, G) / C_kd(0.3M, gap, M, MA, G; channels=:conversion) > 1 + 2 * ratio12
 end

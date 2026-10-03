@@ -23,7 +23,9 @@ Three constraints are shaded, each bounding the region of small m_N:
               WDM limits as in Bringmann et al. (2206.10630). Needs
               <scan_dir>/lyman_alpha.csv from src/run_lyman_alpha.jl; without
               it the two are silently skipped.
-  self-int.   sigma/m > 1 cm^2/g from the corrected (A6), see
+  self-int.   sigma/m > 1 cm^2/g for the N1/N2 mixture of each point (N2
+              fraction and splitting from lyman_alpha.csv), with
+              N1N1 -> N2N2, N2N2 -> N1N1 and N1N2 -> N1N2; see
               plot/self_interaction.py.
 
 On every line of constant y the crossing of each limit is interpolated (in
@@ -33,8 +35,10 @@ interpolation is exact, since sigma/m ~ m^-3 at fixed y and m_A'/m_N.
 Environment: LYA_VARIANT=A6 plots the lengths with (A6) as printed in the
 draft, LYA_VARIANT=old as the old Python code computed them (its amplitude and
 its stray factor 1e3), LYA_VARIANT=nokd the free-streaming length without
-kinetic decoupling; SI_VARIANT=A6 and SI_VARIANT=old the self-interaction
-cross section from (A6) as printed and of plotter_3.py.
+kinetic decoupling, LYA_VARIANT=conv kinetic decoupling with N1N1 -> N2N2
+alone (as before 2026-10-03); SI_VARIANT=fixed pure N1N1 -> N2N2 (as before
+2026-10-03), SI_VARIANT=A6 and SI_VARIANT=old the self-interaction cross
+section from (A6) as printed and of plotter_3.py.
 
 Run from julia/pandemic:
     conda run -n pandemic python plot/relic_scan_theta.py [scan_dir] [output_path_without_extension] [--debug]
@@ -106,9 +110,10 @@ LABEL_Y_MIN = 1e-6
 Z_BOUND = {"lya": -3.5, "r_s": -3.7, "si": -3.9}
 Z_LABEL = 2.5   # all on-plot text, above every shaded region
 
-SI_VARIANT = os.environ.get("SI_VARIANT", "fixed")
+SI_VARIANT = os.environ.get("SI_VARIANT", "mix")
 LYA_VARIANT = os.environ.get("LYA_VARIANT", "fixed")
 LYA_COLUMNS = {"fixed": ("lambda_fs_kd_Mpc", "r_s_Mpc"),
+               "conv": ("lambda_fs_kd_conv_Mpc", "r_s_conv_Mpc"),
                "A6": ("lambda_fs_kd_A6_Mpc", "r_s_A6_Mpc"),
                "old": ("lambda_fs_kd_old_Mpc", "r_s_old_Mpc"),
                "nokd": ("lambda_fs_Mpc", None)}[LYA_VARIANT]
@@ -217,6 +222,15 @@ def load_lyman_alpha(scan_dir):
     else:
         r_s = {}
     return lam, r_s
+
+
+def load_mixture(scan_dir):
+    """(m_N [keV], y) -> (f_N2, delta_m) from lyman_alpha.csv, for SI_VARIANT=mix."""
+    data = np.atleast_1d(np.genfromtxt(os.path.join(scan_dir, "lyman_alpha.csv"), delimiter=",",
+                                       names=True, dtype=None, encoding="utf-8"))
+    key = lambda r: (round(r["m_N"] * 1e6, 10), r["y"])
+    return {key(r): (r["f_N2"], r["delta_m"]) for r in data
+            if np.isfinite(r["f_N2"]) and np.isfinite(r["delta_m"])}
 
 
 def bound_crossings(roots, vals, limit):
@@ -473,7 +487,12 @@ def main():
     args = parse_args()
     roots = freeze_in_roots(load_scan(args.scan_dir))
     lam, r_s = load_lyman_alpha(args.scan_dir)
-    sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, SI_VARIANT) for k in roots}
+    if SI_VARIANT == "mix":
+        mix = load_mixture(args.scan_dir)
+        sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, "mix", f2=mix[k][0], delta=mix[k][1])
+                 for k in roots if k in mix}
+    else:
+        sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, SI_VARIANT) for k in roots}
     out = args.out + ("_debug" if args.debug else "")
 
     set_style()
@@ -495,20 +514,20 @@ def main():
         ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
         r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28
     )
-    # The r_s label sits below the self-interaction line, the only part of
-    # its boundary with room for the text: the corridor that r_s alone
-    # excludes, above that line, is narrower than the label.
+    # The r_s label sits on the upper part of its boundary, above the
+    # lambda_fs line. Both label positions depend on the data: recheck them
+    # (and those of Ly-alpha (lambda_fs) and self-int.) when the bounds move.
     plot_bound(
         ax, roots, r_s, R_S_MAX_MPC, C_RS,
-        r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.3
+        r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.45
     )
-    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"], frac=0.25)
+    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"], frac=0.55)
 
     excluded = {
         k: (
             lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC
             or r_s.get(k, 0.0) > R_S_MAX_MPC
-            or sig_m[k] > SIGMA_M_MAX
+            or sig_m.get(k, 0.0) > SIGMA_M_MAX
         ) for k in roots
     }
     plot_contours(ax, roots, excluded, args.debug)

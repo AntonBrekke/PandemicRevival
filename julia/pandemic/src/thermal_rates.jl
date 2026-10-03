@@ -38,7 +38,9 @@ integrated as X |D|^2 + 2 Y Re D + Z (tree_amplitudes.jl), with the narrow
 Breit-Wigner either in full (`propagator=:bw`: the on-shell part, i.e. inverse
 decay and decay of the resonance, included) or real-intermediate-state
 subtracted (`propagator=:ris`: |D|^2 -> ((s-M^2)^2 - M^2 Gamma^2)/((s-M^2)^2 + M^2 Gamma^2)^2,
-the off-shell remainder, to be added to the 1 -> 2 rates).
+the off-shell remainder, to be added to the 1 -> 2 rates; the pole is
+subtracted analytically, but this is slow at high temperature), or without the
+s-channel at all (`propagator=:nonres`: Z only, the t/u-channel part).
 """
 
 import QuadGK
@@ -162,10 +164,20 @@ function sigma_parts(q, s, p)
     # t- and u-channel peaks sit at the two ends of [tlo, thi], with widths ~ m^2:
     # geometric breakpoints towards both ends, or QuadGK misses one at s >> m^2
     pts = _t_breakpoints(tlo, thi, p)
+    # Far above threshold the amplitudes with external A' cancel like
+    # (s/m_A^2)^2 between diagrams (gauge cancellation), beyond double
+    # precision: evaluate them in 256-bit BigFloat there.
+    hp = s > 1e3 * max((m1 + m2)^2, (m3 + m4)^2)
+    pb = hp ? map(x -> BigFloat(x; precision=256), p) : p
+    ev(f) = hp ? (t -> Float64.(f(BigFloat(s; precision=256), BigFloat(t; precision=256), pb))) :
+                 (t -> f(s, t, p))
+    kw = (rtol=1e-6, maxevals=10^5)
     if q.xyz === nothing
-        return (0.0, 0.0, c * QuadGK.quadgk(t -> q.msq(s, t, p), pts...; rtol=1e-8)[1])
+        g = ev(q.msq)
+        return (0.0, 0.0, c * QuadGK.quadgk(g, pts...; kw...)[1])
     end
-    v = QuadGK.quadgk(t -> collect(q.xyz(s, t, p)), pts...; rtol=1e-8)[1]
+    g = ev(q.xyz)
+    v = QuadGK.quadgk(t -> collect(g(t)), pts...; kw...)[1]
     return (c * v[1], c * v[2], c * v[3])
 end
 
@@ -189,7 +201,7 @@ function sigma_eval(tab::SigmaTable, s, propagator)
     s <= tab.s_th && return 0.0
     u = log(s - tab.s_th)
     X, Y, Z = tab.interp[1](u), tab.interp[2](u), tab.interp[3](u)
-    tab.M == 0 && return Z
+    (tab.M == 0 || propagator === :nonres) && return Z
     d = s - tab.M^2
     MG2 = (tab.M * tab.Gamma)^2
     D2 = propagator === :bw ? 1 / (d^2 + MG2) : (d^2 - MG2) / (d^2 + MG2)^2
@@ -247,23 +259,41 @@ function rate_density_scaled(tab::SigmaTable, a::Species, b::Species; propagator
     s_lo = max(tab.s_th, (a.m + b.m)^2)
     rs_lo = sqrt(s_lo)
     Tm = max(a.T, b.T)
-    integrand(q) = begin
-        rs = rs_lo + q
-        s = rs^2
-        # ds = 2 sqrt(s) dq
-        2rs * sigma_eval(tab, s, propagator) * sqrt(max(kallen(s, a.m^2, b.m^2), 0.0)) / 2 * W_scaled(s, a, b)
-    end
-    pts = Float64[0.0, Tm, 5Tm, 20Tm, 80Tm, 250Tm]
-    if tab.pole_in_range && tab.M > rs_lo
-        qr, dq = tab.M - rs_lo, tab.Gamma / 2
-        append!(pts, filter(>(0), qr .+ dq .* (-1e5, -1e3, -30.0, -3.0, -1.0, 0.0, 1.0, 3.0, 30.0, 1e3, 1e5)))
-    end
+    flux(s) = sqrt(max(kallen(s, a.m^2, b.m^2), 0.0)) / 2
+    # integrand per ds, and per dq with q = sqrt(s) - sqrt(s_lo) (ds = 2 sqrt(s) dq)
+    G(s) = sigma_eval(tab, s, propagator) * flux(s) * W_scaled(s, a, b)
+    Gq(q) = (rs = rs_lo + q; 2rs * G(rs^2))
     q_max = sqrt(tab.s_max) - rs_lo
-    pts = sort!(unique!(filter(x -> x <= q_max, pts)))
-    pts[end] < q_max && push!(pts, q_max)
-    # rtol 1e-4: the tabulated sigma is linear between nodes, and its kinks make a
-    # tighter tolerance expensive for no gain (rates are compared with H)
-    return QuadGK.quadgk(integrand, pts...; rtol=rtol)[1] / (16pi^4)
+    function q_integral(q_lo, q_hi)
+        q_hi > q_lo || return 0.0
+        pts = Float64[q_lo; filter(x -> q_lo < x < q_hi, [Tm, 5Tm, 20Tm, 80Tm, 250Tm]); q_hi]
+        return QuadGK.quadgk(Gq, pts...; rtol=rtol)[1]
+    end
+    s0 = tab.M^2
+    if propagator === :nonres || !(tab.pole_in_range && s0 > s_lo)
+        return q_integral(0.0, q_max) / (16pi^4)
+    end
+    aw = tab.M * tab.Gamma
+    if propagator === :bw
+        # positive Lorentzian: breakpoints on the width scale suffice
+        qr, dq = tab.M - rs_lo, tab.Gamma / 2
+        pts = sort!(unique!(filter(x -> 0 <= x <= q_max,
+              [0.0, Tm, 5Tm, 20Tm, 80Tm, 250Tm, q_max, (qr .+ dq .* (-1e5, -1e3, -30.0, -3.0, -1.0, 0.0, 1.0, 3.0, 30.0, 1e3, 1e5))...])))
+        return QuadGK.quadgk(Gq, pts...; rtol=rtol)[1] / (16pi^4)
+    end
+    # RIS: subtract the singular part analytically in a window |s - s0| < L.
+    # With h = X F W (the coefficient of |D|^2) and the even kernel R(d) =
+    # (d^2 - aw^2)/(d^2 + aw^2)^2, pair s0 ± d: G(s0+d) + G(s0-d) - 2 h(s0) R(d) is
+    # smooth (the Re D part is odd and cancels to O(d)), and ∫_0^L R = -L/(L^2 + aw^2).
+    L = min(s0 - s_lo, 0.5 * s0)
+    h0 = tab.interp[1](log(s0 - tab.s_th)) * flux(s0) * W_scaled(s0, a, b)
+    R(d) = (d^2 - aw^2) / (d^2 + aw^2)^2
+    sym(d) = G(s0 + d) + G(s0 - d) - 2h0 * R(d)
+    dpts = Float64[0.0; filter(x -> x < L, aw .* 10.0 .^ (0:2:30)); L]
+    J = QuadGK.quadgk(sym, dpts...; rtol=rtol, atol=0.0)[1] + 2h0 * (-L / (L^2 + aw^2))
+    below = q_integral(0.0, sqrt(s0 - L) - rs_lo)
+    above = q_integral(sqrt(s0 + L) - rs_lo, q_max)
+    return (below + J + above) / (16pi^4)
 end
 
 """

@@ -6,8 +6,9 @@ freeze-in root in <scan>/m_N_*keV.csv, re-solve once at the root and compute
 the Lyman-alpha lengths of N: the free-streaming length without kinetic
 decoupling (src/lyman_alpha.jl), and kinetic decoupling with the free-streaming
 length after it and the sound horizon before it (src/kinetic_decoupling.jl),
-with the (A6) amplitude and, for comparison, as the old code computed them
-(its amplitude and its factor 1e3). The Lyman-alpha
+with the corrected (A6) amplitude and, for comparison, with (A6) as printed
+in the draft and as the old code computed them (its amplitude and its factor
+1e3). The Lyman-alpha
 quantities are thus computed once per relic point, not in every solve of the
 root search.
 
@@ -18,10 +19,11 @@ Output: <out> (default <scan>/lyman_alpha.csv), rewritten after every point, wit
     m_N,y,sin2_2theta,omega_h2_scan,omega_h2,converged,retcode,
     lambda_fs_Mpc,lambda_fs_eq_Mpc,lambda_fs_free_Mpc,v_end,
     x_kd,lambda_fs_kd_Mpc,r_s_Mpc,x_kd3,lambda_fs_kd3_Mpc,r_s3_Mpc,
-    x_kd_old,lambda_fs_kd_old_Mpc,r_s_old_Mpc
+    x_kd_old,lambda_fs_kd_old_Mpc,r_s_old_Mpc,x_kd_A6,lambda_fs_kd_A6_Mpc,r_s_A6_Mpc
 lambda_fs_* without "kd": no kinetic decoupling (`free_streaming_length`);
-x_kd, lambda_fs_kd, r_s: `lyman_alpha_lengths` with (A6) at Gamma_kd = H, "3"
-at 3H; "_old": old amplitude with the old code's factor 1e3, at H. Points
+x_kd, lambda_fs_kd, r_s: `lyman_alpha_lengths` with the corrected (A6)
+(`amp=:fixed`) at Gamma_kd = H, "3" at 3H; "_old": old amplitude with the old
+code's factor 1e3, at H; "_A6": (A6) as printed, at H. Points
 already in <out> with a finite lambda_fs_kd are skipped, so an interrupted run
 can be resumed (a file with another header is recomputed).
 
@@ -41,7 +43,8 @@ Usage: julia --project=. src/run_lyman_alpha.jl [options]
 """
 
 const HEADER = "m_N,y,sin2_2theta,omega_h2_scan,omega_h2,converged,retcode,lambda_fs_Mpc,lambda_fs_eq_Mpc,lambda_fs_free_Mpc,v_end," *
-               "x_kd,lambda_fs_kd_Mpc,r_s_Mpc,x_kd3,lambda_fs_kd3_Mpc,r_s3_Mpc,x_kd_old,lambda_fs_kd_old_Mpc,r_s_old_Mpc"
+               "x_kd,lambda_fs_kd_Mpc,r_s_Mpc,x_kd3,lambda_fs_kd3_Mpc,r_s3_Mpc,x_kd_old,lambda_fs_kd_old_Mpc,r_s_old_Mpc," *
+               "x_kd_A6,lambda_fs_kd_A6_Mpc,r_s_A6_Mpc"
 const N_COLS = length(split(HEADER, ","))
 const COL_LAMBDA_KD = findfirst(==("lambda_fs_kd_Mpc"), split(HEADER, ","))
 
@@ -159,12 +162,13 @@ const CODE = joinpath(@__DIR__, "kinetic_decoupling.jl")
         sol, omega, converged, retcode = solve_relic_point(pan, _TT_REL[], y, theta; reltol=reltol)
         fs = (lambda_fs=NaN, lambda_fs_eq=NaN, lambda_fs_free=NaN, v_end=NaN)
         nan6 = (x_kd=NaN, lambda_fs=NaN, r_s=NaN, x_kd3=NaN, lambda_fs3=NaN, r_s3=NaN)
-        kd, kd_old = nan6, nan6
+        kd, kd_old, kd_A6 = nan6, nan6, nan6
         if sol !== nothing
             try
                 fs = free_streaming_length(pan, _TT_REL[], sol)
                 kd = lyman_alpha_lengths(pan, _TT_REL[], sol)
                 kd_old = lyman_alpha_lengths(pan, _TT_REL[], sol; amp=:old, sigma_scale=1e3)
+                kd_A6 = lyman_alpha_lengths(pan, _TT_REL[], sol; amp=:A6)
             catch e
                 @warn "Lyman-alpha lengths failed at m_N=$m_N, y=$y" exception = (e, catch_backtrace())
             end
@@ -172,7 +176,8 @@ const CODE = joinpath(@__DIR__, "kinetic_decoupling.jl")
         return "$m_N,$y,$s,$omega_scan,$omega,$converged,$retcode," *
                "$(fs.lambda_fs),$(fs.lambda_fs_eq),$(fs.lambda_fs_free),$(fs.v_end)," *
                "$(kd.x_kd),$(kd.lambda_fs),$(kd.r_s),$(kd.x_kd3),$(kd.lambda_fs3),$(kd.r_s3)," *
-               "$(kd_old.x_kd),$(kd_old.lambda_fs),$(kd_old.r_s)"
+               "$(kd_old.x_kd),$(kd_old.lambda_fs),$(kd_old.r_s)," *
+               "$(kd_A6.x_kd),$(kd_A6.lambda_fs),$(kd_A6.r_s)"
     end
 end
 

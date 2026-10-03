@@ -23,17 +23,18 @@ Three constraints are shaded, each bounding the region of small m_N:
               WDM limits as in Bringmann et al. (2206.10630). Needs
               <scan_dir>/lyman_alpha.csv from src/run_lyman_alpha.jl; without
               it the two are silently skipped.
-  self-int.   sigma/m > 1 cm^2/g from the draft's (A6), see
+  self-int.   sigma/m > 1 cm^2/g from the corrected (A6), see
               plot/self_interaction.py.
 
 On every line of constant y the crossing of each limit is interpolated (in
 log) between neighbouring roots and the crossings are joined. For sigma/m the
 interpolation is exact, since sigma/m ~ m^-3 at fixed y and m_A'/m_N.
 
-Environment: LYA_VARIANT=old plots the lengths as the old Python code computed
-them (its amplitude and its stray factor 1e3), LYA_VARIANT=nokd the
-free-streaming length without kinetic decoupling; SI_VARIANT=old the
-self-interaction cross section of plotter_3.py.
+Environment: LYA_VARIANT=A6 plots the lengths with (A6) as printed in the
+draft, LYA_VARIANT=old as the old Python code computed them (its amplitude and
+its stray factor 1e3), LYA_VARIANT=nokd the free-streaming length without
+kinetic decoupling; SI_VARIANT=A6 and SI_VARIANT=old the self-interaction
+cross section from (A6) as printed and of plotter_3.py.
 
 Run from julia/pandemic:
     conda run -n pandemic python plot/relic_scan_theta.py [scan_dir] [output_path_without_extension] [--debug]
@@ -105,9 +106,10 @@ LABEL_Y_MIN = 1e-6
 Z_BOUND = {"lya": -3.5, "r_s": -3.7, "si": -3.9}
 Z_LABEL = 2.5   # all on-plot text, above every shaded region
 
-SI_VARIANT = os.environ.get("SI_VARIANT", "A6")
-LYA_VARIANT = os.environ.get("LYA_VARIANT", "A6")
-LYA_COLUMNS = {"A6": ("lambda_fs_kd_Mpc", "r_s_Mpc"),
+SI_VARIANT = os.environ.get("SI_VARIANT", "fixed")
+LYA_VARIANT = os.environ.get("LYA_VARIANT", "fixed")
+LYA_COLUMNS = {"fixed": ("lambda_fs_kd_Mpc", "r_s_Mpc"),
+               "A6": ("lambda_fs_kd_A6_Mpc", "r_s_A6_Mpc"),
                "old": ("lambda_fs_kd_old_Mpc", "r_s_old_Mpc"),
                "nokd": ("lambda_fs_Mpc", None)}[LYA_VARIANT]
 
@@ -278,32 +280,6 @@ def extend_boundary(m_c, s_c):
             np.concatenate(([lo[1]], s_c, [hi[1]])))
 
 
-def m_at(crossings, s):
-    """m_N on a boundary at height s, by log interpolation of its crossings.
-    NaN outside the range of sin^2 2theta that they span."""
-    ls = np.log([c[1] for c in crossings])
-    lm = np.log([c[0] for c in crossings])
-    if not ls[0] <= np.log(s) <= ls[-1]:
-        return np.nan
-    return float(np.exp(np.interp(np.log(s), ls, lm)))
-
-
-def gap_label_anchor(cross):
-    """Middle of the corridor that only the sound horizon excludes, taken at
-    the height where the self-interaction bound gives out -- which is where
-    that corridor is widest, since below it the self-interaction region
-    overtakes the r_s one and above it the lambda_fs region does. Returns
-    (m_N, sin^2 2theta), or None if there is no such corridor."""
-    if not (cross["r_s"] and cross["si"]):
-        return None
-    m_si, s = cross["si"][-1]           # top end of the self-interaction bound
-    m_left = np.nanmax([m_at(cross["lya"], s), m_si]) if cross["lya"] else m_si
-    m_right = m_at(cross["r_s"], s)
-    if not (np.isfinite(m_left) and np.isfinite(m_right) and m_right > m_left):
-        return None
-    return float(np.sqrt(m_left * m_right)), s
-
-
 def plot_bound(
         ax,
         roots,
@@ -312,13 +288,11 @@ def plot_bound(
         color,
         label,
         zorder,
-        frac=0.5,
-        label_at=None
+        frac=0.5
     ):
     """Shade the region of smaller m_N than the crossings of `limit` and label
     the boundary inside the shaded side, `frac` of the way up its visible part
-    (0.5 is halfway; lower it to dodge a busy part of the figure). `label_at`
-    overrides that with an explicit (m_N, sin^2 2theta), centred on it."""
+    (0.5 is halfway; lower it to dodge a busy part of the figure)."""
     crossings = sorted(bound_crossings(roots, vals, limit), key=lambda c: c[1])
     if len(crossings) < 2:
         return False
@@ -337,16 +311,6 @@ def plot_bound(
     # Label offset into the excluded (left) side and below the anchor, so it
     # clears the boundary line instead of sitting on it. The text is above
     # everything, since the shading is drawn under the X-ray region.
-    if label_at is not None:
-        ax.text(
-            label_at[0], label_at[1],
-            label,
-            color=color,
-            fontsize=BOUND_LABEL_SIZE,
-            ha="center", va="center",
-            zorder=Z_LABEL
-        )
-        return True
     vis = np.nonzero((s_c > S_LIM[0]) & (s_c < S_LIM[1]))[0]
     if len(vis):
         mid = vis[min(int(frac * len(vis)), len(vis) - 1)]
@@ -531,19 +495,14 @@ def main():
         ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
         r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28
     )
-    # The r_s label goes in the corridor between the lambda_fs and
-    # self-interaction bounds -- the only part of the figure that r_s alone
-    # excludes, and the only place near its boundary with room for the text.
-    cross = {n: sorted(bound_crossings(roots, v, l), key=lambda c: c[1])
-             for n, (v, l) in (("lya", (lam, LAMBDA_FS_MAX_MPC)),
-                               ("r_s", (r_s, R_S_MAX_MPC)),
-                               ("si", (sig_m, SIGMA_M_MAX)))}
+    # The r_s label sits below the self-interaction line, the only part of
+    # its boundary with room for the text: the corridor that r_s alone
+    # excludes, above that line, is narrower than the label.
     plot_bound(
         ax, roots, r_s, R_S_MAX_MPC, C_RS,
-        r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"],
-        label_at=gap_label_anchor(cross)
+        r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.3
     )
-    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"])
+    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"], frac=0.25)
 
     excluded = {
         k: (

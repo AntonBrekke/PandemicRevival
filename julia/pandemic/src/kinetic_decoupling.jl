@@ -22,13 +22,17 @@ N1 N2 for T_N > m_A', neither of which occurs after T_nu < 0.1 m_A').
 
 AMPLITUDE
 =========
-Default: N1 N1 -> N2 N2, eq. (A6) of the draft (m_N1 = m_N2), which for
-degenerate masses acts as elastic scattering. Alternative (`amp=:old`): a
-port of `vector_mediator.M2_gen` with all four masses equal, the amplitude of
-the old code. The two differ: at threshold old / (A6) = 4/3, and the ratio
-grows with s. At threshold the old one reproduces the draft's
+Default (`amp=:fixed`): N1 N1 -> N2 N2 for m_N1 = m_N2, which for degenerate
+masses acts as elastic scattering, with the corrected amplitude, eq. (A6fixed)
+of notes/amplitudes_majorana.tex (in pandemic_neutrinos/, outside this repo):
+4 x the t- and u-channel terms of the draft's (A6) and the opposite sign on
+its interference term. At threshold it reproduces the draft's
 sigma_NR = g^4 m^2 / (8 pi m_A^4) (eq. NNconversionNR, with the spin average
-1/4 and the identical-particle factor 1/2); (A6) gives 3/4 of it.
+1/4 and the identical-particle factor 1/2). `amp=:old` is a port of the old
+code's `vector_mediator.M2_gen` with all four masses equal; it is the same
+amplitude, agreeing with :fixed to rounding. `amp=:A6` is (A6) as printed in
+the draft, kept for comparison only: the cross section is 3/4 of :fixed at
+threshold, dips to ~0.11 of it near s = 20 m^2 and tends to 1/4 at large s.
 
 The old code's `sigma_gen_new` returned 1e3 times the cross section (the 1e-3
 rescaling of its integrand had been commented out), so its C_kd was 1e3 times
@@ -43,7 +47,8 @@ const LYA_R_S_MAX_MPC = 0.34
 """
     sq_amp_NN_A6(s, t, m, m_A, g)
 
-sum |M|^2 of N1 N1 -> N2 N2 for m_N1 = m_N2 = m, eq. (A6) of the draft.
+sum |M|^2 of N1 N1 -> N2 N2 for m_N1 = m_N2 = m, eq. (A6) of the draft as
+printed, which is wrong (see the header); for comparison only.
 """
 function sq_amp_NN_A6(s, t, m, m_A, g)
     m2, mA2 = m * m, m_A * m_A
@@ -52,6 +57,22 @@ function sq_amp_NN_A6(s, t, m, m_A, g)
         ((s - 2 * m2)^2 + s * t + t^2 / 2) / (t - mA2)^2
         + ((s - 2 * m2)^2 + s * u + u^2 / 2) / (u - mA2)^2
         - ((s - 4 * m2)^2 - 4 * m2^2) / ((t - mA2) * (u - mA2))
+    )
+end
+
+"""
+    sq_amp_NN_fixed(s, t, m, m_A, g)
+
+sum |M|^2 of N1 N1 -> N2 N2 for m_N1 = m_N2 = m, the corrected (A6): eq.
+(A6fixed) of notes/amplitudes_majorana.tex.
+"""
+function sq_amp_NN_fixed(s, t, m, m_A, g)
+    m2, mA2 = m * m, m_A * m_A
+    u = 4 * m2 - s - t
+    return 16 * g^4 * (
+        ((s - 2 * m2)^2 + s * t + t^2 / 2) / (t - mA2)^2
+        + ((s - 2 * m2)^2 + s * u + u^2 / 2) / (u - mA2)^2
+        + ((s - 4 * m2)^2 - 4 * m2^2) / ((t - mA2) * (u - mA2))
     )
 end
 
@@ -86,16 +107,17 @@ function _M2_gen_old(s, t, m1, m2, m3, m4, m_X2)
 end
 
 """
-    sigma_NN(s, m, m_A, g; amp=:A6)
+    sigma_NN(s, m, m_A, g; amp=:fixed)
 
 ∫ dt sum|M|^2 / (64 pi s p_cm^2) for N N -> N N with all masses m: the cross
 section summed over initial and final dof, without a symmetry factor (as
 `vector_mediator.sigma_gen_new`, without its factor 1e3).
 """
-function sigma_NN(s, m, m_A, g; amp::Symbol=:A6)
+function sigma_NN(s, m, m_A, g; amp::Symbol=:fixed)
     p2 = s / 4 - m * m
     p2 > 0 || return 0.0
-    f = amp === :A6 ? sq_amp_NN_A6 : amp === :old ? sq_amp_NN_old : error("unknown amplitude $amp")
+    f = amp === :fixed ? sq_amp_NN_fixed : amp === :A6 ? sq_amp_NN_A6 :
+        amp === :old ? sq_amp_NN_old : error("unknown amplitude $amp")
     val = QuadGK.quadgk(t -> f(s, t, m, m_A, g), -4 * p2, 0.0; rtol=1e-8)[1]
     return val / (64 * pi * s * p2)
 end
@@ -107,13 +129,13 @@ the Amos routine behind `besselkx` refuses the argument.
 _besselk1x(x) = x < 1e4 ? SF.besselkx(1, x) : sqrt(pi / (2x)) * (1 + 3 / (8x) - 15 / (128x^2) + 315 / (3072x^3))
 
 """
-    C_kd(T, gap, m, m_A, g; amp=:A6, sigma_scale=1.0)
+    C_kd(T, gap, m, m_A, g; amp=:fixed, sigma_scale=1.0)
 
 Momentum-exchange rate density of the old code (see the header), at dark
 temperature T and gap = (m - mu)/T. Integrated in w = (sqrt(s) - 2m)/T, with
 e^(2 xi) K_1(sqrt(s)/T) = e^(-w - 2 gap) besselkx(1, sqrt(s)/T).
 """
-function C_kd(T, gap, m, m_A, g; amp::Symbol=:A6, sigma_scale=1.0)
+function C_kd(T, gap, m, m_A, g; amp::Symbol=:fixed, sigma_scale=1.0)
     integrand(w) = begin
         rs = 2 * m + w * T
         s = rs * rs
@@ -153,7 +175,7 @@ function temp_gap(h::DarkHistory, z)
 end
 
 """Gamma_kd / (crit H) with Gamma_kd = C_kd / n_N1, at z."""
-function kd_ratio(h::DarkHistory, z; crit=1.0, amp::Symbol=:A6, sigma_scale=1.0)
+function kd_ratio(h::DarkHistory, z; crit=1.0, amp::Symbol=:fixed, sigma_scale=1.0)
     pan = h.pan
     T, gap = temp_gap(h, z)
     C = C_kd(T, gap, pan.N1.m, pan.A.m, pan.mp.y; amp=amp, sigma_scale=sigma_scale)
@@ -245,7 +267,7 @@ function sound_horizon(h::DarkHistory, z_hi; n_grid=2000)
 end
 
 """
-    lyman_alpha_lengths(pan, tT_rel, sol; amp=:A6, sigma_scale=1.0, z_red_end=LYA_Z_RED_END)
+    lyman_alpha_lengths(pan, tT_rel, sol; amp=:fixed, sigma_scale=1.0, z_red_end=LYA_Z_RED_END)
 
 Lyman-alpha lengths of the old code for the solved point `sol`, for kinetic
 decoupling at Gamma_kd = H (and, with suffix 3, = 3H). NamedTuple with, in Mpc,
@@ -255,7 +277,7 @@ code), and `x_kd` = m_N/T_nu at decoupling (Inf if the dark sector is still
 coupled at the end of the time grid).
 """
 function lyman_alpha_lengths(pan::PandemolatorZ, tT_rel::TimeTempRelation, sol;
-        amp::Symbol=:A6, sigma_scale=1.0, z_red_end=LYA_Z_RED_END)
+        amp::Symbol=:fixed, sigma_scale=1.0, z_red_end=LYA_Z_RED_END)
     h = DarkHistory(pan, sol)
     m = pan.N1.m
     z_lo = max(log(m / (0.1 * pan.A.m)), sol.t[1])

@@ -1,5 +1,5 @@
 """
-Free-streaming length lambda_fs at the network's relic roots, next to the
+Free-streaming length lambda_fs and final N2 fraction at the network's relic roots, next to the
 reduced solver's at the same (m_N, y) (tmp/relic_scan_theta_merged/lyman_alpha.csv,
 column lambda_fs_Mpc: same definition, kinetic equilibrium through the
 solution, frozen spectrum after x = 100, up to redshift 50).
@@ -46,7 +46,7 @@ function network_lambda_fs(itp, tT_rel, m, g, s2; n=4001)
     net = Network(itp, rate_params(m, g, s2), tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
     sol = solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
-    sol.retcode == DE.ReturnCode.Success || return NaN
+    sol.retcode == DE.ReturnCode.Success || return NaN, NaN
     bg = NetworkBackground(net)
     z_i, z_f = sol.t[1], sol.t[end]
     zs = range(z_i, z_f, length=n)
@@ -59,7 +59,9 @@ function network_lambda_fs(itp, tT_rel, m, g, s2; n=4001)
     a_f = scale_factor_z(bg, z_f)
     v_free(z) = mean_speed(bg.N1, T_f, gap_f; r=a_f / scale_factor_z(bg, z))
     L_free = comoving_distance(bg, v_free, z_f, z_end)
-    return (L_eq + L_free) / Mpc
+    # final N2 fraction of the DM (the reduced solver has 1/2 by construction)
+    nf, _ = state_densities(net, sol.u[end], z_f)
+    return (L_eq + L_free) / Mpc, nf[2] / (nf[1] + nf[2])
 end
 
 function network_lambda_fs_adaptive(itp, tT_rel, m, g, s2)
@@ -106,17 +108,17 @@ function main(args)
     Threads.@threads :dynamic for i in eachindex(rows)
         c = rows[i]
         m, y, s2n = parse(Float64, c[1]), parse(Float64, c[2]), parse(Float64, c[5])
-        lam = try
+        lam, fN2 = try
             network_lambda_fs(itp, tT_rel, m, y, s2n)
         catch
-            NaN
+            NaN, NaN
         end
-        res[i] = (m, y, s2n, lam, get(la, (round(m; sigdigits=4), round(y; sigdigits=4)), NaN))
+        res[i] = (m, y, s2n, lam, get(la, (round(m; sigdigits=4), round(y; sigdigits=4)), NaN), fN2)
     end
     open(out, "w") do io
-        println(io, "m_N,y,s2_network,lambda_fs_network_Mpc,lambda_fs_reduced_Mpc")
+        println(io, "m_N,y,s2_network,lambda_fs_network_Mpc,lambda_fs_reduced_Mpc,f_N2_network")
         for r in sort(res; by=r -> (r[1], r[2]))
-            @printf(io, "%.6g,%.6g,%.6g,%.5g,%.5g\n", r...)
+            @printf(io, "%.6g,%.6g,%.6g,%.5g,%.5g,%.4g\n", r...)
         end
     end
     println("written ", out, " after ", round((time() - t0) / 60; digits=1), " min")

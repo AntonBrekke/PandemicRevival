@@ -376,7 +376,8 @@ end
 State at the start of DW production as the reduced solver has it (all of the
 DW yield at T_dw, `DodelsonWidrow`): N1 with the DW number and energy density.
 N2, A', phi (in this order, each produced from the previous ones) start with
-what their production makes in the first `dz_seed` of z (at most n_N1/2), so
+what their production makes in the first `dz_seed` of z (at most n_N1/2 for
+N2, 1e-2 n_N1 for A' and phi), so
 that their initial d ln n/dz is ~1/dz_seed; N1 and N2 are then rescaled so
 that the number of N after all decays is the DW number. Zero is not representable in log variables,
 and a tiny seed gives rates whose time step is below the resolution of z.
@@ -408,8 +409,9 @@ function network_initial_state(net::Network, dw::DodelsonWidrow, tT_rel::TimeTem
         T_N = dark_temperature(net, n, kappa)
         C, _ = network_collision(net, T_N, T_nu, n)
         # production over dz_seed (a production rate does not depend on the tiny n_k),
-        # at most the equilibrium share n1/2
-        C[k] > 0 && (n[k] = max(n[k], min(n1 / 2, C[k] * xfac * dz_seed)))
+        # at most the equilibrium share n1/2 for N2 and 1e-2 n1 for A', phi (they are
+        # taken out of the DW population below: larger seeds can exhaust it at large g)
+        C[k] > 0 && (n[k] = max(n[k], min(k == 2 ? n1 / 2 : 1e-2n1, C[k] * xfac * dz_seed)))
     end
     # the seeds come out of the DW population: keep n~ = n_N1 + n_N2 + 2 n_A' + 4 n_phi
     # (the number of N after all decays) equal to the DW number

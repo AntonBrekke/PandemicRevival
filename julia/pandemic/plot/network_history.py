@@ -1,11 +1,12 @@
 """
 Benchmark plot of the species-resolved network: abundances of N1, N2, A', phi
-(top) and the forward rate per particle over H of every reaction (bottom).
+(top) and the forward rate per particle of every reaction, with the Hubble
+rate (bottom).
 
     python plot/network_history.py <history.csv | dir> [fig_dir]
 
 Input from src/run_network_history.jl. Rates: Gamma_fwd per particle of the
-first dark initial species, over H; solid lines dark-sector reactions, dashed
+first dark initial species, in GeV; thick black line H; solid lines dark-sector reactions, dashed
 portal reactions (with nu). Resonance-subtracted rates are shown as |.|.
 """
 import sys
@@ -50,11 +51,12 @@ def plot(path, fig_dir):
         r = d[n]
         if not np.any(r > 1e-6):
             continue
-        a2.plot(x, np.where(r > 0, r, np.nan), ls="--" if n in PORTAL else "-", color=cmap(i % 20), label=LABELS[n], lw=1.2)
-    a2.axhline(1, color="k", lw=0.8)
+        a2.plot(x, np.where(r > 0, r * d["H_GeV"], np.nan), ls="--" if n in PORTAL else "-", color=cmap(i % 20),
+                label=LABELS[n], lw=1.2)
+    a2.plot(x, d["H_GeV"], color="k", lw=3.5, zorder=10, label=r"Hubble rate $H$")
     a2.set_yscale("log")
-    a2.set_ylim(1e-6, 1e14)
-    a2.set_ylabel(r"$\Gamma/H$ per particle")
+    a2.set_ylim(1e-6 * d["H_GeV"].min(), 1e14 * d["H_GeV"].max())
+    a2.set_ylabel(r"rate per particle $\Gamma$ [GeV]")
     a2.set_xscale("log")
     a2.set_xlabel(r"$x = m_N/T_\nu$")
     a2.legend(fontsize=7, loc="upper left", bbox_to_anchor=(1.12, 1.0))

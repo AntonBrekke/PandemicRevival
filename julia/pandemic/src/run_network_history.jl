@@ -3,7 +3,7 @@ Abundance history and reaction rates of the network at benchmark points.
 
     julia --project=. src/run_network_history.jl m_keV:g:sin2_2theta,... [out_dir]
 
-One CSV per point in <out_dir> (default tmp/network_history): x, T_N/T_nu,
+One CSV per point in <out_dir> (default tmp/network_history): x, T_N/T_nu, H [GeV],
 Y of N1, N2, A', phi, Omega h^2, and for every reaction the forward rate per
 particle of its first dark initial species over H (Gamma_fwd/n_I1/H), from the
 tables (resonance-subtracted rates can be negative; |.| is stored).
@@ -21,7 +21,7 @@ function history(itp, tT_rel, mk, g, s2, out_dir)
     first_species = [dark_index(r.I[1]) for r in REACTIONS if haskey(itp.dark, r.name) || haskey(itp.portal, r.name)]
     path = joinpath(out_dir, @sprintf("m_N_%gkeV_g_%g_sin22th_%.4g.csv", mk, g, s2))
     open(path, "w") do io
-        println(io, "x,TN_Tnu,Y_N1,Y_N2,Y_A,Y_phi,omega_h2,", join(names, ","))
+        println(io, "x,TN_Tnu,H_GeV,Y_N1,Y_N2,Y_A,Y_phi,omega_h2,", join(names, ","))
         for z in range(sol.t[1], sol.t[end], length=400)
             u = sol(z)
             s = net.ent(z)
@@ -33,7 +33,7 @@ function history(itp, tT_rel, mk, g, s2, out_dir)
             lnA, lnphi = log(n[3]), log(n[4])
             rates = [abs(exp(ur.lnGf + ur.cI[1] * lnA + ur.cI[2] * lnphi) * ur.xf) / n[k] / H
                      for (ur, k) in zip(urs, first_species)]
-            @printf(io, "%.6g,%.5g,%.5g,%.5g,%.5g,%.5g,%.5g,%s\n", exp(z), T_N / T_nu, (n ./ s)...,
+            @printf(io, "%.6g,%.5g,%.5g,%.5g,%.5g,%.5g,%.5g,%.5g,%s\n", exp(z), T_N / T_nu, H, (n ./ s)...,
                     network_omega_h2(net, u, z), join((@sprintf("%.4g", r) for r in rates), ","))
         end
     end

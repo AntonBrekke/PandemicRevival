@@ -251,17 +251,28 @@ function W_scaled(s, a::Species, b::Species)
 end
 
 """
-    rate_density_scaled(tab, a, b; propagator=:ris)
+    rate_density_scaled(tab, a, b; propagator=:ris, W=nothing)
 
-R e^(gap_a + gap_b) for a + b -> c + d (see the header).
+R e^(gap_a + gap_b) for a + b -> c + d (see the header). A function `W(s)`
+replaces `W_scaled(s, a, b)` when given: any weights that depend only on E_a
+and E_b reduce to the same single integral over s (rate_tables.jl uses this
+for a Fermi-Dirac neutrino).
 """
-function rate_density_scaled(tab::SigmaTable, a::Species, b::Species; propagator::Symbol=:ris, rtol=1e-4)
+function rate_density_scaled(tab::SigmaTable, a::Species, b::Species; propagator::Symbol=:ris, rtol=1e-4,
+                             W=nothing)
+    # function barrier: a Union-typed W sends type inference of the nested
+    # quadrature closures into a near-endless loop
+    Ws = W === nothing ? (s -> W_scaled(s, a, b)) : W
+    return _rate_density_scaled(tab, a, b, Ws, propagator, rtol)
+end
+
+Base.@constprop :none function _rate_density_scaled(tab::SigmaTable, a::Species, b::Species, Ws::F, propagator::Symbol, rtol) where {F}
     s_lo = max(tab.s_th, (a.m + b.m)^2)
     rs_lo = sqrt(s_lo)
     Tm = max(a.T, b.T)
     flux(s) = sqrt(max(kallen(s, a.m^2, b.m^2), 0.0)) / 2
     # integrand per ds, and per dq with q = sqrt(s) - sqrt(s_lo) (ds = 2 sqrt(s) dq)
-    G(s) = sigma_eval(tab, s, propagator) * flux(s) * W_scaled(s, a, b)
+    G(s) = sigma_eval(tab, s, propagator) * flux(s) * Ws(s)
     Gq(q) = (rs = rs_lo + q; 2rs * G(rs^2))
     q_max = sqrt(tab.s_max) - rs_lo
     function q_integral(q_lo, q_hi)
@@ -286,7 +297,7 @@ function rate_density_scaled(tab::SigmaTable, a::Species, b::Species; propagator
     # (d^2 - aw^2)/(d^2 + aw^2)^2, pair s0 ± d: G(s0+d) + G(s0-d) - 2 h(s0) R(d) is
     # smooth (the Re D part is odd and cancels to O(d)), and ∫_0^L R = -L/(L^2 + aw^2).
     L = min(s0 - s_lo, 0.5 * s0)
-    h0 = tab.interp[1](log(s0 - tab.s_th)) * flux(s0) * W_scaled(s0, a, b)
+    h0 = tab.interp[1](log(s0 - tab.s_th)) * flux(s0) * Ws(s0)
     R(d) = (d^2 - aw^2) / (d^2 + aw^2)^2
     sym(d) = G(s0 + d) + G(s0 - d) - 2h0 * R(d)
     dpts = Float64[0.0; filter(x -> x < L, aw .* 10.0 .^ (0:2:30)); L]

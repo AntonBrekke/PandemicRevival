@@ -70,8 +70,8 @@ end
         fd = (dw_fraction(h, T * exp(e))[1] - dw_fraction(h, T * exp(-e))[1]) / 2e
         @test isapprox(dw_fraction(h, T)[2], fd; rtol=1e-4, atol=1e-8)
     end
-    # production momentum = the reduced solver's initial condition at T_dw
+    # production momentum = the fluid solver's initial condition at T_dw
     dw = DodelsonWidrow{Float64}(1e-5, 1e-7, tT_rel)
-    s_ic = net.ent(log(1e-5 / tT_rel.T_nu_grid[dw.i_ic]))
+    s_ic = net.ent_interp_z(log(1e-5 / tT_rel.T_nu_grid[dw.i_ic]))
     @test isapprox(h.p0 * (s_ic / s0)^(1 / 3), dw.rho_ic / dw.n_ic; rtol=1e-10)
 end

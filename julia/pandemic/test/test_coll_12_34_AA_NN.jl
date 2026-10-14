@@ -2,13 +2,13 @@ using Test, Printf, Random
 import QuadGK
 import SpecialFunctions as SF
 
-include(joinpath(@__DIR__, "../src/coll_12_34.jl"))
+include(joinpath(@__DIR__, "coll_12_34_nested.jl"))
 include(joinpath(@__DIR__, "../src/coll_12_34_legendre.jl"))
 
 """
 Tests for the A'A' <-> N N collision integral with the amplitude of eq. (A9):
 
-  coll_12_34           src/coll_12_34.jl: nested adaptive quadrature over
+  coll_12_34           test/coll_12_34_nested.jl: nested adaptive quadrature over
                        E1, E2, E3, s with the t-integral in closed form.
   coll_12_34_legendre  src/coll_12_34_legendre.jl: CM-frame Legendre /
                        Funk-Hecke decomposition.

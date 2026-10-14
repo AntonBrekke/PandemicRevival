@@ -1,47 +1,47 @@
 """
 lyman_alpha.jl
 
-Free-streaming length of the dark matter N (= N1, N2) for the Lyman-alpha
-bound, evaluated on a solved relic point.
+Lyman-alpha lengths of the dark matter at a relic root, for both solvers (the network,
+network.jl, and the one-fluid solver, fluid.jl), as in Bringmann et al.
+(arXiv:2206.10630), who recast the thermal-WDM bound m_WDM > 1.9 keV (Garzilli et al.)
+into lambda_fs < 0.24 Mpc and r_s < 0.34 Mpc:
 
-PHYSICS (as in the Python code)
-===============================
-Same definitions as code/sterile_caller.py and data/dw/0612182_fs_length.py,
-remapping the warm-DM Lyman-alpha limit as in Bringmann et al.
-(arXiv:2206.10630):
+    lambda_fs = ∫ <v>/a dt   while the dark matter free-streams, up to redshift 50,
+    r_s       = ∫ c_s/a dt   while the dark sector is kinetically coupled,
 
-    lambda_fs = ∫_{t_i}^{t(z_red)} <v>(t) / a(t) dt,    a = (s0 / s)^(1/3), a_today = 1,
-    <v>       = ∫ d^3p f p/E / ∫ d^3p f               (mean speed of N),
+with a = (s0/s)^(1/3), <v> the mean speed of N1 and c_s^2 = dP/drho of the dark sector.
 
-integrated up to redshift z_red = `LYA_Z_RED_END` = 50 (defined, as in the
-Python code, by T_SM / T0 - 1), and excluded if lambda_fs > `LYA_LAMBDA_FS_MAX_MPC`
-= 0.24 Mpc.
+KINETIC COUPLING
+================
+Gamma_kd = C_kd/n_N1 (kinetic_decoupling.jl) against H, from the start of the solution:
+the onset x_c is the first time Gamma_kd > H, the decoupling x_kd the last time
+Gamma_kd drops below H (short dips in between count as coupled). The fluid starts
+thermal and is coupled from the start (x_c = start); at small g the network sector is
+produced free-streaming by the Dodelson-Widrow mechanism and couples only later, or (if
+Gamma_kd < H throughout) never. Then
 
-DIFFERENCES TO THE PYTHON CODE
-==============================
-- No kinetic decoupling (option (i)): the solver assumes kinetic equilibrium
-  of the dark sector throughout, so <v> is taken from the Fermi-Dirac
-  distribution with the solved (T_N, xi_N) over the whole solution, from
-  T_nu = T_dw (start of the solution) to x = m_N/T_nu = 100. The Python code
-  instead started the integral at T_kd, with a frozen spectrum from there on,
-  and added the sound horizon r_s before T_kd. There is therefore no r_s here.
-- After the end of the solution the spectrum is frozen (free streaming,
-  p ∝ 1/a) and redshifted to z_red, as the Python code did after T_kd.
-- The integral is done by adaptive quadrature in z = log(m_N/T_nu) on the
-  dense ODE output (breakpoints at the solver steps), and the momentum
-  moments with `thermal_moment`, rather than Simpson on the time grid with a
-  fixed 5000-point momentum grid at every time step.
-- It is computed once per relic point, after the root finding
-  (src/run_lyman_alpha.jl), not inside every solve of the root search.
+    lambda_fs_kd = free streaming before x_c + after x_kd,   r_s = sound horizon x_c -> x_kd,
+
+and, never coupled, lambda_fs_kd = lambda_fs, r_s = 0. `lambda_fs` alone (no kinetic
+decoupling: free streaming over the whole history) overstates the bound wherever the
+sector is coupled.
+
+Free streaming uses <v> at the dark temperature during the solution (x <= 100), and a
+frozen spectrum, redshifted with p ∝ 1/a, after it and after x_kd. After the solution the
+dark state continues as a non-relativistic gas with conserved number, T ∝ a^-2 at fixed
+chemical-potential gaps. The sound speed is the derivative of the background P(rho) on a
+grid, kept only where dP/dt < 0, drho/dt < 0 and c_s^2 < 0.3 (as the old code; this drops
+the relativistic phase and energy injection, a few-% effect on r_s); after the solution
+c_s^2 = 5T/(3m + 7.5T).
 """
 
-include(joinpath(@__DIR__, "relic_scan_z.jl"))
+include(joinpath(@__DIR__, "fluid.jl"))
+include(joinpath(@__DIR__, "network.jl"))
+include(joinpath(@__DIR__, "kinetic_decoupling.jl"))
+using Printf
 
-# Free streaming is followed until this redshift (sterile_caller.py: z = 50).
+# Free streaming is followed until this redshift (as the old code).
 const LYA_Z_RED_END = 50.0
-# Lyman-alpha limit on lambda_fs in Mpc (Bringmann et al. 2206.10630, as in
-# code/sterile_res/plotter.py).
-const LYA_LAMBDA_FS_MAX_MPC = 0.24
 
 """Speed q/E of a particle of mass m and momentum q (exactly 1 for m = 0)."""
 _speed(q, m) = q / sqrt(q * q + m * m)
@@ -49,16 +49,17 @@ _speed(q, m) = q / sqrt(q * q + m * m)
 """
     mean_speed(p::Particle, temp, gap; r=1.0)
 
-Mean speed <|v|> of particle `p` with occupation f = 1/(e^((E-m)/temp + gap) + k)
-per dof, after all momenta have been scaled by `r` (free streaming with f
-fixed in comoving momentum: r = a_f/a). With r = 1, the value in kinetic
-equilibrium at (temp, gap).
-
-In the Maxwell-Boltzmann limit the ratio does not depend on the gap, which is
-therefore capped at `m_T_r_MB` (a relative change below e^-m_T_r_MB): for
-large gaps both moments would otherwise underflow to 0.
+Mean speed <|v|> of particle `p` with occupation f = 1/(e^((E-m)/temp + gap) + k) per
+dof, after all momenta have been scaled by `r` (free streaming with f fixed in comoving
+momentum: r = a_f/a). With r = 1, the value in kinetic equilibrium at (temp, gap). For
+Maxwell-Boltzmann (and gap >= m_T_r_MB, where the ratio no longer depends on the gap) at
+r = 1 the closed form 2(x + 1)/(x^2 e^x K_2(x)), x = m/T.
 """
 function mean_speed(p::Particle, temp, gap; r=1.0)
+    if r == 1 && (p.k == 0 || gap >= m_T_r_MB) && p.m > 0
+        x = p.m / temp
+        return 2 * (x + 1) / (x^2 * SF.besselkx(2, x))
+    end
     g = min(gap, m_T_r_MB)
     # d^3p = 4 pi p^2 dp = 4 pi E p dE
     num = thermal_moment(p, temp, g, (E, mom) -> E * mom * _speed(r * mom, p.m))
@@ -66,26 +67,7 @@ function mean_speed(p::Particle, temp, gap; r=1.0)
     return num / den
 end
 
-"""
-    N_temp_gap(pan, u)
-
-(T_N, (m_N - mu_N)/T_N) of N1 (= N2) in the solver state u = [ln Y_n, ln Y_rho,
-ln x_N, eta]. The gap is built from e^eta directly,
-x_N (1 - m_A/(fac_n_A m_N)) + e^eta/fac_n_A, rather than as x_N - xi_N.
-"""
-function N_temp_gap(pan, u)
-    ln_x_N, eta = u[3], u[4]
-    x_N = exp(ln_x_N)
-    gap = x_N * (1 - pan.A.m / (pan.fac_n_A * pan.N1.m)) + gap_A_from_eta(eta) / pan.fac_n_A
-    return T_N_from_ln_x_N(pan, ln_x_N), gap
-end
-
-"""
-    z_at_redshift(m_N, tT_rel, z_red)
-
-z = log(m_N / T_nu) at redshift z_red, with 1 + z_red = T_SM / T0 as in the
-Python code (log-linear interpolation on the time grid).
-"""
+"""z = log(m_N/T_nu) at redshift z_red, with 1 + z_red = T_SM/T0 (log-linear on the time grid)."""
 function z_at_redshift(m_N, tT_rel::TimeTempRelation, z_red)
     target = log((1 + z_red) * T0)
     i = findfirst(<(target), log.(tT_rel.T_SM_grid))
@@ -96,87 +78,215 @@ function z_at_redshift(m_N, tT_rel::TimeTempRelation, z_red)
     return log(m_N) - ln_Tnu
 end
 
-"""Scale factor today = 1, from entropy conservation, at z = log(m_N/T_nu)."""
-scale_factor_z(pan, z) = cbrt(s0 / pan.ent_interp_z(z))
+"""Scale factor (today = 1, from entropy conservation) at z; `bg` has `ent_interp_z`."""
+scale_factor_z(bg, z) = cbrt(s0 / bg.ent_interp_z(z))
 
-"""dt/dz = x / (dx/dt), with z = log x."""
-dt_dz(pan, z) = exp(z) / pan.dx_dt_interp_z(z)
+"""dt/dz = x/(dx/dt), with z = log x."""
+dt_dz(bg, z) = exp(z) / bg.dx_dt_interp_z(z)
 
 """
-    comoving_distance(pan, v_of_z, z_lo, z_hi; breakpoints=(), rtol=1e-6)
+    comoving_distance(bg, v_of_z, z_lo, z_hi; breakpoints=(), rtol=1e-6)
 
-∫ v(t)/a(t) dt between z_lo and z_hi, in GeV^-1 (divide by `Mpc` for Mpc).
-`v_of_z(z)` is the mean speed at z = log(m_N/T_nu).
+∫ v/a dt between z_lo and z_hi, in GeV^-1 (divide by `Mpc` for Mpc).
 """
-function comoving_distance(pan, v_of_z, z_lo, z_hi; breakpoints=(), rtol=1e-6)
+function comoving_distance(bg, v_of_z, z_lo, z_hi; breakpoints=(), rtol=1e-6)
     z_hi > z_lo || return 0.0
     pts = sort!(unique!([z_lo; [b for b in breakpoints if z_lo < b < z_hi]; z_hi]))
-    integrand(z) = v_of_z(z) / scale_factor_z(pan, z) * dt_dz(pan, z)
-    # Segment by segment: splatting O(100) breakpoints into one quadgk call
-    # makes Julia compile it for a tuple of that length (minutes).
+    integrand(z) = v_of_z(z) / scale_factor_z(bg, z) * dt_dz(bg, z)
+    # segment by segment: splatting O(100) breakpoints into one quadgk call makes Julia
+    # compile it for a tuple of that length (minutes)
     return sum(QuadGK.quadgk(integrand, pts[i], pts[i+1]; rtol=rtol, atol=0)[1] for i in 1:length(pts)-1)
 end
 
+# --------------------------------------------------------------------------- dark history
 """
-    free_streaming_length(pan, tT_rel, sol; z_red_end=LYA_Z_RED_END, rtol=1e-6)
-
-Free-streaming length of N for the solved point `sol` (from `pandemolate_z`).
-Returns a NamedTuple with, all in Mpc:
-- `lambda_fs`: the total;
-- `lambda_fs_eq`: the part during the solution, from <v> in kinetic
-  equilibrium at the solved (T_N, xi_N);
-- `lambda_fs_free`: the part after it, with the final spectrum frozen and
-  redshifted to z_red_end;
-and `v_end`, the mean speed at the end of the solution.
+The dark sector along a solution and after it. `state(u, z)` gives
+(T_N, gap of N1, gap of N2, n_N1, P, rho) of the dark sector in the solver state u;
+`N1` carries the statistics of the dark matter (Fermi-Dirac in the fluid, MB (k = 0) in
+the network). `bg` has the background interpolants `ent_interp_z`, `dx_dt_interp_z`,
+`H_interp_z`.
 """
-function free_streaming_length(pan, tT_rel::TimeTempRelation, sol;
-        z_red_end=LYA_Z_RED_END, rtol=1e-6)
-    z_i, z_f = sol.t[1], sol.t[end]
-    z_end = z_at_redshift(pan.N1.m, tT_rel, z_red_end)
-    z_end > z_f || error("the solution ends after redshift $z_red_end")
-
-    # Hide the ODESolution type behind Ref{Any}: specialising quadgk on a
-    # closure that carries it takes minutes to compile (one dynamic call per
-    # evaluation is negligible next to `mean_speed`).
-    sol_ref = Ref{Any}(sol)
-    v_eq(z) = mean_speed(pan.N1, N_temp_gap(pan, sol_ref[](z)::Vector{Float64})...)
-    L_eq = comoving_distance(pan, v_eq, z_i, z_f; breakpoints=sol.t, rtol=rtol)
-
-    T_f, gap_f = N_temp_gap(pan, sol.u[end])
-    a_f = scale_factor_z(pan, z_f)
-    v_free(z) = mean_speed(pan.N1, T_f, gap_f; r=a_f / scale_factor_z(pan, z))
-    L_free = comoving_distance(pan, v_free, z_f, z_end; rtol=rtol)
-
-    return (
-        lambda_fs=(L_eq + L_free) / Mpc,
-        lambda_fs_eq=L_eq / Mpc,
-        lambda_fs_free=L_free / Mpc,
-        v_end=mean_speed(pan.N1, T_f, gap_f),
-    )
+struct DarkHistory{B,F}
+    bg::B
+    N1::Particle{Float64}
+    state::F
+    sol::Any                  # untyped: specialising quadgk on it compiles for minutes
+    tab::CkdTable
+    z_i::Float64
+    z_f::Float64
+    a_f::Float64
+    fin::NTuple{4,Float64}    # (T, gap1, gap2, n1) at z_f
 end
 
-"""
-    solve_relic_point(pan, tT_rel, y, theta; reltol=1e-4, wall_limit=600.0)
+function DarkHistory(bg, N1, m_A, g, sol, state)
+    z_f = sol.t[end]
+    fin = state(sol.u[end], z_f)[1:4]
+    return DarkHistory(bg, N1, state, sol, CkdTable(N1.m, m_A, g), sol.t[1], z_f, scale_factor_z(bg, z_f), fin)
+end
 
-Solves one point as `solve_point_z` does (same checks), but also returns the
-solution: (sol, omega_h2, converged, retcode), with sol = nothing on failure.
-"""
-function solve_relic_point(pan::PandemolatorZ{T}, tT_rel::TimeTempRelation{T}, y, theta;
-        reltol=1e-4, wall_limit=600.0, plateau_frac=0.05, plateau_tol=1e-3) where T <: Real
-    dw = DodelsonWidrow{T}(pan.N1.m, theta, tT_rel)
-    pan.mp = ModelParams{T}(y, theta)
-    pan.deadline = time() + wall_limit
-    try
-        sol = pandemolate_z(tT_rel, dw, pan; reltol=reltol)
-        DE.successful_retcode(sol) || return nothing, NaN, false, Symbol(sol.retcode)
-        omega_h2 = final_omega_h2_z(pan, sol)
-        converged = check_plateau_z(pan, sol; frac=plateau_frac, tol=plateau_tol) && isfinite(omega_h2) && omega_h2 > 0
-        return sol, omega_h2, converged, Symbol(sol.retcode)
-    catch e
-        e isa SolveDeadlineExceeded && return nothing, NaN, false, :WallLimit
-        @warn "pandemolate_z failed at y=$y, theta=$theta" exception = (e, catch_backtrace())
-        return nothing, NaN, false, :Exception
-    finally
-        pan.deadline = Inf
+"""History of a fluid solution (fluid.jl): one T_N and one chemical potential for N1 and N2."""
+function DarkHistory(pan::FluidSolver, sol)
+    function state(u, z)
+        T, gap = N_temp_gap(pan, u)
+        xi = xi_from_eta(pan, u[4], u[3])
+        gA = gap_A_from_eta(u[4])
+        return (T, gap, gap, number_density(pan.N1, T, 0.0; gap=gap),
+                pressure_dens(pan, T, xi; gap_A=gA), energy_dens(pan, T, xi; gap_A=gA))
     end
+    return DarkHistory(pan, pan.N1, pan.A.m, pan.mp.y, sol, state)
 end
+
+"""History of a network solution (network.jl): MB species, separate N1 and N2 densities."""
+function DarkHistory(net::Network, sol)
+    function state(u, z)
+        n, kappa = state_densities(net, u, z)
+        T = dark_temperature(net, n, kappa)
+        gap(k) = log(n_scaled_safe(net.masses[k], net.dofs[k], T) / n[k])
+        return (T, gap(1), gap(2), n[1], sum(n) * T, sum(net.masses[k] * n[k] for k in 1:NSPECIES) + kappa)
+    end
+    return DarkHistory(net, Particle{Float64}(net.p.m1, 0, dof=2), net.masses[3], net.p.g, sol, state)
+end
+
+"""(T, gap1, gap2, n1) at z: from the solution, then non-relativistic with conserved number."""
+function dark_state(h::DarkHistory, z)
+    z <= h.z_f && return h.state(h.sol(z)::Vector{Float64}, z)[1:4]
+    r = h.a_f / scale_factor_z(h.bg, z)
+    T, g1, g2, n1 = h.fin
+    return (T * r^2, g1, g2, n1 * r^3)
+end
+
+"""Gamma_kd/H of N1 at z."""
+function kd_ratio(h::DarkHistory, z)
+    T, g1, g2, n1 = dark_state(h, z)
+    return C_kd(h.tab, T, g1; gap2=g2) / (h.bg.H_interp_z(z) * n1)
+end
+
+"""
+(z_c, z_kd, coupled): the first z with Gamma_kd > H and the last at which it drops below
+H, on a grid of step `dz` from z_lo to z_hi, refined by bisection to 1e-4; coupled =
+false if Gamma_kd < H throughout, z_kd = z_hi if it is still coupled there.
+"""
+function find_kd(h::DarkHistory, z_lo, z_hi; dz=0.05)
+    r(z) = kd_ratio(h, z)
+    function crossing(a, b)
+        up = r(a) < 1
+        while b - a > 1e-4
+            c = (a + b) / 2
+            (r(c) < 1) == up ? (a = c) : (b = c)
+        end
+        return b
+    end
+    zs = collect(range(z_lo, z_hi, length=max(2, ceil(Int, (z_hi - z_lo) / dz) + 1)))
+    on = [r(z) >= 1 for z in zs]
+    i_c = findfirst(on)
+    i_c === nothing && return z_lo, z_lo, false
+    i_kd = findlast(on)
+    z_c = i_c == 1 ? z_lo : crossing(zs[i_c-1], zs[i_c])
+    z_kd = i_kd == length(zs) ? z_hi : crossing(zs[i_kd], zs[i_kd+1])
+    return z_c, z_kd, true
+end
+
+"""
+∫ <v>/a dt from z_lo to z_hi in GeV^-1, with <v> at the dark temperature during the
+solution and the spectrum at z_f frozen after it.
+"""
+function free_stream(h::DarkHistory, z_lo, z_hi)
+    z_hi > z_lo || return 0.0
+    L = 0.0
+    if z_lo < h.z_f
+        v_eq(z) = mean_speed(h.N1, dark_state(h, z)[1:2]...)
+        L += comoving_distance(h.bg, v_eq, z_lo, min(z_hi, h.z_f); breakpoints=h.sol.t)
+    end
+    z_hi > h.z_f && (L += free_stream_frozen(h, max(z_lo, h.z_f), z_hi; z_freeze=h.z_f))
+    return L
+end
+
+"""∫ <v>/a dt from z_lo to z_hi in GeV^-1 for the spectrum at z_freeze (<= z_lo) redshifted freely."""
+function free_stream_frozen(h::DarkHistory, z_lo, z_hi; z_freeze=z_lo)
+    T, g1 = dark_state(h, z_freeze)[1:2]
+    a0 = scale_factor_z(h.bg, z_freeze)
+    v(z) = mean_speed(h.N1, T, g1; r=a0 / scale_factor_z(h.bg, z))
+    return comoving_distance(h.bg, v, z_lo, z_hi)
+end
+
+"""∫ c_s/a dt from z_lo to z_hi in GeV^-1 (see the header for c_s)."""
+function sound_horizon(h::DarkHistory, z_lo, z_hi; n_grid=2000)
+    z_hi > z_lo || return 0.0
+    r = 0.0
+    if z_lo < h.z_f
+        zs = range(z_lo, min(z_hi, h.z_f), length=n_grid)
+        PR = [h.state(h.sol(z)::Vector{Float64}, z)[5:6] for z in zs]
+        lP, lR = log.(first.(PR)), log.(last.(PR))
+        f_prev = 0.0
+        for i in eachindex(zs)
+            j0, j1 = max(i - 1, 1), min(i + 1, n_grid)
+            dlP, dlR = lP[j1] - lP[j0], lR[j1] - lR[j0]
+            cs2 = (PR[i][1] * dlP) / (PR[i][2] * dlR)
+            f = (dlP < 0 && dlR < 0 && cs2 < 0.3) ? sqrt(cs2) / scale_factor_z(h.bg, zs[i]) * dt_dz(h.bg, zs[i]) : 0.0
+            i > 1 && (r += (f + f_prev) / 2 * step(zs))
+            f_prev = f
+        end
+    end
+    if z_hi > h.z_f
+        cs(z) = (T = dark_state(h, z)[1]; sqrt(5T / (3 * h.N1.m + 7.5T)))
+        r += comoving_distance(h.bg, cs, max(z_lo, h.z_f), z_hi)
+    end
+    return r
+end
+
+"""
+    lyman_alpha_lengths(h, tT_rel)
+
+NamedTuple, lengths in Mpc: `lambda_fs` (free streaming over the whole history, no
+kinetic decoupling), `x_c`, `x_kd` (m_N/T_nu at the coupling onset and at decoupling; NaN
+if never coupled, Inf if still coupled at the end of the time grid), `lambda_fs_pre`
+(before x_c), `lambda_fs_kd` (before x_c plus after x_kd), `r_s`, `coupled`.
+"""
+function lyman_alpha_lengths(h::DarkHistory, tT_rel::TimeTempRelation)
+    m = h.N1.m
+    z_hi = log(m / tT_rel.T_nu_grid[end])
+    z_end = z_at_redshift(m, tT_rel, LYA_Z_RED_END)
+    z_end > h.z_f || error("the solution ends after redshift $LYA_Z_RED_END")
+    lam = free_stream(h, h.z_i, z_end) / Mpc
+    z_c, z_kd, coupled = find_kd(h, h.z_i, z_hi)
+    coupled || return (lambda_fs=lam, x_c=NaN, x_kd=NaN, lambda_fs_pre=lam, lambda_fs_kd=lam, r_s=0.0, coupled=false)
+    pre = free_stream(h, h.z_i, z_c) / Mpc
+    post = z_kd < z_end ? free_stream_frozen(h, z_kd, z_end) / Mpc : 0.0
+    return (lambda_fs=lam, x_c=exp(z_c), x_kd=z_kd >= z_hi ? Inf : exp(z_kd), lambda_fs_pre=pre,
+            lambda_fs_kd=pre + post, r_s=sound_horizon(h, z_c, z_kd) / Mpc, coupled=true)
+end
+
+# --------------------------------------------------------------------------- per relic root
+"""
+    lyman_alpha_network(itp, tT_rel, m, g, s2)
+
+Network solve at (m_N [GeV], g, sin^2 2theta) and its Lyman-alpha lengths:
+`lyman_alpha_lengths` plus `omega_h2` and `f_N2` = N2/(N1 + N2) today. NaN lengths if the
+solve fails.
+"""
+function lyman_alpha_network(itp, tT_rel, m, g, s2)
+    net = Network(itp, rate_params(m, g, s2), tT_rel)
+    dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
+    sol = solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
+    sol.retcode == DE.ReturnCode.Success || return failed_lengths()
+    n, _ = state_densities(net, sol.u[end], sol.t[end])
+    return (; lyman_alpha_lengths(DarkHistory(net, sol), tT_rel)...,
+            omega_h2=network_omega_h2(net, sol.u[end], sol.t[end]), f_N2=n[2] / (n[1] + n[2]))
+end
+
+"""As `lyman_alpha_network` for the fluid (`solve_relic`; f_N2 = 1/2 by construction)."""
+function lyman_alpha_fluid(itp, tT_rel, m, g, s2; pan=FluidSolver(m, tT_rel, itp))
+    sol, om, plateau = solve_relic(pan, tT_rel, g, s2)
+    plateau || return failed_lengths()
+    return (; lyman_alpha_lengths(DarkHistory(pan, sol), tT_rel)..., omega_h2=om, f_N2=0.5)
+end
+
+failed_lengths() = (lambda_fs=NaN, x_c=NaN, x_kd=NaN, lambda_fs_pre=NaN, lambda_fs_kd=NaN, r_s=NaN,
+                    coupled=false, omega_h2=NaN, f_N2=NaN)
+
+const LYMAN_ALPHA_HEADER = "m_N,y,sin2_2theta,omega_h2,lambda_fs_Mpc,x_c,x_kd,lambda_fs_pre_Mpc,lambda_fs_kd_Mpc,r_s_Mpc,coupled,f_N2"
+
+"""One CSV row of `LYMAN_ALPHA_HEADER`."""
+lyman_alpha_row(m, g, s2, r) =
+    join((@sprintf("%.6g", v) for v in (m, g, s2, r.omega_h2, r.lambda_fs, r.x_c, r.x_kd,
+          r.lambda_fs_pre, r.lambda_fs_kd, r.r_s, Int(r.coupled), r.f_N2)), ",")

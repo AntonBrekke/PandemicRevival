@@ -11,11 +11,9 @@ const temp_nu_dec_sm = 1.4e-3
 const hubble_T5_nu_dec = 1.62211799511e-10
 const G = 6.7086096877e-39
 const hbar = 6.582119514e-25
-const c_light = 2.99792458e10
 const Mpc = 1.563738357134461e38
 
 const conv_GeV_cm_3 = 1.3014892628900395e41
-const conv_cm2_g = 4.57821356e3
 const omega_d0 = 0.12
 const omega_b0 = 0.02237
 const rho_crit0_h2 = 1.053672e-5 / conv_GeV_cm_3
@@ -28,7 +26,6 @@ const s0 = (2.0 * pi2 / 45.0) * (T0^3.0) * 3.9267
 const _DATA_DIR = joinpath(@__DIR__, "..", "data")
 const _G_STAR_DIR = joinpath(_DATA_DIR, "g_star")
 const _DW_DIR = joinpath(_DATA_DIR, "dw")
-const _DENS_DIR = joinpath(_DATA_DIR, "densities")
 
 function _load_table(path::AbstractString; skipstart::Int=0)
     return readdlm(path, Float64; skipstart=skipstart)
@@ -82,11 +79,8 @@ P_SM_before_nu_dec(T) = pi2 * g_P_before_nu_dec(T) * (T^4.0) / 90.0
 s_SM_before_nu_dec(T) = pi2 * g_s_before_nu_dec(T) * (T^3.0) * 2.0 / 45.0
 
 rho_nu(T) = pi2 * 6.0 * (7.0 / 8.0) * (T^4.0) / 30.0
-P_nu(T) = pi2 * 6.0 * (7.0 / 8.0) * (T^4.0) / 90.0
 s_nu(T) = pi2 * 6.0 * (7.0 / 8.0) * (T^3.0) * 2.0 / 45.0
 
-rho_d(T_SM, T_nu) = rho_d0 * (s_SM_no_nu(T_SM) + s_nu(T_nu)) / s0
-rho_b(T_SM, T_nu) = rho_b0 * (s_SM_no_nu(T_SM) + s_nu(T_nu)) / s0
 rho_m(T_SM, T_nu) = rho_m0 * (s_SM_no_nu(T_SM) + s_nu(T_nu)) / s0
 
 const _dw_cache = Ref{Any}(nothing)
@@ -145,241 +139,3 @@ function O_h2_dw_Tevo(T, md, th)
     return _get_dw_cache().Tevo_dw_interp(log10(T_rescaled)) * O_h2
 end
 
-function norm_f_d_dw(md, th, dofd)
-    return 4.0 * pi2 * s_SM_before_nu_dec(T_d_dw(md)) * O_h2_dw(md, th) * rho_crit0_h2 /
-        (3.0 * zeta3 * dofd * (T_d_dw(md)^3.0) * md * s0)
-end
-
-const _dens_cache = Ref{Any}(nothing)
-
-function _load_dens_table(fname::AbstractString)
-    return _load_table(joinpath(_DENS_DIR, fname))
-end
-
-function _get_dens_cache()
-    if _dens_cache[] === nothing
-        rho_red_boson = _load_dens_table("rho_red_boson.dat")
-        rho_red_fermion = _load_dens_table("rho_red_fermion.dat")
-        rho_der_red_boson = _load_dens_table("rho_der_red_boson.dat")
-        rho_der_red_fermion = _load_dens_table("rho_der_red_fermion.dat")
-        P_red_boson = _load_dens_table("P_red_boson.dat")
-        P_red_fermion = _load_dens_table("P_red_fermion.dat")
-        rho_3P_diff_red_boson = _load_dens_table("rho_3P_diff_red_boson.dat")
-        rho_3P_diff_red_fermion = _load_dens_table("rho_3P_diff_red_fermion.dat")
-        n_red_boson = _load_dens_table("n_red_boson.dat")
-        n_red_fermion = _load_dens_table("n_red_fermion.dat")
-        n_der_red_boson = _load_dens_table("n_der_red_boson.dat")
-        n_der_red_fermion = _load_dens_table("n_der_red_fermion.dat")
-
-        _dens_cache[] = (
-            rho_red_boson=rho_red_boson,
-            rho_red_boson_interp=LogInterp(_col(rho_red_boson, 1), _col(rho_red_boson, 2)),
-            rho_red_fermion=rho_red_fermion,
-            rho_red_fermion_interp=LogInterp(_col(rho_red_fermion, 1), _col(rho_red_fermion, 2)),
-            rho_der_red_boson=rho_der_red_boson,
-            rho_der_red_boson_interp=LogInterp(_col(rho_der_red_boson, 1), _col(rho_der_red_boson, 2)),
-            rho_der_red_fermion=rho_der_red_fermion,
-            rho_der_red_fermion_interp=LogInterp(_col(rho_der_red_fermion, 1), _col(rho_der_red_fermion, 2)),
-            P_red_boson=P_red_boson,
-            P_red_boson_interp=LogInterp(_col(P_red_boson, 1), _col(P_red_boson, 2)),
-            P_red_fermion=P_red_fermion,
-            P_red_fermion_interp=LogInterp(_col(P_red_fermion, 1), _col(P_red_fermion, 2)),
-            rho_3P_diff_red_boson=rho_3P_diff_red_boson,
-            rho_3P_diff_red_boson_interp=LogInterp(_col(rho_3P_diff_red_boson, 1), _col(rho_3P_diff_red_boson, 2)),
-            rho_3P_diff_red_fermion=rho_3P_diff_red_fermion,
-            rho_3P_diff_red_fermion_interp=LogInterp(_col(rho_3P_diff_red_fermion, 1), _col(rho_3P_diff_red_fermion, 2)),
-            n_red_boson=n_red_boson,
-            n_red_boson_interp=LogInterp(_col(n_red_boson, 1), _col(n_red_boson, 2)),
-            n_red_fermion=n_red_fermion,
-            n_red_fermion_interp=LogInterp(_col(n_red_fermion, 1), _col(n_red_fermion, 2)),
-            n_der_red_boson=n_der_red_boson,
-            n_der_red_boson_interp=LogInterp(_col(n_der_red_boson, 1), _col(n_der_red_boson, 2)),
-            n_der_red_fermion=n_der_red_fermion,
-            n_der_red_fermion_interp=LogInterp(_col(n_der_red_fermion, 1), _col(n_der_red_fermion, 2)),
-        )
-    end
-    return _dens_cache[]
-end
-
-function rho_boson(p, temp, xi)
-    cache = _get_dens_cache()
-    x = p.m / temp
-    x_xi_diff = x - xi
-    if x_xi_diff > 700.0
-        return 0.0
-    end
-    if x > cache.rho_red_boson[end, 1] || xi > 700.0
-        return p.dof * (p.m + 1.5 * temp) * exp(-x_xi_diff) * (p.m^2 / (2.0 * pi * x))^1.5
-    end
-    if x < cache.rho_red_boson[1, 1]
-        return p.dof * exp(xi) * pi^2 * temp^4 / 30.
-    end
-    return p.dof * temp^4 * exp(xi) * cache.rho_red_boson_interp(x)
-end
-
-function rho_fermion(p, temp, xi)
-    cache = _get_dens_cache()
-    x = p.m / temp
-    x_xi_diff = x - xi
-    if x_xi_diff > 700.
-        return 0.
-    end
-    if (x > cache.rho_red_fermion[end, 1]) || (xi > 700.0)
-        return p.dof * (p.m + 1.5 * temp) * exp(xi - x) * ((p.m^2 / (2.0 * pi * x))^1.5)
-    end
-    if x < cache.rho_red_fermion[1, 1]
-        return p.dof * exp(xi) * pi^2 * temp^4 * 7. / 240.
-    end
-    return p.dof * temp^4 * exp(xi) * cache.rho_red_fermion_interp(x)
-end
-
-function rho_der_boson(p, temp, xi)
-    cache = _get_dens_cache()
-    x = p.m / temp
-    x_xi_diff = x - xi
-    if x_xi_diff > 700.
-        return 0.
-    end
-    if (x > cache.rho_der_red_boson[end, 1]) || (xi > 700.)
-        return p.dof * exp(-x_xi_diff) * temp^3 * (x^3.5 + 3. * x^2.5 + 3.75 * x^1.5) / (2.0 * pi)^1.5
-    end
-    if x < cache.rho_der_red_boson[1, 1]
-        return p.dof * exp(xi) * pi^2 * p.tempT^3 * 2. / 15.
-    end
-    return p.dof * temp^3 * exp(xi) * cache.rho_der_red_boson_interp(x)
-end
-
-# function rho_der_fermion(T, m, dof; xi=0.0)
-#     cache = _get_dens_cache()
-#     x = m / T
-#     if x - xi > 700.0
-#         return 0.0
-#     end
-#     if x > cache.rho_der_red_fermion[end, 1] || xi > 700.0
-#         return dof * exp(xi - x) * (T^3.0) * ((x^3.5) + 3.0 * (x^2.5) + 3.75 * (x^1.5)) / ((2.0 * pi)^1.5)
-#     end
-#     if x < cache.rho_der_red_fermion[1, 1]
-#         return dof * exp(xi) * pi2 * (T^3.0) * 7.0 / 60.0
-#     end
-#     return dof * (T^3.0) * exp(xi) * cache.rho_der_red_fermion_interp(x)
-# end
-
-# function P_boson(T, m, dof; xi=0.0)
-#     cache = _get_dens_cache()
-#     x = m / T
-#     if x - xi > 700.0
-#         return 0.0
-#     end
-#     if x > cache.P_red_boson[end, 1] || xi > 700.0
-#         return dof * (T - 2.5 * (T^2.0) / m) * exp(xi - x) * ((m * T / (2.0 * pi))^1.5)
-#     end
-#     if x < cache.P_red_boson[1, 1]
-#         return dof * exp(xi) * pi2 * (T^4.0) / 90.0
-#     end
-#     return dof * (T^4.0) * exp(xi) * cache.P_red_boson_interp(x)
-# end
-
-# function P_fermion(T, m, dof; xi=0.0)
-#     cache = _get_dens_cache()
-#     x = m / T
-#     if x - xi > 700.0
-#         return 0.0
-#     end
-#     if x > cache.P_red_fermion[end, 1] || xi > 700.0
-#         return dof * (T - 2.5 * (T^2.0) / m) * exp(xi - x) * ((m * T / (2.0 * pi))^1.5)
-#     end
-#     if x < cache.P_red_fermion[1, 1]
-#         return dof * exp(xi) * pi2 * (T^4.0) * 7.0 / 720.0
-#     end
-#     return dof * (T^4.0) * exp(xi) * cache.P_red_fermion_interp(x)
-# end
-
-function rho_3P_diff_boson(p::Particle{T}, temp::R, xi::S) where {T<:Real, R<:Real, S<:Real}
-    cache = _get_dens_cache()
-    x = p.m / temp
-    if x - xi > 700.0
-        return 0.0
-    end
-    if x > cache.rho_3P_diff_red_boson[end, 1] || xi > 700.0
-        return p.dof * exp(xi - x) * p.m^4 / (2. * pi * x)^(3. /2.) * (1. + 3. / (8. * x))
-    end
-    if x < cache.rho_3P_diff_red_boson[1, 1]
-        return p.dof * exp(xi) * p.m^4 / (12.0 * x^2)
-    end
-    return p.dof * p.m^4 / x^2 * exp(xi) * cache.rho_3P_diff_red_boson_interp(x)
-end
-
-function rho_3P_diff_fermion(p::Particle{T}, temp::R, xi::S) where {T<:Real, R<:Real, S<:Real}
-    cache = _get_dens_cache()
-    x = p.m / temp
-    if x - xi > 700.
-        return 0.
-    end
-    if x > cache.rho_3P_diff_red_fermion[end, 1] || xi > 700.
-        return p.dof * exp(xi - x) * p.m^4 / (2. * pi * x)^(3. / 2.) * (1. + 3. / (8. * x))
-    end
-    if x < cache.rho_3P_diff_red_fermion[1, 1]
-        return p.dof * exp(xi) * p.m^4 / (24. * x^2)
-    end
-    return p.dof * p.m^4 / x^2 * exp(xi) * cache.rho_3P_diff_red_fermion_interp(x)
-end
-
-function n_boson(p::Particle{T}, temp::R, xi::S) where {T<:Real, R<:Real, S<:Real}
-    cache = _get_dens_cache()
-    x = p.m / temp
-    if x - xi > 700.0
-        return 0.0
-    end
-    if x > cache.n_red_boson[end, 1] || xi > 700.0
-        return p.dof * exp(xi - x) * (p.m^2 / (2. * pi * x))^1.5
-    end
-    if x < cache.n_red_boson[1, 1]
-        return p.dof * exp(xi) * zeta3 * temp^3 / pi^2
-    end
-    return p.dof * temp^3 * exp(xi) * cache.n_red_boson_interp(x)
-end
-
-function n_fermion(p::Particle{T}, temp::R, xi::S) where {T<:Real, R<:Real, S<:Real}
-    cache = _get_dens_cache()
-    x = p.m / temp
-    if x - xi > 700.0
-        return 0.0
-    end
-    if x > cache.n_red_fermion[end, 1] || xi > 700.0
-        return p.dof * exp(xi - x) * (p.m^2 / (2. * pi * x))^1.5
-    end
-    if x < cache.n_red_fermion[1, 1]
-        return p.dof * exp(xi) * 0.75 * zeta3 * temp^3 / pi^2
-    end
-    return p.dof * temp^3 * exp(xi) * cache.n_red_fermion_interp(x)
-end
-
-# function n_der_boson(T, m, dof; xi=0.0)
-#     cache = _get_dens_cache()
-#     x = m / T
-#     if x - xi > 700.0
-#         return 0.0
-#     end
-#     if x > cache.n_der_red_boson[end, 1] || xi > 700.0
-#         return dof * exp(xi - x) * (T^2.0) * ((x^2.5) + 1.5 * (x^1.5)) / ((2.0 * pi)^1.5)
-#     end
-#     if x < cache.n_der_red_boson[1, 1]
-#         return dof * exp(xi) * 3.0 * zeta3 * (T^2.0) / pi2
-#     end
-#     return dof * (T^2.0) * exp(xi) * cache.n_der_red_boson_interp(x)
-# end
-
-# function n_der_fermion(T, m, dof; xi=0.0)
-#     cache = _get_dens_cache()
-#     x = m / T
-#     if x - xi > 700.0
-#         return 0.0
-#     end
-#     if x > cache.n_der_red_fermion[end, 1] || xi > 700.0
-#         return dof * exp(xi - x) * (T^2.0) * ((x^2.5) + 1.5 * (x^1.5)) / ((2.0 * pi)^1.5)
-#     end
-#     if x < cache.n_der_red_fermion[1, 1]
-#         return dof * exp(xi) * 3.0 * 0.75 * zeta3 * (T^2.0) / pi2
-#     end
-#     return dof * (T^2.0) * exp(xi) * cache.n_der_red_fermion_interp(x)
-# end

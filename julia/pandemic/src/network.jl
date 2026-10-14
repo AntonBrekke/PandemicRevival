@@ -28,7 +28,7 @@ C_K is the kinetic energy gained: E_nu - Delta per forward portal reaction
 (Delta = sum_F m - m_a, the rest mass created), -Delta per dark-only reaction.
 
 The solver is an implicit Rosenbrock method (Rodas4P) with a finite-difference
-Jacobian, as the reduced solver: the decay and conversion rates reach 1e20 H,
+Jacobian, as the fluid solver: the decay and conversion rates reach 1e20 H,
 and an L-stable method follows the equilibrium they enforce.
 """
 
@@ -37,7 +37,7 @@ import OrdinaryDiffEqRosenbrock as ODER   # AutoFiniteDiff comes with `using Dif
 
 include(joinpath(@__DIR__, "time_temp_relation.jl"))
 include(joinpath(@__DIR__, "dodelson_widrow.jl"))
-include(joinpath(@__DIR__, "dimless_interp.jl"))
+include(joinpath(@__DIR__, "interpolation_helpers.jl"))
 include(joinpath(@__DIR__, "rate_tables.jl"))
 
 const NSPECIES = 4
@@ -49,7 +49,7 @@ with T_dw(m)/T_dw(10 keV), as `O_h2_dw_Tevo`), made monotonic and
 interpolated with a monotone cubic (PCHIP) in ln T so that the source term
 dF/dz is continuous. Each N1 is produced with the DW mean momentum of today,
 `avg_mom_0_dw` (Fig. 8), redshifted back with the entropy scale factor,
-p(z) = p_0 (s(z)/s_0)^(1/3), as the reduced solver's initial condition does.
+p(z) = p_0 (s(z)/s_0)^(1/3), as the fluid solver's initial condition does.
 (Not r_q 3.15 T_nu: r_q = <q>/<q_active> compares with active neutrinos at late
 times, which the QCD-era entropy release has heated relative to the
 free-streaming N1, by (g_s(T)/g_s,late)^(1/3) ~ 1.7.)
@@ -104,9 +104,9 @@ struct Network{FH,FS,FX}
     norms::Dict{Symbol,Tuple{Float64,Float64}}
     masses::NTuple{4,Float64}      # N1, N2, A', phi
     dofs::NTuple{4,Int}
-    H::FH                          # interpolants keyed on z
-    ent::FS
-    dx_dt::FX
+    H_interp_z::FH                 # background interpolants keyed on z
+    ent_interp_z::FS
+    dx_dt_interp_z::FX
     dw::Union{Nothing,DWHistory}   # DW production as a source term (nothing: all at T_dw)
 end
 
@@ -290,7 +290,7 @@ at large g) then cancel exactly in the equation for the total, and only relax
 the ratio.
 """
 function state_densities(net::Network, u, z)
-    s = net.ent(z)
+    s = net.ent_interp_z(z)
     N = exp(u[1]) * s
     r = exp(u[2])
     n1 = N / (1 + r)
@@ -326,9 +326,9 @@ end
 function network_rhs!(du, u, net::Network, z)
     x = exp(z)
     T_nu = net.p.m1 / x
-    H = net.H(z)
-    xfac = x / net.dx_dt(z)
-    s = net.ent(z)
+    H = net.H_interp_z(z)
+    xfac = x / net.dx_dt_interp_z(z)
+    s = net.ent_interp_z(z)
     n, kappa = state_densities(net, u, z)
     T_N = dark_temperature(net, n, kappa)
     urs = unit_rates(net, T_N, T_nu, n[1], n[2])
@@ -373,7 +373,7 @@ end
 """
     network_initial_state(net, dw, tT_rel; dz_seed=1e-3)
 
-State at the start of DW production as the reduced solver has it (all of the
+State at the start of DW production as the fluid solver has it (all of the
 DW yield at T_dw, `DodelsonWidrow`): N1 with the DW number and energy density.
 N2, A', phi (in this order, each produced from the previous ones) start with
 what their production makes in the first `dz_seed` of z (at most n_N1/2 for
@@ -395,13 +395,13 @@ function network_initial_state(net::Network, dw::DodelsonWidrow, tT_rel::TimeTem
         T0 = exp(h.lnT[i]) * h.scale
         z0 = log(net.p.m1 / T0)
         F0, _ = dw_fraction(h, T0)
-        n1 = F0 * h.Y_final * net.ent(z0)
-        p = h.p0 * (net.ent(z0) / s0)^(1 / 3)
+        n1 = F0 * h.Y_final * net.ent_interp_z(z0)
+        p = h.p0 * (net.ent_interp_z(z0) / s0)^(1 / 3)
         rho1 = n1 * sqrt(p^2 + net.masses[1]^2)
     end
-    s = net.ent(z0)
+    s = net.ent_interp_z(z0)
     x0 = exp(z0)
-    xfac = x0 / net.dx_dt(z0)
+    xfac = x0 / net.dx_dt_interp_z(z0)
     T_nu = net.p.m1 / x0
     n = [n1, 1e-30n1, 1e-30n1, 1e-30n1]
     kappa = rho1 - sum(n[k] * net.masses[k] for k in 1:NSPECIES)
@@ -423,49 +423,31 @@ function network_initial_state(net::Network, dw::DodelsonWidrow, tT_rel::TimeTem
 end
 
 """
-    solve_network(net, dw, tT_rel; x_end=100, reltol=1e-6, abstol=1e-8, fmax_stop=0.5, progress=0)
+    solve_network(net, dw, tT_rel; x_end=100, reltol=1e-6, abstol=1e-8, fmax_stop=0.5)
 
 Integrates the network from the DW initial state to x = x_end. Stops with
 retcode Terminated if the dark sector becomes degenerate (largest MB
 occupation number > `fmax_stop`): the network does not apply there.
 """
 function solve_network(net::Network, dw::DodelsonWidrow, tT_rel::TimeTempRelation;
-                       x_end=100.0, reltol=1e-6, abstol=1e-8, progress=0, x_start=nothing, u_start=nothing,
-                       norm_idx=(1, 2, 3, 4, 5), fmax_stop=0.5, kw...)
+                       x_end=100.0, reltol=1e-6, abstol=1e-8, fmax_stop=0.5, kw...)
     u0, z0 = network_initial_state(net, dw, tT_rel)
-    if x_start !== nothing
-        z0, u0 = log(x_start), copy(u_start)
-    end
     prob = DE.ODEProblem(network_rhs!, u0, (z0, log(x_end)), net)
-    # error norm over the listed components only (see `NORM_IDX_QSS`)
-    if norm_idx != (1, 2, 3, 4, 5)
-        kw = (kw..., internalnorm=(v, t) -> v isa Number ? abs(v) : sqrt(sum(abs2, v[i] for i in norm_idx) / length(norm_idx)))
-    end
-    if progress > 0
-        # print x, the step and Omega h^2 every `progress` accepted steps
-        cb = DE.DiscreteCallback((u, t, integ) -> integ.stats.naccept % progress == 0,
-                                 integ -> (println("  step ", integ.stats.naccept, "  x=", round(exp(integ.t); sigdigits=4),
-                                                   "  dz=", round(integ.dt; sigdigits=3), "  Omega h2=",
-                                                   round(network_omega_h2(net, integ.u, integ.t); sigdigits=4)); flush(stdout));
-                                 save_positions=(false, false))
-        kw = (kw..., callback=cb)
-    end
     # MB validity: stop (retcode Terminated) once a dark occupation number exceeds
     # fmax_stop; beyond it Pauli blocking / Bose enhancement matter and the MB rates,
     # which grow with the fugacities, make the system ever stiffer
     degenerate = DE.DiscreteCallback((u, t, integ) -> maximum(network_diagnostics(net, u, t).fmax) > fmax_stop,
                                      DE.terminate!; save_positions=(false, true))
-    kw = haskey(kw, :callback) ? (kw..., callback=DE.CallbackSet(kw[:callback], degenerate)) : (kw..., callback=degenerate)
     # reject steps that leave the representable range (exp of the state overflowing)
     bad(u, p, t) = any(x -> !isfinite(x) || x > 700, u)
     return DE.solve(prob, ODER.Rodas4P(autodiff=AutoFiniteDiff()); reltol=reltol, abstol=abstol,
-                    isoutofdomain=bad, kw...)
+                    isoutofdomain=bad, callback=degenerate, kw...)
 end
 
 """Omega h^2 of the state u at z, counting each A' as the two N it decays into
 and each phi as four (phi -> A'A')."""
 function network_omega_h2(net::Network, u, z)
-    s = net.ent(z)
+    s = net.ent_interp_z(z)
     # u[1] = ln(Y_N1 + Y_N2)
     return net.p.m1 * (exp(u[1]) + 2exp(u[3]) + 4exp(u[4])) * s0 / rho_crit0_h2
 end

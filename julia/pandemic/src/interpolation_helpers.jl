@@ -58,7 +58,6 @@ Log-log interpolation.
 Extrapolation behavior matches the Python use cases in this repository:
 - `extrap = nothing`: throw out-of-range
 - `extrap = "b"`: clamp to boundary y-values
-- `extrap = "c:min,max"`: constant values below/above range
 """
 struct LogInterp{T <: Real}
     logbase::T
@@ -86,16 +85,6 @@ function LogInterp(
         if mode == "b"
             extrap_low = ylog[1]
             extrap_high = ylog[end]
-        elseif mode == "c"
-            if length(parts) != 2
-                throw(ArgumentError("Invalid constant extrapolation format."))
-            end
-            vals = split(parts[2], ',')
-            if length(vals) != 2
-                throw(ArgumentError("Constant extrapolation must be c:min,max."))
-            end
-            extrap_low = log(parse(Float64, vals[1])) / logbase
-            extrap_high = log(parse(Float64, vals[2])) / logbase
         else
             throw(ArgumentError("Unsupported extrapolation mode: $mode"))
         end
@@ -108,4 +97,35 @@ end
 function (li::LogInterp)(x::T) where T <: Real
     xlog = log(x) / li.logbase
     return exp(li.logbase * li.itp(xlog))
+end
+
+"""
+    z_interpolation(z_grid, u)
+
+Interpolation of `u` (log-linear) against the increasing z = log(m_N/T_nu) grid of the
+background, so that a lookup costs one `exp`.
+"""
+function z_interpolation(z_grid, u)
+    log_interp = linear_interpolation(z_grid, log.(u), extrapolation_bc=Line())
+    return z -> exp(log_interp(z))
+end
+
+"""
+    x_grid_of(m_ref, T_nu_grid)
+
+x = m_ref / T_nu on the background grid (increasing). Used to build
+z_grid = log.(x_grid_of(...)) and as an intermediate for `dx_dt_grid_of`.
+"""
+x_grid_of(m_ref, T_nu_grid) = m_ref ./ T_nu_grid
+
+"""
+    dx_dt_grid_of(m_ref, T_nu_grid, dT_nu_dt_grid)
+
+dx/dt = d(m_ref/T)/dt = -(x^2/m_ref) dT/dt, tabulated on the background
+grid. Since dT_nu/dt < 0 this is strictly positive, so it can be
+log-interpolated directly, unlike dT_nu/dt itself.
+"""
+function dx_dt_grid_of(m_ref, T_nu_grid, dT_nu_dt_grid)
+    x_grid = x_grid_of(m_ref, T_nu_grid)
+    return -(x_grid .^ 2) .* dT_nu_dt_grid ./ m_ref
 end

@@ -542,7 +542,7 @@ load_rate_tables(path) = Serialization.deserialize(path)
 """
 Interpolants of a loaded table set (cubic splines in ln x_N, resp. (ln x_nu,
 ln r)); outside the grids they extrapolate linearly in the logs, which is only
-safe a little beyond the edges (check `in_rate_grid`).
+safe a little beyond the edges.
 """
 struct RateInterpolants
     p_ref::Any
@@ -564,11 +564,6 @@ function RateInterpolants(tabs)
     return RateInterpolants(tabs.p_ref, extrema(rN), extrema(rnu), extrema(rr), dark, portal)
 end
 
-"""Whether (T_N, T_nu) lies inside the tabulated grids (for m_N = p.m1)."""
-function in_rate_grid(itp::RateInterpolants, m, T_N, T_nu)
-    lxN, lxnu, lr = log(m / T_N), log(m / T_nu), log(T_N / T_nu)
-    return itp.lnxN[1] <= lxN <= itp.lnxN[2] && itp.lnxnu[1] <= lxnu <= itp.lnxnu[2] && itp.lnr[1] <= lr <= itp.lnr[2]
-end
 
 """ln of the rate and energy normalisation of every reaction at parameters `p` (see `ln_norm`)."""
 rate_norms(itp::RateInterpolants, p) =

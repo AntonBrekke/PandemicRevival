@@ -1,16 +1,15 @@
 #! /usr/bin/env python3
 """
 Contours of the coupling y (= g in the paper) in the (m_N, sin^2 2theta) plane
-for which Omega h^2 = 0.12, from the scan in src/run_relic_scan_theta_z.jl
-(tmp/relic_scan_theta/m_N_*keV.csv). Styled like the money plot of the paper
+for which Omega h^2 = 0.12, from a scan directory written by plot/combined_scan_dir.py
+(tmp/combined_scan: roots.csv and lyman_alpha.csv). Styled like the money plot of the paper
 (code/sterile_res/plotter_3.py): Dodelson-Widrow band, current X-ray limits,
 and the contours labelled on the plot. The X-ray region is drawn over the
 constraint bounds below, and the projected sensitivities (Athena, eROSITA,
 eXTP) are deliberately left out to keep the figure readable.
 
-Only roots on the freeze-in branch are drawn: for each (m_N, y) the smallest
-converged sin^2 2theta at which Omega h^2 rises through the target. The lines
-are monotone (PCHIP) interpolations in log-log between the scanned masses and
+The roots are those of the freeze-in branch (the root searches only follow it). The
+lines are monotone (PCHIP) interpolations in log-log between the scanned masses and
 are broken where no root was found for a mass in the grid. Only whole decades
 of y are drawn, and only those at y >= LABEL_Y_MIN are labelled; a finer
 sub-decade grid, if scanned, still feeds the constraint boundaries below,
@@ -18,11 +17,10 @@ which are what it is needed for.
 
 Three constraints are shaded, each bounding the region of small m_N:
 
-  Ly-alpha    free-streaming length after kinetic decoupling, lambda_fs >
-              0.24 Mpc, and sound horizon r_s > 0.34 Mpc, remapped from the
-              WDM limits as in Bringmann et al. (2206.10630). Needs
-              <scan_dir>/lyman_alpha.csv from src/run_lyman_alpha.jl; without
-              it the two are silently skipped.
+  Ly-alpha    free-streaming length outside the kinetically coupled phase,
+              lambda_fs > 0.24 Mpc, and sound horizon r_s > 0.34 Mpc, remapped
+              from the WDM limit m_WDM > 1.9 keV as in Bringmann et al.
+              (2206.10630); see src/lyman_alpha.jl.
   self-int.   sigma/m > 1 cm^2/g for the N1/N2 mixture of each point (N2
               fraction and splitting from lyman_alpha.csv), with
               N1N1 -> N2N2, N2N2 -> N1N1 and N1N2 -> N1N2; see
@@ -31,14 +29,6 @@ Three constraints are shaded, each bounding the region of small m_N:
 On every line of constant y the crossing of each limit is interpolated (in
 log) between neighbouring roots and the crossings are joined. For sigma/m the
 interpolation is exact, since sigma/m ~ m^-3 at fixed y and m_A'/m_N.
-
-Environment: LYA_VARIANT=A6 plots the lengths with (A6) as printed in the
-draft, LYA_VARIANT=old as the old Python code computed them (its amplitude and
-its stray factor 1e3), LYA_VARIANT=nokd the free-streaming length without
-kinetic decoupling, LYA_VARIANT=conv kinetic decoupling with N1N1 -> N2N2
-alone (as before 2026-10-03); SI_VARIANT=fixed pure N1N1 -> N2N2 (as before
-2026-10-03), SI_VARIANT=A6 and SI_VARIANT=old the self-interaction cross
-section from (A6) as printed and of plotter_3.py.
 
 Run from julia/pandemic:
     conda run -n pandemic python plot/relic_scan_theta.py [scan_dir] [output_path_without_extension] [--debug]
@@ -51,7 +41,6 @@ bar; open where excluded), and writes <output>_debug_all.pdf.
 """
 
 import argparse
-import glob
 import os
 import sys
 
@@ -92,8 +81,6 @@ C_OVERPROD = "#92CBE2"   # skyblue at alpha 0.8 on white
 C_OVERPROD_TEXT = "#155D7A"
 
 # Limits of the three constraints, and the colours they are drawn in.
-# LAMBDA_FS_MAX_MPC and R_S_MAX_MPC are LYA_LAMBDA_FS_MAX_MPC and
-# LYA_R_S_MAX_MPC of src/lyman_alpha.jl and src/kinetic_decoupling.jl.
 LAMBDA_FS_MAX_MPC = 0.24
 R_S_MAX_MPC = 0.34
 SIGMA_M_MAX = 1.0        # cm^2/g
@@ -112,15 +99,6 @@ LABEL_Y_MIN = 1e-6
 Z_BOUND = {"lya": -3.5, "r_s": -3.7, "si": -3.9}
 Z_LABEL = 2.5   # all on-plot text, above every shaded region
 
-SI_VARIANT = os.environ.get("SI_VARIANT", "mix")
-LYA_VARIANT = os.environ.get("LYA_VARIANT", "fixed")
-LYA_COLUMNS = {"fixed": ("lambda_fs_kd_Mpc", "r_s_Mpc"),
-               "conv": ("lambda_fs_kd_conv_Mpc", "r_s_conv_Mpc"),
-               "A6": ("lambda_fs_kd_A6_Mpc", "r_s_A6_Mpc"),
-               "old": ("lambda_fs_kd_old_Mpc", "r_s_old_Mpc"),
-               "nokd": ("lambda_fs_Mpc", None)}[LYA_VARIANT]
-
-
 def parse_args():
     p = argparse.ArgumentParser(
         description=__doc__,
@@ -129,12 +107,12 @@ def parse_args():
     p.add_argument(
         "scan_dir",
         nargs="?",
-        default=os.path.join(ROOT, "tmp", "relic_scan_theta")
+        default=os.path.join(ROOT, "tmp", "combined_scan")
     )
     p.add_argument(
         "out",
         nargs="?",
-        default=os.path.join(ROOT, "figures", "relic_contours_y"),
+        default=os.path.join(ROOT, "figures", "relic_contours"),
         help="output path without extension"
     )
     p.add_argument(
@@ -170,74 +148,27 @@ def get_figsize(columnwidth, wf=1.0, hf=(5.**0.5 - 1.0) / 2.0):
     return [fig_width, fig_width * hf]
 
 
-def load_scan(scan_dir):
-    rows = []
-    for path in sorted(glob.glob(os.path.join(scan_dir, "m_N_*keV.csv"))):
-        data = np.genfromtxt(
-            path,
-            delimiter=",",
-            names=True,
-            dtype=None,
-            encoding="utf-8"
-        )
-        rows.extend(np.atleast_1d(data).tolist())
-    if not rows:
-        raise SystemExit(f"no scan results in {scan_dir}")
-    names = [
-        "m_N",
-        "y",
-        "sin2_2theta",
-        "omega_h2",
-        "converged",
-        "plateau_ok",
-        "retcode",
-        "branch",
-        "slope",
-        "n_failed"
-    ]
-    return {n: np.array([r[i] for r in rows]) for i, n in enumerate(names)}
+def read_csv(path):
+    return np.atleast_1d(np.genfromtxt(path, delimiter=",", names=True, dtype=None, encoding="utf-8"))
 
 
-def freeze_in_roots(scan):
-    """(m_N [keV], y) -> smallest converged sin^2 2theta with dOmega/dtheta > 0."""
-    ok = (scan["converged"] == True) & (scan["plateau_ok"] == True) & (scan["slope"] > 0)  # noqa: E712
-    roots = {}
-    for m, y, s in zip(scan["m_N"][ok], scan["y"][ok], scan["sin2_2theta"][ok]):
-        key = (round(m * 1e6, 10), y)
-        roots[key] = min(s, roots.get(key, np.inf))
-    return roots
+def key(r):
+    return (round(r["m_N"] * 1e6, 10), r["y"])
+
+
+def load_roots(scan_dir):
+    """(m_N [keV], y) -> sin^2 2theta of every root in <scan_dir>/roots.csv."""
+    return {key(r): r["sin2_2theta"] for r in read_csv(os.path.join(scan_dir, "roots.csv"))
+            if r["solver"] != "failed" and np.isfinite(r["sin2_2theta"])}
 
 
 def load_lyman_alpha(scan_dir):
-    """(m_N [keV], y) -> lambda_fs and r_s [Mpc] of LYA_VARIANT from
-    src/run_lyman_alpha.jl, or ({}, {}) if it has not been run."""
-    path = os.path.join(scan_dir, "lyman_alpha.csv")
-    if not os.path.exists(path):
-        return {}, {}
-    data = np.atleast_1d(np.genfromtxt(
-        path,
-        delimiter=",",
-        names=True,
-        dtype=None,
-        encoding="utf-8"
-    ))
-    col_l, col_r = LYA_COLUMNS
-    key = lambda r: (round(r["m_N"] * 1e6, 10), r["y"])
-    lam = {key(r): r[col_l] for r in data if np.isfinite(r[col_l])}
-    if col_r:
-        r_s = {key(r): r[col_r] for r in data if np.isfinite(r[col_r])}
-    else:
-        r_s = {}
-    return lam, r_s
-
-
-def load_mixture(scan_dir):
-    """(m_N [keV], y) -> (f_N2, delta_m) from lyman_alpha.csv, for SI_VARIANT=mix."""
-    data = np.atleast_1d(np.genfromtxt(os.path.join(scan_dir, "lyman_alpha.csv"), delimiter=",",
-                                       names=True, dtype=None, encoding="utf-8"))
-    key = lambda r: (round(r["m_N"] * 1e6, 10), r["y"])
-    return {key(r): (r["f_N2"], r["delta_m"]) for r in data
-            if np.isfinite(r["f_N2"]) and np.isfinite(r["delta_m"])}
+    """(m_N [keV], y) -> lambda_fs and r_s [Mpc], and -> (f_N2, delta_m), from <scan_dir>/lyman_alpha.csv."""
+    data = read_csv(os.path.join(scan_dir, "lyman_alpha.csv"))
+    lam = {key(r): r["lambda_fs_kd_Mpc"] for r in data if np.isfinite(r["lambda_fs_kd_Mpc"])}
+    r_s = {key(r): r["r_s_Mpc"] for r in data if np.isfinite(r["r_s_Mpc"])}
+    mix = {key(r): (r["f_N2"], r["delta_m"]) for r in data if np.isfinite(r["f_N2"]) and np.isfinite(r["delta_m"])}
+    return lam, r_s, mix
 
 
 def bound_crossings(roots, vals, limit):
@@ -508,14 +439,9 @@ def y_label(y, first):
 
 def main():
     args = parse_args()
-    roots = freeze_in_roots(load_scan(args.scan_dir))
-    lam, r_s = load_lyman_alpha(args.scan_dir)
-    if SI_VARIANT == "mix":
-        mix = load_mixture(args.scan_dir)
-        sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, "mix", f2=mix[k][0], delta=mix[k][1])
-                 for k in roots if k in mix}
-    else:
-        sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, SI_VARIANT) for k in roots}
+    roots = load_roots(args.scan_dir)
+    lam, r_s, mix = load_lyman_alpha(args.scan_dir)
+    sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, *mix[k]) for k in roots if k in mix}
     out = args.out + ("_debug_all" if args.all_points else "_debug" if args.debug else "")
 
     set_style()

@@ -1,7 +1,4 @@
-import Integrals
 import SpecialFunctions as SF
-import Polylogarithms as PL
-import PolyLog as PL2
 import QuadGK
 import ForwardDiff as FD
 
@@ -22,7 +19,7 @@ QuadGK.kronrod(::Type{<:FD.Dual{T,V,N}}, n::Integer) where {T,V,N} = QuadGK.kron
 
 # All densities below accept an optional keyword `gap` = (m - mu)/T = m/T - xi.
 # If it is not given, it is computed as m/T - xi. Callers that know it exactly
-# (the A' gap is e^eta in the pandemolator) should pass it: for large m/T the
+# (the A' gap is e^eta in the fluid solver) should pass it: for large m/T the
 # difference m/T - xi loses a small gap to rounding, which for bosons turns
 # into a spurious Bose condensation.
 #
@@ -69,7 +66,6 @@ function number_density(
         temp::R,
         xi::S;
         gap=nothing,
-        debug=false
     ) where {T<:Real, R<:Real, S<:Real}
     x = p.m / temp
     x_xi_diff = isnothing(gap) ? x - xi : gap
@@ -79,10 +75,7 @@ function number_density(
         end
         return p.dof * exp(-x_xi_diff) * temp^3 / pi^2
     else
-        if debug
-            println("n_xi")
-        end
-        return n_xi(p, temp, xi; gap=x_xi_diff, debug=debug)
+        return n_xi(p, temp, xi; gap=x_xi_diff)
     end
 end
 
@@ -91,15 +84,9 @@ function n_xi(
         temp::R,
         xi::S;
         gap=nothing,
-        debug=false
     ) where {T<:Real, R<:Real, S<:Real}
     x = p.m / temp
     x_xi_diff = isnothing(gap) ? x - xi : gap
-    if debug
-        println("x = ", x)
-        println("xi = ", xi)
-        println("x_xi_diff = ", x_xi_diff)
-    end
     if p.k == -1 && x_xi_diff <= 0
         throw(DomainError(x_xi_diff, "m/T - xi <= 0 for a boson (Bose condensation) in n_xi: xi = $xi, temp = $temp, m = $(p.m)"))
     end

@@ -129,7 +129,7 @@ Returns a NamedTuple with, all in Mpc:
   redshifted to z_red_end;
 and `v_end`, the mean speed at the end of the solution.
 """
-function free_streaming_length(pan::PandemolatorZ, tT_rel::TimeTempRelation, sol;
+function free_streaming_length(pan, tT_rel::TimeTempRelation, sol;
         z_red_end=LYA_Z_RED_END, rtol=1e-6)
     z_i, z_f = sol.t[1], sol.t[end]
     z_end = z_at_redshift(pan.N1.m, tT_rel, z_red_end)

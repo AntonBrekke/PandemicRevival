@@ -118,7 +118,7 @@ check therefore flagged many well-converged points as not-plateaued, which
 that false-alarm, and is at least as strict for genuine non-convergence
 (Omega h^2 cannot plateau if its ingredients, including any dominant
 component, are still evolving)."""
-function check_plateau_z(pan::PandemolatorZ, sol; frac::Float64=0.05, tol::Float64=1e-3)
+function check_plateau_z(pan, sol; frac::Float64=0.05, tol::Float64=1e-3)
     n_pts = length(sol.t)
     n_tail = min(n_pts, max(3, ceil(Int, frac * n_pts)))
     idx = (n_pts - n_tail + 1):n_pts
@@ -134,11 +134,11 @@ As `final_omega_h2` in relic_scan.jl, but `sol.t[end]` IS z directly (no
 inversion to T_nu needed before the interpolant lookup, since PandemolatorZ's
 interpolants are keyed on z natively).
 """
-final_omega_h2_z(pan::PandemolatorZ, sol) = omega_h2_of(pan, sol.u[end], sol.t[end])
+final_omega_h2_z(pan, sol) = omega_h2_of(pan, sol.u[end], sol.t[end])
 
 """As `solve_point` in relic_scan.jl, calling `pandemolate_z`."""
 function solve_point_z(
-        pan::PandemolatorZ{T},
+        pan,
         tT_rel::TimeTempRelation{T},
         dw::DodelsonWidrow{T},
         y::Float64, theta::Float64,

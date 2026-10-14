@@ -3,7 +3,11 @@ Relic roots of the species-resolved network at every (m_N, y) of the merged
 reduced-solver scan (tmp/relic_scan_theta_merged), starting from the reduced
 root. Threaded over points.
 
-    julia --project=. -t 8 src/run_network_scan.jl [tables.jls] [out_dir]
+    julia --project=. -t 8 src/run_network_scan.jl [tables.jls] [out_dir] [seeds.csv]
+
+seeds.csv (m_N,y,sin2_2theta,omega_h2; e.g. from plot/fine_g_seeds.py) replaces the
+reduced roots as the points and starting values; its sin2_2theta then appears in the
+s2_reduced column.
 
 Output: <out_dir>/network_roots.csv (default tmp/network_scan), one row per
 point: the reduced root, the network root and Omega h^2 there, the status
@@ -17,11 +21,11 @@ using Printf
 
 const SCAN_DIR = joinpath(@__DIR__, "..", "tmp", "relic_scan_theta_merged")
 
-"""All (m_N [GeV], y, sin^2 2theta, Omega h^2) with a finite reduced root."""
-function reduced_roots()
+"""All (m_N [GeV], y, sin^2 2theta, Omega h^2) with a finite reduced root, or the rows of `files`."""
+function reduced_roots(files=[joinpath(SCAN_DIR, f) for f in readdir(SCAN_DIR) if startswith(f, "m_N_") && endswith(f, "keV.csv")])
     pts = Tuple{Float64,Float64,Float64,Float64}[]
-    for f in filter(f -> startswith(f, "m_N_") && endswith(f, "keV.csv"), readdir(SCAN_DIR))
-        for l in readlines(joinpath(SCAN_DIR, f))[2:end]
+    for f in files
+        for l in readlines(f)[2:end]
             c = split(l, ',')
             s2 = parse(Float64, c[3])
             isnan(s2) || push!(pts, (parse(Float64, c[1]), parse(Float64, c[2]), s2, parse(Float64, c[4])))
@@ -93,7 +97,7 @@ function main(args)
     mkpath(out_dir)
     itp = RateInterpolants(load_rate_tables(path))
     tT_rel = TimeTempRelation{Float64}()
-    pts = reduced_roots()
+    pts = length(args) > 2 ? reduced_roots([args[3]]) : reduced_roots()
     # cheap points first is irrelevant; interleave masses so progress is representative
     sort!(pts; by=p -> (p[2], p[1]))
     # NETWORK_SCAN_LIMIT=n: every k-th point only, n in total (smoke tests)

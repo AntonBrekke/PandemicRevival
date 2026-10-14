@@ -170,19 +170,22 @@ the Amos routine behind `besselkx` refuses the argument.
 _besselk1x(x) = x < 1e4 ? SF.besselkx(1, x) : sqrt(pi / (2x)) * (1 + 3 / (8x) - 15 / (128x^2) + 315 / (3072x^3))
 
 """
-    C_kd(T, gap, m, m_A, g; amp=:fixed, sigma_scale=1.0, channels=:all)
+    C_kd(T, gap, m, m_A, g; amp=:fixed, sigma_scale=1.0, channels=:all, gap2=gap)
 
 Momentum-exchange rate density at dark temperature T and gap = (m - mu)/T
-(see CHANNELS in the header). Integrated in w = (sqrt(s) - 2m)/T, with
+(see CHANNELS in the header). `gap2` is the gap of N2 where it differs from
+that of N1 (the network): the N1 N2 term then carries e^(-gap - gap2) instead of
+e^(-2 gap), so that C_kd/n_N1 = n_N1 <sigma v>_11->22 + n_N2 <sigma v>_12->12. Integrated in w = (sqrt(s) - 2m)/T, with
 e^(2 xi) K_1(sqrt(s)/T) = e^(-w - 2 gap) besselkx(1, sqrt(s)/T); for
 `channels=:all` with breakpoints around the A' pole, w = (m_A - 2m)/T, on the
 scale of its width.
 """
-function C_kd(T, gap, m, m_A, g; amp::Symbol=:fixed, sigma_scale=1.0, channels::Symbol=:all)
+function C_kd(T, gap, m, m_A, g; amp::Symbol=:fixed, sigma_scale=1.0, channels::Symbol=:all, gap2=gap)
     channels in (:all, :conversion) || error("unknown channels $channels")
     Gamma_A = channels === :all ? width_A(m, m_A, g) : 0.0
+    w12 = exp(gap - gap2)
     sig(s) = sigma_NN(s, m, m_A, g; amp=amp) / 2 +
-             (channels === :all ? sigma_NN12(s, m, m_A, g, Gamma_A) : 0.0)
+             (channels === :all ? w12 * sigma_NN12(s, m, m_A, g, Gamma_A) : 0.0)
     integrand(w) = begin
         rs = 2 * m + w * T
         s = rs * rs
@@ -197,6 +200,72 @@ function C_kd(T, gap, m, m_A, g; amp::Symbol=:fixed, sigma_scale=1.0, channels::
     end
     val = QuadGK.quadgk(integrand, pts...; rtol=1e-6)[1]
     return sigma_scale * T / (32 * pi^4) * exp(-2 * gap) * val
+end
+
+"""
+    CkdTable(m, m_A, g; amp=:fixed, per_decade=60, narrow_du=1e-9)
+
+The cross sections of `C_kd` (channels=:all), sigma_11/2 and sigma_12, tabulated once per
+(m, m_A, g) on a fixed grid in u = sqrt(s) - 2m: log-spaced from 1e-18 m to 1e7 m, plus a
+cluster around the A' pole u = m_A - 2m from L_in = 1e-3 of its half-width du = Gamma_A/2
+out to 0.1 m (a trapezoid from the log grid straight to a few widths would weight the tail
+by an interval of up to ~1e10 widths at small g). `C_kd(tab, T, gap; gap2)` is then the same
+integral as `C_kd` by the trapezoidal rule on that grid, microseconds instead of seconds per
+call; agreement with `C_kd` is checked in test/test_ckd_table.jl.
+
+Below g ~ 1e-6 the width is too small for a grid in u (du < narrow_du m: the offsets would be
+lost to rounding of u ~ m). The pole is then the narrow-width delta function of area
+2 du atan(L_in/du) times the peak value (the Lorentzian within +-L_in = 1e3 du; the
+peak is evaluated at s = m_A^2 exactly), the cluster starts at L_in, and the interval across
+the pole is left out of the trapezoid.
+"""
+struct CkdTable
+    m::Float64
+    u::Vector{Float64}
+    w11::Vector{Float64}   # 2 s sigma_11/2 (s - 4m^2): the integrand without the thermal factor
+    w12::Vector{Float64}   # the same for sigma_12
+    u_res::Float64
+    res_area::Float64      # narrow-width pole of w12 (0 if the pole is on the grid)
+end
+
+function CkdTable(m, m_A, g; amp::Symbol=:fixed, per_decade=60, narrow_du=1e-9)
+    Gamma_A = width_A(m, m_A, g)
+    u = collect(m .* 10 .^ range(-18, 7, length=25 * per_decade + 1))
+    u_res, du = m_A - 2m, Gamma_A / 2
+    narrow = du < narrow_du * m
+    L_in = narrow ? 1e3 * du : 1e-3 * du
+    n_off = round(Int, per_decade * log10(0.1m / L_in)) + 1
+    offs = 10 .^ range(log10(L_in), log10(0.1m), length=n_off)
+    append!(u, filter(>(0), narrow ? [u_res .- offs; u_res .+ offs] : [u_res; u_res .- offs; u_res .+ offs]))
+    sort!(unique!(u))
+    narrow && filter!(x -> abs(x - u_res) >= L_in * (1 - 1e-6), u)
+    s = @. (2m + u)^2
+    w11 = [2 * si * sigma_NN(si, m, m_A, g; amp=amp) / 2 * (si - 4m^2) for si in s]
+    w12 = [2 * si * sigma_NN12(si, m, m_A, g, Gamma_A) * (si - 4m^2) for si in s]
+    res_area = 0.0
+    if narrow
+        sA = m_A^2
+        res_area = 2 * sA * sigma_NN12(sA, m, m_A, g, Gamma_A) * (sA - 4m^2) * 2du * atan(L_in / du)
+    end
+    return CkdTable(m, u, w11, w12, u_res, res_area)
+end
+
+function C_kd(tab::CkdTable, T, gap; gap2=gap)
+    m, u = tab.m, tab.u
+    w12 = exp(gap - gap2)
+    thermal(ui) = _besselk1x((2m + ui) / T) * exp(-ui / T)
+    acc, f_prev = 0.0, 0.0
+    skip = tab.res_area > 0
+    for i in eachindex(u)
+        f = (tab.w11[i] + w12 * tab.w12[i]) * thermal(u[i])
+        if i > 1 && !(skip && u[i-1] < tab.u_res < u[i])
+            acc += (f + f_prev) / 2 * (u[i] - u[i-1])
+        end
+        f_prev = f
+        u[i] > 200 * T && break   # e^(-u/T) < e^-200 from here on
+    end
+    acc += w12 * tab.res_area * thermal(tab.u_res)
+    return T / (32 * pi^4) * exp(-2 * gap) * acc
 end
 
 """
@@ -274,6 +343,10 @@ function dark_P_rho(pan, u)
     gap_A = gap_A_from_eta(u[4])
     xi_N = pan.N1.m / T_N - gap_N
     P = pressure(pan.N1, T_N, gap_N) + pressure(pan.N2, T_N, gap_N) + pressure(pan.A, T_N, gap_A)
+    # the high-g fluid (pandemolator_hg.jl) also carries phi, which energy_dens includes
+    if hasproperty(pan, :phi) && pan.with_phi
+        P += pressure(pan.phi, T_N, gap_phi_of(pan, T_N, gap_A))
+    end
     return P, energy_dens(pan, T_N, xi_N; gap_A=gap_A)
 end
 
@@ -328,7 +401,7 @@ and `r_s` (sound horizon up to T_kd, not capped at z_red_end, as in the old
 code), and `x_kd` = m_N/T_nu at decoupling (Inf if the dark sector is still
 coupled at the end of the time grid).
 """
-function lyman_alpha_lengths(pan::PandemolatorZ, tT_rel::TimeTempRelation, sol;
+function lyman_alpha_lengths(pan, tT_rel::TimeTempRelation, sol;
         amp::Symbol=:fixed, sigma_scale=1.0, channels::Symbol=:all, z_red_end=LYA_Z_RED_END)
     h = DarkHistory(pan, sol)
     m = pan.N1.m

@@ -45,7 +45,9 @@ Run from julia/pandemic:
 
 --debug marks the scanned roots on the lines (open markers where a root is
 excluded by one of the constraints) and writes <output>_debug.pdf, so the
-production figure is not overwritten.
+production figure is not overwritten. --all-points marks every scanned root
+instead, sub-decade couplings included (small dots coloured by g, on a colour
+bar; open where excluded), and writes <output>_debug_all.pdf.
 """
 
 import argparse
@@ -139,6 +141,11 @@ def parse_args():
         "--debug",
         action="store_true",
         help="mark the scanned roots on the contour lines"
+    )
+    p.add_argument(
+        "--all-points",
+        action="store_true",
+        help="mark every scanned root, all y, and write <out>_debug_all.pdf"
     )
     return p.parse_args()
 
@@ -474,6 +481,22 @@ def plot_contours(ax, roots, excluded, debug):
             first[0] = False
 
 
+def plot_all_points(fig, ax, roots, excluded):
+    """Every root of the scan, all y, coloured by log10 g (--all-points)."""
+    from matplotlib.colors import Normalize
+    keys = sorted(roots)
+    m = np.array([k[0] for k in keys])
+    s = np.array([roots[k] for k in keys])
+    lg = np.log10([k[1] for k in keys])
+    ex = np.array([excluded.get(k, False) for k in keys])
+    norm = Normalize(lg.min(), lg.max())
+    cmap = plt.cm.viridis
+    ax.scatter(m[~ex], s[~ex], s=3, c=cmap(norm(lg[~ex])), lw=0, zorder=3)
+    ax.scatter(m[ex], s[ex], s=4, facecolors="white", edgecolors=cmap(norm(lg[ex])), lw=0.4, zorder=3)
+    sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+    fig.colorbar(sm, ax=ax, pad=0.02, label=r"$\log_{10} g$")
+
+
 def y_label(y, first):
     exp10 = np.log10(y)
     if abs(exp10 - round(exp10)) < 1e-6:
@@ -493,7 +516,7 @@ def main():
                  for k in roots if k in mix}
     else:
         sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, SI_VARIANT) for k in roots}
-    out = args.out + ("_debug" if args.debug else "")
+    out = args.out + ("_debug_all" if args.all_points else "_debug" if args.debug else "")
 
     set_style()
     fig = plt.figure(figsize=get_figsize(COLUMNWIDTH, wf=1.0, hf=0.9), dpi=150)
@@ -530,7 +553,9 @@ def main():
             or sig_m.get(k, 0.0) > SIGMA_M_MAX
         ) for k in roots
     }
-    plot_contours(ax, roots, excluded, args.debug)
+    plot_contours(ax, roots, excluded, args.debug and not args.all_points)
+    if args.all_points:
+        plot_all_points(fig, ax, roots, excluded)
 
     ax.set_xscale("log")
     ax.set_yscale("log")

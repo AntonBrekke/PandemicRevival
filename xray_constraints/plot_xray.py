@@ -8,7 +8,10 @@ from scipy.interpolate import interp1d
 # CONSTRAINTS
 cbs = np.loadtxt('CBS_2008.02283.dat', skiprows=2)
 dwarfs = np.loadtxt('Dwarfs_1408.3531.dat', skiprows=2)
-integral = np.loadtxt('INTEGRAL_0710.4922.dat', skiprows=2)
+integral_bmn08 = np.loadtxt('INTEGRAL_0710.4922.dat', skiprows=2)
+# INTEGRAL/SPI 2023 (2211.06200) supersedes BMN08 (same instrument, 20 instead of 5 yr, current MW
+# profiles); column 1 is the reference profile, 2 and 3 the weakest/strongest (Fig. 10 band)
+integral = np.loadtxt('INTEGRAL_SPI_2211.06200.dat', comments='#')[:, :2]
 m31 = np.loadtxt('M31_1311.0282.dat', skiprows=2)
 nustar = np.loadtxt('NuSTAR_1908.09037.dat', skiprows=2)
 xmmblanksky = np.loadtxt('XMMBlankSky_2102.02207.dat', skiprows=2)
@@ -45,6 +48,7 @@ extp_proj = np.loadtxt('eXTP_projection_2001.07014.dat', skiprows=2)
 plt.loglog(cbs[:,0], cbs[:,1], ls='-')
 plt.loglog(dwarfs[:,0], dwarfs[:,1], ls='-')
 plt.loglog(integral[:,0], integral[:,1], ls='-')
+plt.loglog(integral_bmn08[:,0], integral_bmn08[:,1], ls=':')
 plt.loglog(m31[:,0], m31[:,1], ls='-')
 plt.loglog(nustar[:,0], nustar[:,1], ls='-')
 plt.loglog(xmmblanksky[:,0], xmmblanksky[:,1], ls='-')

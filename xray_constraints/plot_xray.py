@@ -1,61 +1,73 @@
 #! /usr/bin/env python3
+"""
+The combined X-ray / gamma-ray limit on sin^2(2 theta) of sterile-neutrino decay N -> nu gamma: the
+minimum over the current limits below, written to overall_constraint.dat (m_s [GeV], sin^2 2theta)
+on a log grid. The limits assume that all the dark matter decays; the relic plot rescales by the
+decaying fraction (plot/relic_scan_theta.py in julia/pandemic).
 
+    python plot_xray.py [--plot]      # --plot: draw the limits and their minimum (xray_limits.pdf)
+
+Superseded and therefore not used: INTEGRAL/SPI 2008 (0710.4922, by SPI 2023), and NuSTAR 2020
+(1908.09037, by NuSTAR 2023, same group and data) except above 39.6 keV, where the 2023/2024
+NuSTAR analyses end and SPI starts only at 40.5 keV (its digitised values there sit at the 1e-14
+floor of the compilation figure they were read from, i.e. are conservative). Not used: eROSITA eFEDS (2401.16747; weaker than
+older limits and than eROSITA LMC in its range), SRG/ART-XC (2303.12673; weaker than NuSTAR 2023
+everywhere), XRISM (2510.24560; one mass, 7.1 keV, inside the NuSTAR limits).
+"""
+import sys
 import numpy as np
-import matplotlib.pyplot as plt
 
-from scipy.interpolate import interp1d
+LIMITS = {   # file: label
+    "CBS_2008.02283.dat": "Chandra blank sky (2008.02283)",
+    "Dwarfs_1408.3531.dat": "dwarf spheroidals (1408.3531)",
+    "M31_1311.0282.dat": "M31 (1311.0282)",
+    "XMMBlankSky_2102.02207.dat": "XMM-Newton blank sky (2102.02207)",
+    "eROSITA_LMC_2603.19109.dat": "eROSITA LMC (2603.19109)",
+    "NuSTAR_2207.04572.dat": "NuSTAR halo (2207.04572)",
+    "NuSTAR_straylight_2405.17861.dat": "NuSTAR stray light (2405.17861)",
+    "INTEGRAL_SPI_2211.06200.dat": "INTEGRAL/SPI (2211.06200)",
+    "INTEGRAL_SPI_2209.06299.dat": "INTEGRAL/SPI template (2209.06299)",
+    "NuSTAR_1908.09037.dat": "NuSTAR 2020 above 39.6 keV (1908.09037)",
+}
+M_MIN = {"NuSTAR_1908.09037.dat": 3.96e-5}   # GeV: used only above the newer NuSTAR limits
 
-# CONSTRAINTS
-cbs = np.loadtxt('CBS_2008.02283.dat', skiprows=2)
-dwarfs = np.loadtxt('Dwarfs_1408.3531.dat', skiprows=2)
-integral_bmn08 = np.loadtxt('INTEGRAL_0710.4922.dat', skiprows=2)
-# INTEGRAL/SPI 2023 (2211.06200) supersedes BMN08 (same instrument, 20 instead of 5 yr, current MW
-# profiles); column 1 is the reference profile, 2 and 3 the weakest/strongest (Fig. 10 band)
-integral = np.loadtxt('INTEGRAL_SPI_2211.06200.dat', comments='#')[:, :2]
-m31 = np.loadtxt('M31_1311.0282.dat', skiprows=2)
-nustar = np.loadtxt('NuSTAR_1908.09037.dat', skiprows=2)
-xmmblanksky = np.loadtxt('XMMBlankSky_2102.02207.dat', skiprows=2)
 
-cbs_interp = interp1d(np.log(cbs[:,0]), np.log(cbs[:,1]), kind='linear', bounds_error=False, fill_value=10.)
-dwarfs_interp = interp1d(np.log(dwarfs[:,0]), np.log(dwarfs[:,1]), kind='linear', bounds_error=False, fill_value=10.)
-m31_interp = interp1d(np.log(m31[:,0]), np.log(m31[:,1]), kind='linear', bounds_error=False, fill_value=10.)
-integral_interp = interp1d(np.log(integral[:,0]), np.log(integral[:,1]), kind='linear', bounds_error=False, fill_value=10.)
-nustar_interp = interp1d(np.log(nustar[:,0]), np.log(nustar[:,1]), kind='linear', bounds_error=False, fill_value=10.)
-xmmblanksky_interp = interp1d(np.log(xmmblanksky[:,0]), np.log(xmmblanksky[:,1]), kind='linear', bounds_error=False, fill_value=10.)
+def load(f):
+    return np.loadtxt(f, comments="#")[:, :2]     # SPI 2211.06200: column 1 is the reference profile
 
-def overall_interp(m_d):
-    log_m_d = np.log(m_d)
 
-    cbs_dwarfs = np.minimum(cbs_interp(log_m_d), dwarfs_interp(log_m_d))
-    m31_integral = np.minimum(m31_interp(log_m_d), integral_interp(log_m_d))
-    integral_nustar = np.minimum(nustar_interp(log_m_d), xmmblanksky_interp(log_m_d))
+lims = {f: load(f) for f in LIMITS}
+m_lo = min(d[0, 0] for d in lims.values())
+m_hi = max(d[-1, 0] for d in lims.values())
+m = np.logspace(np.log10(m_lo), np.log10(m_hi), 10000)
+logs = np.array([np.where(m >= M_MIN.get(f, 0.0),
+                          np.interp(np.log(m), np.log(d[:, 0]), np.log(d[:, 1]), left=np.inf, right=np.inf), np.inf)
+                 for f, d in lims.items()])
+overall = np.exp(logs.min(axis=0))
+np.savetxt("overall_constraint.dat", np.column_stack((m, overall)), fmt="%.6e",
+           header="minimum over: " + ", ".join(LIMITS) + "\nm_s [GeV]    sin^2 (2 theta)")
+which = np.where(np.isfinite(logs.min(axis=0)), np.array(list(LIMITS.values()))[logs.argmin(axis=0)], "none")
+print("overall_constraint.dat: %.3g-%.3g keV; set by:" % (m_lo * 1e6, m_hi * 1e6))
+start = 0
+for i in range(1, len(m) + 1):
+    if i == len(m) or which[i] != which[start]:
+        if m[i - 1] / m[start] > 1.02:
+            print(f"  {m[start] * 1e6:8.3g} - {m[i - 1] * 1e6:8.3g} keV  {which[start]}")
+        start = i
 
-    overall = np.minimum(np.minimum(cbs_dwarfs, m31_integral), integral_nustar)
-
-    return np.exp(overall)
-
-min_m_d = min(cbs[0,0], dwarfs[0,0], integral[0,0], m31[0,0], nustar[0,0], xmmblanksky[0,0])
-max_m_d = max(cbs[-1,0], dwarfs[-1,0], integral[-1,0], m31[-1,0], nustar[-1,0], xmmblanksky[-1,0])
-m_d_grid = np.logspace(np.log10(min_m_d), np.log10(max_m_d), 10000)
-overall_constraint_grid = overall_interp(m_d_grid)
-np.savetxt('overall_constraint.dat', np.column_stack((m_d_grid, overall_constraint_grid)))
-
-# PROJECTIONS
-anita_proj = np.loadtxt('Athena_projection_2103.13242.dat', skiprows=2)
-erosita_proj = np.loadtxt('eROSITA_projection_2103.13241.dat', skiprows=2)
-extp_proj = np.loadtxt('eXTP_projection_2001.07014.dat', skiprows=2)
-
-plt.loglog(cbs[:,0], cbs[:,1], ls='-')
-plt.loglog(dwarfs[:,0], dwarfs[:,1], ls='-')
-plt.loglog(integral[:,0], integral[:,1], ls='-')
-plt.loglog(integral_bmn08[:,0], integral_bmn08[:,1], ls=':')
-plt.loglog(m31[:,0], m31[:,1], ls='-')
-plt.loglog(nustar[:,0], nustar[:,1], ls='-')
-plt.loglog(xmmblanksky[:,0], xmmblanksky[:,1], ls='-')
-
-plt.loglog(anita_proj[:,0], anita_proj[:,1], ls='--')
-plt.loglog(erosita_proj[:,0], erosita_proj[:,1], ls='--')
-plt.loglog(extp_proj[:,0], extp_proj[:,1], ls='--')
-plt.loglog([extp_proj[-1,0], 10.*extp_proj[-1,0]], [extp_proj[-1,1], 1e-5*extp_proj[-1,1]], ls='--')
-
-plt.show()
+if "--plot" in sys.argv:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 5))
+    for f, lab in LIMITS.items():
+        ax.loglog(lims[f][:, 0] * 1e6, lims[f][:, 1], lw=1, label=lab)
+    ax.loglog(m * 1e6, overall, "k", lw=2.5, alpha=0.5, label="minimum")
+    ax.set_xlim(1, 1e4)
+    ax.set_ylim(1e-24, 1e-6)
+    ax.set_xlabel(r"$m_s$ [keV]")
+    ax.set_ylabel(r"$\sin^2 2\theta$")
+    ax.legend(fontsize=7)
+    fig.tight_layout()
+    fig.savefig("xray_limits.pdf")
+    print("written xray_limits.pdf")

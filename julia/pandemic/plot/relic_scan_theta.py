@@ -3,10 +3,11 @@
 Contours of the coupling y (= g in the paper) in the (m_N, sin^2 2theta) plane
 for which Omega h^2 = 0.12, from a scan directory written by plot/combined_scan_dir.py
 (tmp/combined_scan: roots.csv and lyman_alpha.csv). Styled like the money plot of the paper
-(code/sterile_res/plotter_3.py): Dodelson-Widrow band, current X-ray limits,
-and the contours labelled on the plot. The X-ray region is drawn over the
-constraint bounds below, and the projected sensitivities (Athena, eROSITA,
-eXTP) are deliberately left out to keep the figure readable.
+(code/sterile_res/plotter_3.py): Dodelson-Widrow band, the X-ray limit and the contours
+labelled on the plot. The X-ray region is one line: the minimum over the current limits
+(PandemicRevival/xray_constraints/plot_xray.py), rescaled by the N1 fraction of the dark matter
+at each root (`scaled_xray_limit`), since only N1 decays to nu gamma. It is drawn over the
+constraint bounds below; projected sensitivities are left out.
 
 The roots are those of the freeze-in branch (the root searches only follow it). The
 lines are monotone (PCHIP) interpolations in log-log between the scanned masses and
@@ -313,9 +314,62 @@ def plot_dodelson_widrow(ax):
     )
 
 
-def plot_xrays(ax):
+def load_xray_limit():
+    """(m_N [keV], sin^2 2theta) of the combined X-ray limit, which assumes that all the DM decays."""
     xray = np.loadtxt(os.path.join(XRAY_DIR, "overall_constraint.dat"))
-    m, s = 1e6 * xray[:, 0], xray[:, 1]
+    return 1e6 * xray[:, 0], xray[:, 1]
+
+
+def f_N1_field(roots, mix):
+    """
+    f_N1(m [keV], sin^2 2theta) interpolated from the roots: at each scanned mass linear in
+    log sin^2 2theta between the roots (constant beyond the first and last), and linear in
+    log m between scanned masses (constant beyond them).
+    """
+    cols = {}
+    for k in roots:
+        if k in mix:
+            cols.setdefault(k[0], []).append((np.log(roots[k]), 1.0 - mix[k][0]))
+    ms = np.array(sorted(cols))
+    tabs = [np.array(sorted(cols[m])).T for m in ms]
+
+    def f(m, s2):
+        lm, ls = np.log(m), np.log(s2)
+        col = lambda i: np.interp(ls, tabs[i][0], tabs[i][1])
+        if m <= ms[0]:
+            return col(0)
+        if m >= ms[-1]:
+            return col(len(ms) - 1)
+        i = np.searchsorted(ms, m) - 1
+        t = (lm - np.log(ms[i])) / (np.log(ms[i + 1]) - np.log(ms[i]))
+        return (1 - t) * col(i) + t * col(i + 1)
+    return f
+
+
+def scaled_xray_limit(roots, mix):
+    """
+    The X-ray boundary in the relic plane. Only N1 mixes with nu and decays to nu gamma, so a root
+    is excluded if f_N1 sin^2 2theta exceeds the limit L(m), which assumes that all the DM decays.
+    f_N1 depends on the root (from 1 for DW-produced N1 at small g to 1/2 where N1 and N2 are in
+    chemical equilibrium), so the boundary at each mass is the s with s f_N1(m, s) = L(m): s lies in
+    [L, 2L] and s f_N1(m, s) grows with s, found by bisection in log s.
+    """
+    m, L = load_xray_limit()
+    f = f_N1_field(roots, mix)
+    s_b = np.empty_like(L)
+    for i in range(len(m)):
+        lo, hi = np.log(L[i]), np.log(2 * L[i])
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            if mid + np.log(f(m[i], np.exp(mid))) > np.log(L[i]):
+                hi = mid
+            else:
+                lo = mid
+        s_b[i] = np.exp((lo + hi) / 2)
+    return m, s_b
+
+
+def plot_xrays(ax, m, s):
     ax.fill_between(m, s, 1.0, color="white", lw=0, zorder=-3)
     ax.fill_between(m, s, 1.0, color="black", alpha=0.25, lw=0, zorder=-3)
     ax.plot(m, s, color="black", lw=1.3, zorder=-2)
@@ -454,7 +508,8 @@ def main():
         ax.spines[axis].set_linewidth(0.5)
 
     plot_dodelson_widrow(ax)
-    plot_xrays(ax)
+    m_x, s_x = scaled_xray_limit(roots, mix)
+    plot_xrays(ax, m_x, s_x)
     # Both Lyman-alpha bounds are labelled by the length that sets them.
     # Both bounds are Lyman-alpha; the length in brackets says which one, as in
     # Bringmann et al. (2206.10630). Ly-alpha (lambda_fs) is labelled low on
@@ -474,7 +529,8 @@ def main():
 
     excluded = {
         k: (
-            lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC
+            roots[k] > np.exp(np.interp(np.log(k[0]), np.log(m_x), np.log(s_x), left=np.inf, right=np.inf))
+            or lam.get(k, 0.0) > LAMBDA_FS_MAX_MPC
             or r_s.get(k, 0.0) > R_S_MAX_MPC
             or sig_m.get(k, 0.0) > SIGMA_M_MAX
         ) for k in roots

@@ -10,7 +10,7 @@ constants). From julia/pandemic:
 
 const TESTS = ["test_tree_amplitudes.jl", "test_thermal_rates.jl", "test_rate_tables.jl", "test_network.jl",
                "test_fluid.jl", "test_kinetic_decoupling.jl", "test_ckd_table.jl", "test_lyman_alpha.jl",
-               "test_coll_12_34_AA_NN.jl", "test_rate_tables_eval.jl", "test_regression.jl"]
+               "test_coll_12_34_AA_NN.jl", "test_rate_tables_eval.jl", "test_regression.jl", "test_late_decays.jl"]
 const SLOW = ["test_coll_12_34_AA_NN.jl", "test_rate_tables_eval.jl", "test_regression.jl"]
 
 tests = "--quick" in ARGS ? setdiff(TESTS, SLOW) : TESTS

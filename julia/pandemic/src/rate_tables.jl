@@ -565,6 +565,15 @@ function RateInterpolants(tabs)
 end
 
 
+"""(m_A'/m_N, m_phi/m_N) of a table set."""
+mass_ratios(itp::RateInterpolants) = (itp.p_ref.mA / itp.p_ref.m1, itp.p_ref.mphi / itp.p_ref.m1)
+
+"""rate_params at (m_N, g, sin^2 2theta) with the mass ratios of the table set `itp`."""
+function table_params(itp::RateInterpolants, m_N, g, sin2_2theta)
+    rA, rphi = mass_ratios(itp)
+    return rate_params(m_N, g, sin2_2theta; mA_over_mN=rA, mphi_over_mN=rphi)
+end
+
 """ln of the rate and energy normalisation of every reaction at parameters `p` (see `ln_norm`)."""
 rate_norms(itp::RateInterpolants, p) =
     Dict(r.name => (ln_norm(r, p, itp.p_ref), ln_norm(r, p, itp.p_ref; energy=true)) for r in REACTIONS)

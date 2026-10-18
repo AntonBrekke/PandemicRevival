@@ -36,7 +36,7 @@ end
 
 """(Omega h^2, status) of one network solve."""
 function solve_omega(itp, tT_rel, m, g, s2)
-    net = Network(itp, rate_params(m, g, s2), tT_rel)
+    net = Network(itp, table_params(itp, m, g, s2), tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
     sol = try
         solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
@@ -48,47 +48,48 @@ function solve_omega(itp, tT_rel, m, g, s2)
 end
 
 """
-Root of ln(Omega/0.12) in ln sin^2 2theta from the seed s2_0: secant steps
-(at most a factor e^0.5) until the root is bracketed, then safeguarded false
-position, or bisection when the upper end is degenerate (a degenerate trial
-overproduces and counts as above the target). Omega can jump across the
-target when the pandemic takes off; the root is then returned with status
-:bracketed once the bracket is narrower than 1e-6 in ln sin^2 2theta.
-Returns (s2, Omega, status, number of solves); status :degenerate or :failed
-if the solve at the seed itself is.
+Root of ln(Omega/0.12) in ln sin^2 2theta from the seed s2_0: secant steps (at most a factor
+e^0.5) until the root is bracketed, then safeguarded false position, or bisection when the upper
+end is not a regular solve. A degenerate or failed solve (MaxIters in a strongly overproducing
+history) counts as above the target, so the search steps down from a seed that overproduces by
+orders of magnitude (another m_phi); after 6 such solves in a row (3 e-folds in sin^2 2theta,
+enough for any overproducing seed) it returns their status, since the network then does not
+apply at any mixing nearby. Only a successful solve within `tol` of the target is :converged. Omega can jump across the target when the pandemic takes off; the root is then
+returned with status :bracketed once the bracket is narrower than 1e-6 in ln sin^2 2theta, or
+:degenerate (:failed) if the upper end of that bracket is a degenerate (failed) solve, i.e. the
+root lies where the network does not apply. Returns (s2, Omega, status, number of solves).
 """
 function network_root(itp, tT_rel, m, g, s2_0; tol=1e-3, maxit=30)
     lnf(om) = log(om / omega_d0)
-    om, st = solve_omega(itp, tT_rel, m, g, s2_0)
-    st === :ok || return NaN, NaN, st, 1
-    lo = (-Inf, -Inf, NaN)        # (ln s2, f, Omega) with f < 0
-    hi = (Inf, Inf, NaN)          # f > 0 or degenerate (f = Inf)
-    l, f = log(s2_0), lnf(om)
-    abs(f) < tol && return s2_0, om, :converged, 1
-    f < 0 ? (lo = (l, f, om)) : (hi = (l, f, om))
-    lp, fp = l, f
-    l = l - 0.1 * sign(f)
-    nsolve = 1
-    for _ in 1:maxit
+    lo = (-Inf, -Inf, NaN, :ok)       # (ln s2, f, Omega, status) with f < 0
+    hi = (Inf, Inf, NaN, :ok)         # f > 0, or a degenerate / failed solve (f = Inf)
+    l, lp, fp = log(s2_0), NaN, NaN
+    nbad = 0
+    for nsolve in 1:maxit+1
         om, st = solve_omega(itp, tT_rel, m, g, exp(l))
-        nsolve += 1
-        st === :failed && return exp(l), NaN, :failed, nsolve
-        f = st === :degenerate ? Inf : lnf(om)
+        nbad = st === :ok ? 0 : nbad + 1
+        nbad >= 6 && return exp(l), NaN, st, nsolve
+        f = st === :ok ? lnf(om) : Inf
         abs(f) < tol && return exp(l), om, :converged, nsolve
-        f < 0 ? (lo = (l, f, om)) : (hi = (l, f, om))
+        f < 0 ? (lo = (l, f, om, st)) : (hi = (l, f, om, st))
         if isfinite(lo[1]) && isfinite(hi[1])
             w = hi[1] - lo[1]
-            w < 1e-6 && return exp((lo[1] + hi[1]) / 2), (lo[3] + hi[3]) / 2, :bracketed, nsolve
+            if w < 1e-6
+                hi[4] === :ok || return exp(hi[1]), NaN, hi[4], nsolve
+                return exp((lo[1] + hi[1]) / 2), (lo[3] + hi[3]) / 2, :bracketed, nsolve
+            end
             ln = isfinite(hi[2]) ? lo[1] - lo[2] * w / (hi[2] - lo[2]) : (lo[1] + hi[1]) / 2
             ln = clamp(ln, lo[1] + 0.1w, hi[1] - 0.1w)       # keep shrinking the bracket
         elseif isfinite(f) && isfinite(fp)
             ln = clamp(l - f * (l - lp) / (f - fp), l - 0.5, l + 0.5)
+        elseif nsolve == 1 && isfinite(f)
+            ln = l - 0.1 * sign(f)                            # first step from the seed
         else
-            ln = l - 0.5 * sign(f)                            # degenerate without a lower end: step back
+            ln = l - 0.5 * sign(f)                            # above the target without a lower end: step down
         end
         lp, fp, l = l, f, ln
     end
-    return exp(l), om, :failed, nsolve
+    return exp(l), NaN, :failed, maxit + 1
 end
 
 function main(args)

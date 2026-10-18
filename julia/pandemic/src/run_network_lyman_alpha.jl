@@ -1,10 +1,10 @@
 """
 Lyman-alpha lengths at the network's relic roots (lyman_alpha.jl), threaded over roots.
 
-    julia --project=. -t 8 src/run_network_lyman_alpha.jl [network_roots.csv] [out.csv]
+    julia --project=. -t 8 src/run_network_lyman_alpha.jl [network_roots.csv] [out.csv] [tables.jls]
 
 Defaults: tmp/network_scan/network_roots.csv -> tmp/network_scan/lyman_alpha.csv, one row
-per converged root (`LYMAN_ALPHA_HEADER`).
+per converged root (`LYMAN_ALPHA_HEADER`), with the m_phi = 100 m_N tables.
 """
 
 include(joinpath(@__DIR__, "lyman_alpha.jl"))
@@ -13,7 +13,8 @@ function main(args)
     dir = joinpath(@__DIR__, "..", "tmp", "network_scan")
     roots = length(args) > 0 ? args[1] : joinpath(dir, "network_roots.csv")
     out = length(args) > 1 ? args[2] : joinpath(dir, "lyman_alpha.csv")
-    itp = RateInterpolants(load_rate_tables(rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))))
+    tables = length(args) > 2 ? args[3] : rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))
+    itp = RateInterpolants(load_rate_tables(tables))
     tT_rel = TimeTempRelation{Float64}()
     hdr = split(readline(roots), ',')
     col(name) = findfirst(==(name), hdr)

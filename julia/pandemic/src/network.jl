@@ -108,17 +108,36 @@ struct Network{FH,FS,FX}
     ent_interp_z::FS
     dx_dt_interp_z::FX
     dw::Union{Nothing,DWHistory}   # DW production as a source term (nothing: all at T_dw)
+    w_phi::Float64                 # N per phi after its decays (`phi_weight`)
+end
+
+"""Age of the Universe [s]."""
+const T_AGE = 4.35e17
+
+"""
+Weight of phi in Omega h^2 and in the number of N after all decays: the number of N per phi
+after its decays (phi -> A'A' -> 4 N, phi -> N1 N1, phi -> N1 nu, by branching ratio), or
+m_phi/m_N if phi outlives the Universe (it is then dark matter itself). 4 for
+m_phi > 2 m_A'; 1 in the light window m_N1 < m_phi < 2 m_N1 (phi -> N1 nu only).
+"""
+function phi_weight(p)
+    w = (width(:phi_AA, p), width(:phi_N1N1, p), width(:phi_N1nu, p))
+    tot = sum(w)
+    tot * T_AGE / hbar < 1 && return p.mphi / p.m1
+    return (4w[1] + 2w[2] + w[3]) / tot
 end
 
 function Network(itp::RateInterpolants, p, tT_rel::TimeTempRelation; dw=nothing)
     m = p.m1
+    all(isapprox.((p.mA / m, p.mphi / m), mass_ratios(itp); rtol=1e-12)) ||
+        error("parameters have m_A'/m_N, m_phi/m_N = $((p.mA / m, p.mphi / m)) but the tables $(mass_ratios(itp)): use table_params")
     z_grid = log.(x_grid_of(m, tT_rel.T_nu_grid))
     masses = ntuple(k -> field_mass(DARK_SPECIES[k], p), 4)
     dofs = ntuple(k -> field_dof(DARK_SPECIES[k]), 4)
     return Network(p, itp, rate_norms(itp, p), masses, dofs,
                    z_interpolation(z_grid, tT_rel.hubble_grid),
                    z_interpolation(z_grid, tT_rel.ent_grid),
-                   z_interpolation(z_grid, dx_dt_grid_of(m, tT_rel.T_nu_grid, tT_rel.dT_nu_dt_grid)), dw)
+                   z_interpolation(z_grid, dx_dt_grid_of(m, tT_rel.T_nu_grid, tT_rel.dT_nu_dt_grid)), dw, phi_weight(p))
 end
 
 """
@@ -413,9 +432,9 @@ function network_initial_state(net::Network, dw::DodelsonWidrow, tT_rel::TimeTem
         # taken out of the DW population below: larger seeds can exhaust it at large g)
         C[k] > 0 && (n[k] = max(n[k], min(k == 2 ? n1 / 2 : 1e-2n1, C[k] * xfac * dz_seed)))
     end
-    # the seeds come out of the DW population: keep n~ = n_N1 + n_N2 + 2 n_A' + 4 n_phi
+    # the seeds come out of the DW population: keep n~ = n_N1 + n_N2 + 2 n_A' + w_phi n_phi
     # (the number of N after all decays) equal to the DW number
-    f = (n1 - 2n[3] - 4n[4]) / (n[1] + n[2])
+    f = (n1 - 2n[3] - net.w_phi * n[4]) / (n[1] + n[2])
     n[1] *= f
     n[2] *= f
     kappa = rho1 - sum(n[k] * net.masses[k] for k in 1:NSPECIES)
@@ -445,11 +464,11 @@ function solve_network(net::Network, dw::DodelsonWidrow, tT_rel::TimeTempRelatio
 end
 
 """Omega h^2 of the state u at z, counting each A' as the two N it decays into
-and each phi as four (phi -> A'A')."""
+and each phi with its weight `w_phi` (4 for phi -> A'A')."""
 function network_omega_h2(net::Network, u, z)
     s = net.ent_interp_z(z)
     # u[1] = ln(Y_N1 + Y_N2)
-    return net.p.m1 * (exp(u[1]) + 2exp(u[3]) + 4exp(u[4])) * s0 / rho_crit0_h2
+    return net.p.m1 * (exp(u[1]) + 2exp(u[3]) + net.w_phi * exp(u[4])) * s0 / rho_crit0_h2
 end
 
 """Diagnostics along a solution: T_N, T_nu, largest MB occupation number per species, Omega h^2."""

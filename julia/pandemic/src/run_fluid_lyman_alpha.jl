@@ -4,13 +4,15 @@ converged root and writes one row per root (`LYMAN_ALPHA_HEADER`). Distributed o
 worker processes.
 
     julia --project=. src/run_fluid_lyman_alpha.jl [--nproc 8] [--roots tmp/fluid_scan/fluid_roots.csv] [--out tmp/fluid_scan/lyman_alpha.csv]
+        [--tables tmp/rate_tables/rate_tables_mA2.5_mphi100.0.jls]
 """
 
 using Distributed
 
 function parse_opts(args)
     dir = joinpath(@__DIR__, "..", "tmp", "fluid_scan")
-    o = Dict("nproc" => "8", "roots" => joinpath(dir, "fluid_roots.csv"), "out" => joinpath(dir, "lyman_alpha.csv"))
+    o = Dict("nproc" => "8", "roots" => joinpath(dir, "fluid_roots.csv"), "out" => joinpath(dir, "lyman_alpha.csv"),
+             "tables" => joinpath(@__DIR__, "..", "tmp", "rate_tables", "rate_tables_mA2.5_mphi100.0.jls"))
     i = 1
     while i <= length(args)
         k = args[i][3:end]
@@ -29,11 +31,12 @@ todo = [Tuple(parse(Float64, c[col(k)]) for k in ("m_N", "y", "s2_fluid"))
 println(length(todo), " converged roots"); flush(stdout)
 
 addprocs(min(parse(Int, OPTS["nproc"]), length(todo)); exeflags=["--project=$(Base.active_project())", "--threads=1"])
+@eval @everywhere const TABLES = $(OPTS["tables"])
 @everywhere begin
     include(joinpath(@__DIR__, "lyman_alpha.jl"))
     LA.BLAS.set_num_threads(1)
     const TT_REL = TimeTempRelation{Float64}()
-    const ITP = RateInterpolants(load_rate_tables(rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))))
+    const ITP = RateInterpolants(load_rate_tables(TABLES))
     const PANS = Dict{Float64,Any}()
 
     function lya_job(m, g, s2)

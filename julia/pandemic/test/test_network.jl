@@ -7,7 +7,7 @@ path = length(ARGS) > 0 ? ARGS[1] : rate_table_path(joinpath(@__DIR__, "..", "tm
 itp = RateInterpolants(load_rate_tables(path))
 tT_rel = TimeTempRelation{Float64}()
 m = 1e-5
-p = rate_params(m, 1e-3, 1e-13)
+p = table_params(itp, m, 1e-3, 1e-13)
 net = Network(itp, p, tT_rel)
 
 @testset "kinetic energy and dark temperature" begin

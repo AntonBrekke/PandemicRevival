@@ -5,6 +5,7 @@ y >= ymin, starting from the seed's sin^2 2theta. Distributed over worker proces
 
     julia --project=. src/run_fluid_scan.jl [--nproc 8] [--ymin 1e-3] [--out tmp/fluid_scan]
         [--points tmp/network_scan/network_roots.csv] [--only m_keV:y,...] [--portal-scale 1.0]
+        [--tables tmp/rate_tables/rate_tables_mA2.5_mphi100.0.jls]
 
 --points: CSV with columns m_N,y,s2_reduced,omega_reduced,s2_network,..,status (the
 network scan's output, whose s2_reduced is the reduced-solver root; plot/fine_g_seeds.py
@@ -21,9 +22,12 @@ the fluid at mu = 0 (number-changing equilibrium), not whether the one-fluid ass
 using Distributed
 using Printf
 
+rate_table_path_default() = joinpath(@__DIR__, "..", "tmp", "rate_tables", "rate_tables_mA2.5_mphi100.0.jls")
+
 function parse_opts(args)
     o = Dict("nproc" => "8", "ymin" => "1e-3", "out" => joinpath(@__DIR__, "..", "tmp", "fluid_scan"),
              "portal-scale" => "1.0", "only" => "",
+             "tables" => rate_table_path_default(),
              "points" => joinpath(@__DIR__, "..", "tmp", "network_scan", "network_roots.csv"))
     i = 1
     while i <= length(args)
@@ -37,11 +41,12 @@ end
 
 const OPTS = parse_opts(ARGS)
 addprocs(parse(Int, OPTS["nproc"]); exeflags="--project=$(Base.active_project())")
+@eval @everywhere const TABLES = $(OPTS["tables"])
 
 @everywhere begin
     include(joinpath(@__DIR__, "fluid.jl"))
     const TT_REL = TimeTempRelation{Float64}()
-    const ITP = RateInterpolants(load_rate_tables(rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))))
+    const ITP = RateInterpolants(load_rate_tables(TABLES))
     const PANS = Dict{Float64,Any}()
     const PORTAL_SCALE = Ref(1.0)
     fluid_pan(m) = get!(() -> FluidSolver(m, TT_REL, ITP; portal_scale=PORTAL_SCALE[]), PANS, m)
@@ -72,6 +77,9 @@ addprocs(parse(Int, OPTS["nproc"]); exeflags="--project=$(Base.active_project())
     deplete it more at larger mixing, so above its maximum it falls again. The search therefore
     only moves down from a point with Omega > 0.12 and up from one with Omega < 0.12, keeps the
     bracket lo < hi with f(lo) < 0 < f(hi), and refines it by false position in ln s2.
+    A failed solve (exception or the wall limit, in practice strongly overproducing histories)
+    counts as above the target, so the search steps down from a seed that overproduces by orders
+    of magnitude (another m_phi); after 3 failures in a row it gives up.
     Status: converged (|ln(Omega/0.12)| < tol with Omega settled), bracketed (Omega jumps across
     the target: bracket < 1e-3 in ln s2), noplateau (|f| < tol, Omega still moving at x = 1000),
     failed.
@@ -82,11 +90,13 @@ addprocs(parse(Int, OPTS["nproc"]); exeflags="--project=$(Base.active_project())
         hi = (Inf, NaN, NaN)           # f > 0
         l = log(s2_0)
         nsolve = 0
+        nfail = 0
         for _ in 1:maxit
             sol, om, plat = solve_relic(pan, TT_REL, g, exp(l))
             nsolve += 1
-            isfinite(om) || return exp(l), NaN, :failed, nsolve, nothing
-            f = lnf(om)
+            nfail = isfinite(om) ? 0 : nfail + 1
+            nfail >= 3 && return exp(l), NaN, :failed, nsolve, nothing
+            f = isfinite(om) ? lnf(om) : Inf
             abs(f) < tol && return exp(l), om, plat ? :converged : :noplateau, nsolve, sol
             if f > 0
                 l < hi[1] && (hi = (l, f, om))
@@ -95,10 +105,14 @@ addprocs(parse(Int, OPTS["nproc"]); exeflags="--project=$(Base.active_project())
             end
             if isfinite(lo[1]) && isfinite(hi[1])
                 w = hi[1] - lo[1]
-                w < 1e-3 && return exp((lo[1] + hi[1]) / 2), (lo[3] + hi[3]) / 2, :bracketed, nsolve, nothing
-                l = clamp(lo[1] - lo[2] * w / (hi[2] - lo[2]), lo[1] + 0.05w, hi[1] - 0.05w)
+                if w < 1e-3
+                    isfinite(hi[3]) || return exp(hi[1]), NaN, :failed, nsolve, nothing
+                    return exp((lo[1] + hi[1]) / 2), (lo[3] + hi[3]) / 2, :bracketed, nsolve, nothing
+                end
+                l = isfinite(hi[2]) ? clamp(lo[1] - lo[2] * w / (hi[2] - lo[2]), lo[1] + 0.05w, hi[1] - 0.05w) :
+                    (lo[1] + hi[1]) / 2
             elseif isfinite(hi[1])
-                # d ln Omega / d ln s2 ~ 5 on the freeze-in branch
+                # d ln Omega / d ln s2 ~ 5 on the freeze-in branch (a failed solve: the largest step)
                 l = hi[1] - clamp(hi[2] / 5, 0.3, 3.0)
             else
                 l = lo[1] + clamp(-lo[2] / 5, 0.3, 3.0)

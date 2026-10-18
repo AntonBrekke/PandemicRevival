@@ -5,7 +5,9 @@ one-fluid solver (tmp/fluid_scan) for y >= y_switch, on the base grid and, where
 the finer one of plot/fine_g_seeds.py (tmp/*_scan_fine). Where the fluid root search did
 not settle but the network (valid in the overlap) has a root, the network root is used.
 
-    python plot/combined_scan_dir.py [out_dir] [y_switch]
+    python plot/combined_scan_dir.py [out_dir] [y_switch] [scan_root]
+
+scan_root (default tmp) holds the <solver>_scan{,_fine} directories, e.g. tmp/mphi_scans/mphi10.
 
 Output (default tmp/combined_scan):
 - roots.csv: m_N,y,sin2_2theta,omega_h2,solver (network / fluid / failed);
@@ -20,6 +22,7 @@ import math
 
 out = sys.argv[1] if len(sys.argv) > 1 else "tmp/combined_scan"
 y_switch = float(sys.argv[2]) if len(sys.argv) > 2 else 1e-3
+root = sys.argv[3] if len(sys.argv) > 3 else "tmp"
 os.makedirs(out, exist_ok=True)
 M_NU = 0.1e-9   # GeV, m_nu of rate_params (src/thermal_rates.jl)
 
@@ -27,8 +30,8 @@ key = lambda m, y: (round(float(m) * 1e6, 3), round(math.log10(float(y)), 3))
 
 
 def load(solver, name):
-    """{(m, y): row} from tmp/<solver>_scan/<name> and tmp/<solver>_scan_fine/<name>."""
-    paths = [f"tmp/{solver}_scan/{name}", f"tmp/{solver}_scan_fine/{name}"]
+    """{(m, y): row} from <root>/<solver>_scan/<name> and <root>/<solver>_scan_fine/<name>."""
+    paths = [f"{root}/{solver}_scan/{name}", f"{root}/{solver}_scan_fine/{name}"]
     return {key(r["m_N"], r["y"]): r for p in paths if os.path.exists(p) for r in csv.DictReader(open(p))}
 
 

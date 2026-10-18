@@ -2,11 +2,12 @@
 Benchmark histories at relic roots, for either solver: what the solver computes along the
 solution (network: 400 points in x = m_N/T_nu; fluid: the solver's accepted steps).
 
-    julia --project=. src/run_benchmarks.jl solver:m_keV:g[:sin2_2theta],... [out_dir]
+    julia --project=. src/run_benchmarks.jl solver:m_keV:g[:sin2_2theta],... [out_dir] [tables.jls]
 
 solver is `network` or `fluid`; without sin2_2theta the root is taken from
-tmp/<solver>_scan{,_fine}/<solver>_roots.csv. One CSV per point in <out_dir> (default
-tmp/benchmarks), <solver>_m_<m>keV_g_<g>.csv, with the columns
+tmp/<solver>_scan{,_fine}/<solver>_roots.csv (m_phi = 100 m_N). One CSV per point in <out_dir>
+(default tmp/benchmarks), <solver>_m_<m>keV_g_<g>[_mphi<r>].csv (the suffix for tables other than
+m_phi = 100 m_N), with the columns
 - x, TN_Tnu, H_GeV, Y_N1, Y_N2, Y_A, Y_phi (n/s), omega_h2, gap_N1 = (m_N - mu_N1)/T_N;
 - Gamma_kd_H: the momentum-exchange rate of N1 over H (lyman_alpha.jl; sets x_c and x_kd);
 - network: `fwd:<reaction>`, the forward rate per particle of the reaction's first dark
@@ -43,7 +44,7 @@ end
 fmt(v) = @sprintf("%.5g", v)
 
 function network_benchmark(itp, tT_rel, m, g, s2)
-    net = Network(itp, rate_params(m, g, s2), tT_rel)
+    net = Network(itp, table_params(itp, m, g, s2), tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
     sol = solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
     h = DarkHistory(net, sol)
@@ -94,16 +95,19 @@ end
 function main(args)
     out_dir = length(args) > 1 ? args[2] : joinpath(@__DIR__, "..", "tmp", "benchmarks")
     mkpath(out_dir)
-    itp = RateInterpolants(load_rate_tables(rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))))
+    tables = length(args) > 2 ? args[3] : rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))
+    itp = RateInterpolants(load_rate_tables(tables))
+    rphi = mass_ratios(itp)[2]
+    suffix = rphi == 100 ? "" : @sprintf("_mphi%g", rphi)
     tT_rel = TimeTempRelation{Float64}()
     for spec in split(args[1], ',')
         f = split(spec, ':')
         solver, m_keV, g = f[1], parse(Float64, f[2]), parse(Float64, f[3])
         s2 = length(f) > 3 ? parse(Float64, f[4]) : stored_root(solver, m_keV, g)
         t = @elapsed (rate_cols, rows, om) = (solver == "network" ? network_benchmark : fluid_benchmark)(itp, tT_rel, m_keV * 1e-6, g, s2)
-        path = joinpath(out_dir, @sprintf("%s_m_%gkeV_g_%g.csv", solver, m_keV, g))
+        path = joinpath(out_dir, @sprintf("%s_m_%gkeV_g_%g%s.csv", solver, m_keV, g, suffix))
         open(path, "w") do io
-            println(io, "# ", solver, " m_N = ", m_keV, " keV, g = ", g, ", sin^2 2theta = ", s2)
+            println(io, "# ", solver, " m_N = ", m_keV, " keV, g = ", g, ", sin^2 2theta = ", s2, ", m_phi = ", rphi, " m_N")
             println(io, "x,TN_Tnu,H_GeV,Y_N1,Y_N2,Y_A,Y_phi,omega_h2,gap_N1,Gamma_kd_H,", join(rate_cols, ","))
             foreach(r -> println(io, r), rows)
         end

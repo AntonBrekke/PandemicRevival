@@ -265,7 +265,7 @@ Network solve at (m_N [GeV], g, sin^2 2theta) and its Lyman-alpha lengths:
 solve fails.
 """
 function lyman_alpha_network(itp, tT_rel, m, g, s2)
-    net = Network(itp, rate_params(m, g, s2), tT_rel)
+    net = Network(itp, table_params(itp, m, g, s2), tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
     sol = solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
     sol.retcode == DE.ReturnCode.Success || return failed_lengths()

@@ -97,23 +97,22 @@ mutable struct FluidSolver{FdX, FEnt, FH}
 end
 
 """
-    FluidSolver(m_N, tT_rel, itp; mA_over_mN=2.5, mphi_over_mN=100, portal_scale=1)
+    FluidSolver(m_N, tT_rel, itp; portal_scale=1)
 
-`itp` = RateInterpolants of the tables at these mass ratios. The couplings are set
-through `pan.mp = ModelParams{Float64}(g, theta_1)`.
+`itp` = RateInterpolants of the tables; the mass ratios m_A'/m_N, m_phi/m_N are theirs. Needs
+m_phi > 2 m_A': mu_phi = 2 mu_A' holds only while phi <-> A'A' is open (and fast). The couplings
+are set through `pan.mp = ModelParams{Float64}(g, theta_1)`.
 """
 function FluidSolver(m_N::Float64, tT_rel::TimeTempRelation{Float64}, itp::RateInterpolants;
-                     mA_over_mN=2.5, mphi_over_mN=100.0, portal_scale=1.0, T_ratio_min=1e-6, T_ratio_max=1e3)
+                     portal_scale=1.0, T_ratio_min=1e-6, T_ratio_max=1e3)
+    mA_over_mN, mphi_over_mN = mass_ratios(itp)
     N1 = Particle{Float64}(m_N, 1, dof=2)
     N2 = Particle{Float64}(m_N, 1, dof=2)
     A = Particle{Float64}(mA_over_mN * m_N, -1, dof=3)
     nu = Particle{Float64}(0.0, 1, dof=2)
     phi = Particle{Float64}(mphi_over_mN * m_N, -1, dof=1)
     A.m > N1.m + N2.m || error("FluidSolver assumes A' -> N1 N2 is open")
-    phi.m > 2A.m || error("FluidSolver assumes phi -> A'A' is open (m_phi > 2 m_A')")
-    isapprox(itp.p_ref.mA / itp.p_ref.m1, mA_over_mN; rtol=1e-12) &&
-        isapprox(itp.p_ref.mphi / itp.p_ref.m1, mphi_over_mN; rtol=1e-12) ||
-        error("rate tables are for other mass ratios")
+    phi.m > 2A.m || error("FluidSolver assumes phi -> A'A' is open (m_phi > 2 m_A'): mu_phi = 2 mu_A'")
     reactions = Tuple{Reaction,Int}[]
     for r in REACTIONS
         r.name in FLUID_EXACT && continue

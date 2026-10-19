@@ -3,6 +3,14 @@
 `../INTEGRAL_SPI_2209.06299.dat` is recomputed here from the authors' data release instead of
 being read off Fig. 5 of the paper.
 
+**Not in the combined bound** (`plot_xray.py` draws it only as a cross-check): it analyses the same
+SPI data as 2211.06200 (Galactic-centre pointings, overlapping years), which is kept (line search
+at the full SPI resolution, explicit systematics, published data). The minimum of two analyses of
+the same data picks the lower fluctuation of either, and would mix a 95% Bayesian with a 3 sigma
+limit. In addition, the 95% limit here depends on the floor of the log-uniform prior on Norm: the
+posterior piles up at the floor, and lowering it from 1e-8 to 1e-12 leaves channel 4 unchanged
+but halves the limit of channel 7 (4 seeds each).
+
 Source: T. Siegert, Zenodo record 7984451 (doi:10.5281/zenodo.7984451, CC-BY-4.0):
 `total_spectrum.fits.gz` (SPI 16 yr total spectrum, 30 keV - 8 MeV, 24 channels),
 `spectral_response.rmf.fits.gz` and `Positronium_Spectrum.py` are copied unchanged;

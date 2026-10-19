@@ -18,13 +18,13 @@ Galactic-centre search of 2016 (1609.00667); the 2020 and 2023 analyses do not s
 older limits and than eROSITA LMC in its range), SRG/ART-XC (2303.12673; weaker than NuSTAR 2023
 everywhere), XRISM (2510.24560; one mass, 7.1 keV, inside the NuSTAR limits).
 
-Not in the minimum, drawn only as a cross-check: INTEGRAL/SPI with a DM template (2209.06299),
-recomputed from the authors' data and notebook (Zenodo 7984451) in spi_2209.06299/ (README there).
-It analyses the same SPI data as 2211.06200 (Galactic-centre pointings, overlapping years), so the
-minimum of the two would pick the lower fluctuation of either analysis and mix a 95% Bayesian with
-a 3 sigma limit. 2211.06200 is kept: line search at the full SPI resolution, explicit systematics,
-published data; the template fit uses 24 broad channels, and its 95% limit depends on the floor of
-the log-uniform prior on the line flux (halves in one channel for 1e-8 -> 1e-12).
+Not used either: INTEGRAL/SPI with a DM template (2209.06299). It analyses the same SPI data as
+2211.06200 (Galactic-centre pointings, overlapping years), so the minimum of the two would pick
+the lower fluctuation of either analysis and mix a 95% Bayesian with a 3 sigma limit. 2211.06200
+is kept: line search at the full SPI resolution, explicit systematics, published data; the
+template fit uses 24 broad channels, and its 95% limit depends on the floor of the log-uniform
+prior on the line flux (halves in one channel for 1e-8 -> 1e-12). Its recomputation from the
+authors' data (Zenodo 7984451; Fig. 5 of the paper is 2x too strong) is in commit 2d327e3.
 """
 import sys
 import numpy as np
@@ -41,7 +41,6 @@ LIMITS = {   # file: label
     "NuSTAR_1908.09037.dat": "NuSTAR combined (1908.09037) above 39.6 keV: Galactic centre 2016 (1609.00667)",
 }
 M_MIN = {"NuSTAR_1908.09037.dat": 3.96e-5}   # GeV: used only above the newer NuSTAR limits
-CROSS_CHECKS = {"INTEGRAL_SPI_2209.06299.dat": "INTEGRAL/SPI template (2209.06299), not used"}   # drawn only
 
 
 def load(f):
@@ -74,9 +73,6 @@ if "--plot" in sys.argv:
     fig, ax = plt.subplots(figsize=(8, 5))
     for f, lab in LIMITS.items():
         ax.loglog(lims[f][:, 0] * 1e6, lims[f][:, 1], lw=1, label=lab)
-    for f, lab in CROSS_CHECKS.items():
-        d = load(f)
-        ax.loglog(d[:, 0] * 1e6, d[:, 1], lw=1, ls=":", color="0.3", label=lab)
     ax.loglog(m * 1e6, overall, "k", lw=2.5, alpha=0.5, label="minimum")
     ax.set_xlim(1, 1e4)
     ax.set_ylim(1e-24, 1e-6)

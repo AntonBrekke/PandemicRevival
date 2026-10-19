@@ -9,8 +9,9 @@ decaying fraction (plot/relic_scan_theta.py in julia/pandemic).
 
 Superseded and therefore not used: INTEGRAL/SPI 2008 (0710.4922, by SPI 2023), and NuSTAR 2020
 (1908.09037, by NuSTAR 2023, same group and data) except above 39.6 keV, where the 2023/2024
-NuSTAR analyses end and SPI starts only at 40.5 keV (its digitised values there sit at the 1e-14
-floor of the compilation figure they were read from, i.e. are conservative). Not used: eROSITA eFEDS (2401.16747; weaker than
+NuSTAR analyses end and SPI starts only at 40.5 keV (extracted from the paper's vector figure; the
+earlier digitisation from the 2203.07377 compilation sat at its 1e-14 floor there, up to 1.9x too
+weak). Not used: eROSITA eFEDS (2401.16747; weaker than
 older limits and than eROSITA LMC in its range), SRG/ART-XC (2303.12673; weaker than NuSTAR 2023
 everywhere), XRISM (2510.24560; one mass, 7.1 keV, inside the NuSTAR limits).
 

@@ -4,9 +4,10 @@ Extract curves from a vector (matplotlib) PDF figure with mutool.
     python extract_vector_limit.py fig.pdf                    # calibration and the stroked paths
     python extract_vector_limit.py fig.pdf "R G B" [width]    # data points of the paths with that colour
 
-Used for NuSTAR_2207.04572.dat, NuSTAR_straylight_2405.17861.dat, INTEGRAL_SPI_2209.06299.dat and
-eROSITA_LMC_2603.19109.dat (figures and curve colours in their headers; drop the vertical
-segments to the frame at the ends of a curve).
+Used for NuSTAR_2207.04572.dat, NuSTAR_straylight_2405.17861.dat and eROSITA_LMC_2603.19109.dat
+(figures and curve colours in their headers; drop the vertical segments to the frame at the ends
+of a curve). INTEGRAL_SPI_2209.06299.dat, first read from Fig. 5 of the paper, is now recomputed
+from the published data in spi_2209.06299/.
 
 Axes are calibrated from the tick marks (short stroked segments on the frame) and the numeric
 tick labels next to them; log axes (labels "10" + exponent, exponent sign taken negative for

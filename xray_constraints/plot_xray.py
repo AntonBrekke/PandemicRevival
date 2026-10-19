@@ -13,6 +13,10 @@ NuSTAR analyses end and SPI starts only at 40.5 keV (its digitised values there 
 floor of the compilation figure they were read from, i.e. are conservative). Not used: eROSITA eFEDS (2401.16747; weaker than
 older limits and than eROSITA LMC in its range), SRG/ART-XC (2303.12673; weaker than NuSTAR 2023
 everywhere), XRISM (2510.24560; one mass, 7.1 keV, inside the NuSTAR limits).
+
+INTEGRAL/SPI template (2209.06299) is recomputed from the authors' data and notebook (Zenodo
+7984451) in spi_2209.06299/ (README there); the curve of the paper's Fig. 5 is 2x too strong in
+the Majorana convention used here.
 """
 import sys
 import numpy as np

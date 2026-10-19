@@ -11,7 +11,10 @@ Superseded and therefore not used: INTEGRAL/SPI 2008 (0710.4922, by SPI 2023), a
 (1908.09037, by NuSTAR 2023, same group and data) except above 39.6 keV, where the 2023/2024
 NuSTAR analyses end and SPI starts only at 40.5 keV (extracted from the paper's vector figure; the
 earlier digitisation from the 2203.07377 compilation sat at its 1e-14 floor there, up to 1.9x too
-weak). Not used: eROSITA eFEDS (2401.16747; weaker than
+weak). Above 40 keV (E > 20 keV, the NuSTAR instrument-line forest) the 2020 combined line is the
+Galactic-centre search of 2016 (1609.00667); the 2020 and 2023 analyses do not search there. Kept
+(decision 2026-10-20): without it the bound is 1.6-5x weaker at 40-45 keV and has no limit at
+39.7-40.5 keV, but no relic root changes. Not used: eROSITA eFEDS (2401.16747; weaker than
 older limits and than eROSITA LMC in its range), SRG/ART-XC (2303.12673; weaker than NuSTAR 2023
 everywhere), XRISM (2510.24560; one mass, 7.1 keV, inside the NuSTAR limits).
 
@@ -35,7 +38,7 @@ LIMITS = {   # file: label
     "NuSTAR_2207.04572.dat": "NuSTAR halo (2207.04572)",
     "NuSTAR_straylight_2405.17861.dat": "NuSTAR stray light (2405.17861)",
     "INTEGRAL_SPI_2211.06200.dat": "INTEGRAL/SPI (2211.06200)",
-    "NuSTAR_1908.09037.dat": "NuSTAR 2020 above 39.6 keV (1908.09037)",
+    "NuSTAR_1908.09037.dat": "NuSTAR combined (1908.09037) above 39.6 keV: Galactic centre 2016 (1609.00667)",
 }
 M_MIN = {"NuSTAR_1908.09037.dat": 3.96e-5}   # GeV: used only above the newer NuSTAR limits
 CROSS_CHECKS = {"INTEGRAL_SPI_2209.06299.dat": "INTEGRAL/SPI template (2209.06299), not used"}   # drawn only

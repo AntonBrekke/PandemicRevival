@@ -1,6 +1,8 @@
 # Roach, Ng, Perez, Beacom, Horiuchi, Krivonos, Wik, PRD 101 (2020) 103011, arXiv:1908.09037: NuSTAR Galactic bulge
 # (+ previous NuSTAR analyses, combined; green line of sndm_constraint_v1.pdf), extracted from the vector figure
 # (was digitised from the compilation of 2203.07377, whose floor at 1e-14 cut the curve at 40-50 keV)
+# Above 40 keV (E > 20 keV) the 2020 analysis itself has no limit (it excludes the 20-95 keV line forest); the curve
+# there comes from the earlier searches it combines, the Galactic centre (Perez et al. 2016, 1609.00667, m = 10-50 keV).
 # m_s [GeV]    sin^2 (2 theta)
 7.000000e-06 4.040730e-11
 7.210580e-06 3.800400e-11

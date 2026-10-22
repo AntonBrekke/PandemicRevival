@@ -135,8 +135,9 @@ def plot(path, fig_dir):
     print("written", out)
 
 
-src = sys.argv[1] if len(sys.argv) > 1 else "tmp/benchmarks"
-fig_dir = sys.argv[2] if len(sys.argv) > 2 else "figures/benchmarks"
-os.makedirs(fig_dir, exist_ok=True)
-for p in sorted(glob.glob(os.path.join(src, "*.csv"))) if os.path.isdir(src) else [src]:
-    plot(p, fig_dir)
+if __name__ == "__main__":
+    src = sys.argv[1] if len(sys.argv) > 1 else "tmp/benchmarks"
+    fig_dir = sys.argv[2] if len(sys.argv) > 2 else "figures/benchmarks"
+    os.makedirs(fig_dir, exist_ok=True)
+    for p in sorted(glob.glob(os.path.join(src, "*.csv"))) if os.path.isdir(src) else [src]:
+        plot(p, fig_dir)

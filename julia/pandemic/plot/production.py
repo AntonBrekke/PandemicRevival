@@ -10,9 +10,18 @@ Defaults: tmp/benchmarks -> figures/production. Against x = m_N/T_nu:
 - bottom left: T_N/T_nu;
 - right: the reaction rates per DM particle [keV], as in the draft (C/n_d), and H: the
   forward rate of each reaction per n~ (its rate per first initial particle times
-  n_first/n~), the same quantity for both solvers (the fluid's from the MB tables at its
-  state). The fluid's per-process net terms are not used: in equilibrium they are
-  residuals of near-cancellations. The net change of the DM is the abundance history.
+  n_first/n~), the same quantity for both solvers. The net change of the DM is the
+  abundance history.
+  network: every reaction, as the network computes it.
+  fluid:   only the reactions in its collision term (the `fwd:` columns of run_benchmarks.jl).
+           A' <-> N1N2, N1N1 <-> N2N2 and phi <-> A'A' are absent: the fluid does not compute
+           them but takes them in equilibrium. For its table reactions the curve is the
+           forward half of what it integrates. For N2 nu <-> A', N1 nu <-> phi and
+           NN <-> A'A', which the fluid computes exactly (FD/BE), the curve is the forward
+           rate from the MB tables at the fluid's state, not the fluid's own integral (that
+           gives only the net term); the two differ only where the dark sector is degenerate
+           (gap ~< 1), by a factor ~1.5 at most. The fluid's per-process net terms are not
+           plotted: in equilibrium they are residuals of near-cancellations.
   n~ = n_N1 + n_N2 + 2 n_A' + w_phi n_phi is the number of N after all decays. A reaction is
   drawn only if it ever runs: if int (rate/H) d ln x over the history reaches --min.
 The first network point is the seed state (network_initial_state) and is left out: its

@@ -19,8 +19,20 @@ m_phi = 100 m_N), with the columns
   solution. Where a process is fast (A'A' <-> NN at up to 1e12 H) the implicit solver keeps
   the fluid on its equilibrium, and the collision term at a stored state is the residual of
   a near-cancellation: only its size >> 1 is meaningful, while `net_total` is what moves n~.
-  Also `fwd:<reaction>` as for the network, from the MB tables at the fluid's T_N and
-  densities (A', phi at their equilibrium): smooth, and comparable with the network.
+  Also `fwd:<reaction>` as for the network (smooth, and comparable with it), only for the
+  reactions in the fluid's collision term:
+  * table reactions (`pan.reactions`): the forward half of the rate the fluid integrates
+    (same MB tables, same fugacities);
+  * the reactions the fluid computes exactly, with FD/BE statistics (`FLUID_EXACT`: N2 nu <->
+    A', N1 nu <-> phi, N1N1 <-> A'A', N2N2 <-> A'A'): the forward rate from the MB tables at
+    the fluid's T_N and densities, NOT the fluid's own exact integrals (these give only the net
+    term, `net:N2nu_A`, `net:N1nu_phi`, `net:NN_AA`). The two agree where the dark sector is
+    non-degenerate; where it is degenerate (gap ~< 1, after the take-off at large g) the MB
+    value can differ by a factor ~1.5.
+  Not written: the dark reactions with Delta n~ = 0 (A' <-> N1N2, N1N1 <-> N2N2,
+  phi <-> A'A'), which the fluid does not compute: it takes them in equilibrium
+  (mu_A' = 2 mu, mu_N1 = mu_N2, mu_phi = 2 mu_A').
+  A' and phi enter at the fluid's (equilibrium) densities.
 Plot with plot/benchmark.py.
 """
 
@@ -76,9 +88,13 @@ function fluid_benchmark(itp, tT_rel, m, g, s2)
     sol, om, plateau = solve_relic(pan, tT_rel, g, s2)
     plateau || error("fluid solve did not settle at m = $m, g = $g")
     h = DarkHistory(pan, sol)
-    # forward rates from the network's MB unit rates at the fluid state
+    # forward rates from the network's MB unit rates at the fluid state, for the reactions in
+    # the fluid's collision term only (its table reactions and FLUID_EXACT; see the header)
     net = Network(itp, table_params(itp, m, g, s2), tT_rel)
-    used = [r for r in REACTIONS if haskey(itp.dark, r.name) || haskey(itp.portal, r.name)]
+    all_used = [r for r in REACTIONS if haskey(itp.dark, r.name) || haskey(itp.portal, r.name)]
+    in_fluid = Set([[r.name for (r, _) in pan.reactions]; collect(FLUID_EXACT)])
+    keep = [r.name in in_fluid for r in all_used]
+    used = all_used[keep]
     first_species = [dark_index(r.I[1]) for r in used]
     names = nothing
     rows = String[]
@@ -100,7 +116,7 @@ function fluid_benchmark(itp, tT_rel, m, g, s2)
         s = pan.ent_interp_z(z)
         # A' and phi floored as in the network (qss_blend): a Boltzmann-suppressed phi underflows
         nk = (n[1], n[2], max(n[3], n[1] * exp(-600)), max(n[4], n[1] * exp(-600)))
-        urs = unit_rates(net, T_N, T_nu, nk[1], nk[2])
+        urs = unit_rates(net, T_N, T_nu, nk[1], nk[2])[keep]
         lnA, lnphi = log(nk[3]), log(nk[4])
         fwd = [abs(exp(ur.lnGf + ur.cI[1] * lnA + ur.cI[2] * lnphi) * ur.xf) / nk[k] / H for (ur, k) in zip(urs, first_species)]
         push!(rows, row(exp(z), [T_N / T_nu, H, (n ./ s)..., omega_h2_of(pan, u, z), N_temp_gap(pan, u)[2],

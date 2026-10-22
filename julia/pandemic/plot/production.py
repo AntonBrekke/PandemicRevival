@@ -6,7 +6,7 @@ src/run_benchmarks.jl: one PDF per point, for either solver.
 
 Defaults: tmp/benchmarks -> figures/production. Against x = m_N/T_nu:
 - top left: m_N n/s [keV] of each species, counting the N it decays into (A' -> 2 N,
-  phi -> w_phi N; their sum is Omega h^2 in other units), with Omega h^2 = 0.12;
+  phi -> w_phi N; their sum is Omega h^2 in other units), with Omega h^2 = 0.12; N2 dashed;
 - bottom left: T_N/T_nu;
 - right: the reaction rates per DM particle [keV], as in the draft (C/n_d), and H:
   network: forward rate of each reaction per n~ (its rate per first initial particle
@@ -27,7 +27,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, FixedFormatter, NullFormatter
-from benchmark import LABELS, omega_parts
+from benchmark import LABELS, RATE_COLOURS, SPECIES_COLOURS, SPECIES_LS, omega_parts
 
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
@@ -37,15 +37,6 @@ plt.rcParams.update({"axes.labelsize": 10, "axes.titlesize": 10, "font.size": 10
 COLUMNWIDTH = 426.39256   # pt, \textwidth of the draft
 GEV_KEV = 1e6
 C_H = "crimson"
-SPECIES_COLOURS = {"N1": "#7bc043", "N2": "#2e7d32", "A": "#f37736", "phi": "#8e44ad"}
-# one colour per reaction, the same in every figure (the first five are the draft's)
-RATE_COLOURS = {
-    "A_N1N2": "#797ef6", "N2nu_A": "#1aa7ec", "NN_AA": "#4adede", "N1N1_AA": "#4adede",
-    "N2N2_AA": "#1e2f97", "N1N1_N2N2": "#ffa62b", "N1nu_phi": "#2a9d8f", "phi_AA": "#9b5de5",
-    "AA_phiphi": "#e76f51", "N1N2_Aphi": "#8d6e63", "N1nu_N2N2": "#606c38", "N2nu_N1N2": "#bc6c25",
-    "N1nu_AA": "#6d597a", "N2nu_Aphi": "#b5838d", "N1nu_phiphi": "#264653", "phi_N1N1": "#a8dadc",
-    "N1N1_phiphi": "#457b9d",
-}
 FIRST = (("N1", "Y_N1"), ("N2", "Y_N2"), ("phi", "Y_phi"), ("A", "Y_A"))   # order matters: A before AA
 
 
@@ -173,7 +164,7 @@ def plot(path, fig_dir, min_moved):
         y = o * keV_per_omega
         if np.nanmax(y) <= 1e2 * bottom:   # never visible
             continue
-        a1.loglog(x, y, color=SPECIES_COLOURS[key])
+        a1.loglog(x, y, color=SPECIES_COLOURS[key], ls=SPECIES_LS.get(key, "-"))
         curves.append((x, y, lab, SPECIES_COLOURS[key]))
     a1.loglog(xlim, [0.12 * keV_per_omega] * 2, color="0.55", ls="-.", zorder=-2)
     curves.append((np.array(xlim), np.array([0.12 * keV_per_omega] * 2), r"$\Omega h^2 = 0.12$", "0.55"))

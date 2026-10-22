@@ -5,10 +5,12 @@ Benchmark figures from src/run_benchmarks.jl: one PDF per point, for either solv
 
 Defaults: tmp/benchmarks -> figures/benchmarks. Panels, against x = m_N/T_nu, one y axis each:
 1. the contribution of each species to Omega h^2, counting the N it decays into (A' -> 2 N,
-   phi -> w_phi N), and their sum Omega h^2 (black dashed; dotted: 0.12);
+   phi -> w_phi N; N2 dashed, it often lies on N1), and their sum Omega h^2 (black dashed;
+   dotted: 0.12);
 2. T_N/T_nu;
 3. (m_N - mu_N1)/T_N;
-4. the rates the solver computes, in GeV, with H as the thick black line:
+4. the rates the solver computes, in GeV, with H as the thick black line (one colour per
+   reaction, RATE_COLOURS, the same for both solvers and in production.py):
    network: forward rate per particle of every reaction (solid: dark sector, dashed:
             with a neutrino);
    fluid:   the collision term of every process over n~ at the solver's steps (solid:
@@ -35,6 +37,17 @@ LABELS = {
     "N2nu_A": r"$N_2\nu\to A'$", "N1nu_phi": r"$N_1\nu\to\phi$", "N2nu_N1N2": r"$N_2\nu\to N_1N_2$ (RIS)",
     "N1nu_N2N2": r"$N_1\nu\to N_2N_2$", "N1nu_AA": r"$N_1\nu\to A'A'$ (RIS)", "N2nu_Aphi": r"$N_2\nu\to A'\phi$",
     "N1nu_phiphi": r"$N_1\nu\to\phi\phi$", "NN_AA": r"$NN\to A'A'$",
+}
+SPECIES_COLOURS = {"N1": "#7bc043", "N2": "#2e7d32", "A": "#f37736", "phi": "#8e44ad"}
+SPECIES_LS = {"N2": "--"}   # N2 often lies on N1
+# one colour per reaction, the same for both solvers and in every figure (the first five are the
+# draft's); NN_AA is the fluid's N1N1_AA + N1N2_AA + N2N2_AA
+RATE_COLOURS = {
+    "A_N1N2": "#797ef6", "N2nu_A": "#1aa7ec", "NN_AA": "#4adede", "N1N1_AA": "#4adede",
+    "N2N2_AA": "#1e2f97", "N1N1_N2N2": "#ffa62b", "N1nu_phi": "#2a9d8f", "phi_AA": "#9b5de5",
+    "AA_phiphi": "#e76f51", "N1N2_Aphi": "#8d6e63", "N1nu_N2N2": "#606c38", "N2nu_N1N2": "#bc6c25",
+    "N1nu_AA": "#6d597a", "N2nu_Aphi": "#b5838d", "N1nu_phiphi": "#264653", "phi_N1N1": "#a8dadc",
+    "N1N1_phiphi": "#457b9d",
 }
 # computed with exact quantum statistics in the fluid (the others come from the MB tables)
 FLUID_EXACT = {"N2nu_A", "N1nu_phi", "NN_AA"}
@@ -68,9 +81,9 @@ def plot(path, fig_dir):
                                          gridspec_kw={"height_ratios": [1.2, 0.5, 0.5, 1.5]})
 
     om1, om2, omA, omphi, w_phi = omega_parts(d)
-    for o, lab, c in ((om1, r"$N_1$", "C0"), (om2, r"$N_2$", "C1"), (omA, r"$A'$ ($\times 2\,N$)", "C2"),
-                      (omphi, rf"$\phi$ ($\times {w_phi:.3g}\,N$)", "C3")):
-        a1.plot(x, o, color=c, label=lab)
+    for o, key, lab in ((om1, "N1", r"$N_1$"), (om2, "N2", r"$N_2$"), (omA, "A", r"$A'$ ($\times 2\,N$)"),
+                        (omphi, "phi", rf"$\phi$ ($\times {w_phi:.3g}\,N$)")):
+        a1.plot(x, o, color=SPECIES_COLOURS[key], ls=SPECIES_LS.get(key, "-"), label=lab)
     a1.plot(x, d["omega_h2"], "k--", lw=1.3, label=r"total $\Omega h^2$")
     a1.axhline(0.12, color="0.5", ls=":", lw=1)
     o_all = np.concatenate([om1, om2, omA])
@@ -97,15 +110,14 @@ def plot(path, fig_dir):
     a3.set_ylabel(r"$(m_N - \mu_{N_1})/T_N$")
 
     # the CSV stores rates over H; plotted in GeV, dropping points below FLOOR H
-    cmap = plt.get_cmap("tab20")
     rate_cols = [n for n in d.dtype.names if n.startswith(("fwd:", "net:"))]   # per process
-    for i, n in enumerate(rate_cols):
+    for n in rate_cols:
         name = n.split(":", 1)[1]
         r = d[n]
         if not np.any(np.abs(r) > FLOOR):
             continue
         lab = LABELS.get(name, name) + (" (exact)" if solver == "fluid" and name in FLUID_EXACT else "")
-        c = cmap((2 * i) % 20 + (i // 10) % 2)
+        c = RATE_COLOURS.get(name, "0.3")
         if solver == "network":
             a4.plot(x, np.where(r > FLOOR, r * H, np.nan), ls="--" if name in PORTAL else "-", color=c, lw=1.2,
                     label=lab)

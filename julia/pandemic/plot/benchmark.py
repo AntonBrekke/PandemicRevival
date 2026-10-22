@@ -60,7 +60,7 @@ def omega_parts(d):
     """
     Contributions of N1, N2, A', phi to Omega h^2 = k (Y_N1 + Y_N2 + 2 Y_A' + w_phi Y_phi),
     k = m_N s0 / rho_crit0_h2. k and w_phi are fitted to the solver's omega_h2 column (exact to
-    the CSV's 5 digits); w_phi only where phi carries a visible share, W_PHI otherwise.
+    the CSV's digits); w_phi only where phi carries a visible share, W_PHI otherwise.
     """
     om = d["omega_h2"]
     A = np.stack([d["Y_N1"] + d["Y_N2"] + 2 * d["Y_A"], d["Y_phi"]], 1) / om[:, None]
@@ -110,7 +110,8 @@ def plot(path, fig_dir):
     a3.set_ylabel(r"$(m_N - \mu_{N_1})/T_N$")
 
     # the CSV stores rates over H; plotted in GeV, dropping points below FLOOR H
-    rate_cols = [n for n in d.dtype.names if n.startswith(("fwd:", "net:"))]   # per process
+    # per process: the network's forward rates, the fluid's collision terms (what it integrates)
+    rate_cols = [n for n in d.dtype.names if n.startswith("fwd:" if solver == "network" else "net:")]
     for n in rate_cols:
         name = n.split(":", 1)[1]
         r = d[n]

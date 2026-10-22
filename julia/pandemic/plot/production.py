@@ -8,13 +8,15 @@ Defaults: tmp/benchmarks -> figures/production. Against x = m_N/T_nu:
 - top left: m_N n/s [keV] of each species, counting the N it decays into (A' -> 2 N,
   phi -> w_phi N; their sum is Omega h^2 in other units), with Omega h^2 = 0.12; N2 dashed;
 - bottom left: T_N/T_nu;
-- right: the reaction rates per DM particle [keV], as in the draft (C/n_d), and H:
-  network: forward rate of each reaction per n~ (its rate per first initial particle
-           times n_first/n~);
-  fluid:   the net collision term of each process, |C_n~|/n~ (dashed: removes n~).
+- right: the reaction rates per DM particle [keV], as in the draft (C/n_d), and H: the
+  forward rate of each reaction per n~ (its rate per first initial particle times
+  n_first/n~), the same quantity for both solvers (the fluid's from the MB tables at its
+  state); thin black: the net rate of change of n~, |d ln Y~/d ln x| H over bins of 0.2 in
+  ln x, where above 3% of H (dashed: n~ falls; d ln x/dt = H once T_nu redshifts freely).
+  The fluid's per-process net terms are not used: in equilibrium they are residuals of
+  near-cancellations, and only their sum is meaningful.
   n~ = n_N1 + n_N2 + 2 n_A' + w_phi n_phi is the number of N after all decays. A reaction is
-  drawn only if it ever contributes: if the fraction of the DM it moves over the history,
-  int (rate/H) d ln x, reaches --min.
+  drawn only if it ever runs: if int (rate/H) d ln x over the history reaches --min.
 The first network point is the seed state (network_initial_state) and is left out: its
 seeds of N2, A' and phi relax within the first step.
 """
@@ -37,6 +39,8 @@ plt.rcParams.update({"axes.labelsize": 10, "axes.titlesize": 10, "font.size": 10
 COLUMNWIDTH = 426.39256   # pt, \textwidth of the draft
 GEV_KEV = 1e6
 C_H = "crimson"
+GROWTH_BIN = 0.2    # bin in ln x of the net rate of change of n~
+GROWTH_MIN = 0.03   # drawn only above this fraction of H (the fluid's noise is ~5e-3 H per bin)
 FIRST = (("N1", "Y_N1"), ("N2", "Y_N2"), ("phi", "Y_phi"), ("A", "Y_A"))   # order matters: A before AA
 
 
@@ -183,27 +187,30 @@ def plot(path, fig_dir, min_moved):
 
     # rates per DM particle
     curves = []
-    rate_cols = [n for n in d.dtype.names if n.startswith(("fwd:", "net:"))]
+    rate_cols = [n for n in d.dtype.names if n.startswith("fwd:")]
     lx = np.log(x)
     rmax = H.max()
     for n in rate_cols:
         name = n.split(":", 1)[1]
-        if solver == "network":
-            first = next(col for sp, col in FIRST if name.startswith(sp))
-            r = d[n] * d[first] / Yt   # over H
-            lab = LABELS.get(name, name)
-        else:
-            r = d[n]
-            lab = LABELS.get(name, name).replace(r"\to", r"\leftrightarrow")
+        first = next(col for sp, col in FIRST if name.startswith(sp))
+        r = d[n] * d[first] / Yt   # over H
         moved = np.sum(0.5 * (np.abs(r[1:]) + np.abs(r[:-1])) * np.diff(lx))
         if moved < min_moved:
             continue
         c = RATE_COLOURS.get(name, "0.3")
         a3.loglog(x, np.where(r > 0, r * H, np.nan), color=c, zorder=-4)
-        if solver == "fluid":
-            a3.loglog(x, np.where(r < 0, -r * H, np.nan), color=c, ls="--", zorder=-4)
-        curves.append((x, np.abs(r) * H, lab, c))
+        curves.append((x, np.abs(r) * H, LABELS.get(name, name), c))
         rmax = max(rmax, np.nanmax(np.abs(r) * H))
+    # net rate over bins of GROWTH_BIN in ln x: the fluid's ln Y~ wobbles by ~1e-3 at its
+    # tolerance, which a pointwise derivative turns into noise of ~0.1 H
+    lxg = np.arange(lx[0], lx[-1], GROWTH_BIN)
+    xg = np.exp(lxg)
+    Hg = np.exp(np.interp(lxg, lx, np.log(H)))
+    growth = np.gradient(np.interp(lxg, lx, np.log(Yt)), lxg) * Hg
+    growth = np.where(np.abs(growth) > GROWTH_MIN * Hg, growth, np.nan)
+    a3.loglog(xg, np.where(growth > 0, growth, np.nan), color="k", lw=0.8, zorder=-1)
+    a3.loglog(xg, np.where(growth < 0, -growth, np.nan), color="k", lw=0.8, ls="--", zorder=-1)
+    curves.append((xg, np.abs(growth), r"$|\mathrm{d}\ln\tilde Y/\mathrm{d}t|$", "k"))
     a3.loglog(x, H, color=C_H, lw=2.0, zorder=0)
     curves.insert(0, (x, H, r"$H$", C_H))
     rlo, rhi = 1e-2 * H.min(), 30 * rmax

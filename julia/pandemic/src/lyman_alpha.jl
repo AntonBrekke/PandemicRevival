@@ -375,9 +375,11 @@ function lyman_alpha_network(itp, tT_rel, m, g, s2)
     p = table_params(itp, m, g, s2)
     net = Network(itp, p, tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
-    # with a splitting the conversions can run past x = 100: follow N2 to the end of the portal tables
+    # with a splitting the late conversions and their heat are followed by `with_conversions`
+    # from x = 100 on, as for the fluid: the network's single dark temperature would give the
+    # bulk all of their heat even after kinetic decoupling
     delta = table_delta(itp)
-    sol = solve_network(net, dw, tT_rel; x_end=delta > 0 ? 1e3 : 100.0, maxiters=20_000)
+    sol = solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
     sol.retcode == DE.ReturnCode.Success || return failed_lengths()
     n, _ = state_densities(net, sol.u[end], sol.t[end])
     h = DarkHistory(net, sol)

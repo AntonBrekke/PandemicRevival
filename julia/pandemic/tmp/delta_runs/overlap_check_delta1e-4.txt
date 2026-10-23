@@ -1,0 +1,22 @@
+julia --project=. test/check_delta_overlap.jl tmp/rate_tables/rate_tables_mA2.5_mphi100.0_delta0.0001.jls \
+    10.57:1e-3:3.64322e-15:3.63749e-15,10.57:1.778e-3:9.11239e-16:9.11111e-16
+(roots: network and fluid at delta = 1e-4, tmp/delta_runs/pilot4)
+
+delta = 0.0001
+m=10.57 keV g=0.001  f_N2 / lambda_fs_kd / x_fo:  (a) 0.119 / 0.103 / 282.0   (b) 0.119 / 0.103 / 282.0   (c) 0.119 / 0.101 / 282.0   (d) 0.119 / 0.101 / 282.0
+m=10.57 keV g=0.001778  f_N2 / lambda_fs_kd / x_fo:  (a) 0.0265 / 0.104 / 568.0   (b) 0.0265 / 0.104 / 568.0   (c) 0.0264 / 0.103 / 568.0   (d) 0.0232 / 0.0906 / 493.0
+
+(a) network to x = 1e3, continued; (b) conversions restarted fluid-style on the network history;
+(c) network to x = 100 only, continued; (d) fluid. lambda_fs_kd in Mpc.
+At delta = 0 (tmp/network_scan, tmp/fluid_scan): lambda_fs_kd = 0.070 (g = 1e-3), 0.046 (g = 1.778e-3) Mpc,
+f_N2 = 0.5, for both solvers.
+
+Low masses (same script; roots 6.11998e-16 / 5.86418e-16 and 1.44954e-15 / 1.43663e-15):
+m=0.6 keV g=0.001  f_N2 / lambda_fs_kd / x_fo:  (a) 0.0368 / 1.36 / 7540.0   (b) 0.0368 / 1.36 / 7540.0   (c) 0.0109 / 1.03 / 3130.0   (d) 0.00278 / 0.593 / 1130.0
+m=2.21 keV g=0.001  f_N2 / lambda_fs_kd / x_fo:  (a) 0.0223 / 0.38 / 944.0   (b) 0.0223 / 0.38 / 944.0   (c) 0.0222 / 0.379 / 925.0   (d) 0.0145 / 0.279 / 645.0
+
+(a) vs (c) at 0.6 keV: the network's single dark temperature gives the bulk all the heat of the
+late conversions after kinetic decoupling; the continuation only Gamma_kd/(Gamma_kd + H) of it.
+Since commit 086c3a4 the network's Lyman-alpha stops at x = 100 and uses the continuation, i.e. (c).
+Remaining network/fluid difference at low mass and g >= 1e-3: factor ~2 in lambda_fs_kd, f_N2 << 1
+in both (scan files: m >~ 5 keV agree to a few %).

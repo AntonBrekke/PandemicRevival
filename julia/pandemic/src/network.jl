@@ -462,13 +462,20 @@ end
 Integrates the network from the DW initial state to x = x_end. Stops with
 retcode Terminated if the dark sector becomes degenerate (largest MB
 occupation number > `fmax_stop`): the network does not apply there.
-`dz_seed` (`network_initial_state`) defaults to 1e-3 for equal masses and to 1e-9 with an
-N1-N2 splitting: the phi N1 N1 coupling g delta m_N/m_A' then makes a large phi seed, whose
-decays light the A'A' -> phi phi -> 4 A' loop at the first point (CLAUDE.md, network seed).
+`dz_seed` (`network_initial_state`) is 1e-3 by default. With an N1-N2 splitting the phi N1 N1
+coupling g delta m_N/m_A' can make the phi seed so large that its decays light the
+A'A' -> phi phi -> 4 A' loop at the first point (CLAUDE.md, network seed): if the default solve
+stops degenerate within a factor 2 of its start, it is repeated with dz_seed = 1e-9 (which in
+turn fails at small g, where the seeds become too small to resolve: hence not always).
 """
 function solve_network(net::Network, dw::DodelsonWidrow, tT_rel::TimeTempRelation;
                        x_end=100.0, reltol=1e-6, abstol=1e-8, fmax_stop=0.5, dz_seed=nothing, kw...)
-    dz_seed = something(dz_seed, table_delta(net.itp) > 0 ? 1e-9 : 1e-3)
+    if dz_seed === nothing
+        sol = solve_network(net, dw, tT_rel; x_end=x_end, reltol=reltol, abstol=abstol, fmax_stop=fmax_stop,
+                            dz_seed=1e-3, kw...)
+        table_delta(net.itp) > 0 && sol.retcode == DE.ReturnCode.Terminated && sol.t[end] - sol.t[1] < log(2) || return sol
+        dz_seed = 1e-9
+    end
     u0, z0 = network_initial_state(net, dw, tT_rel; dz_seed=dz_seed)
     prob = DE.ODEProblem(network_rhs!, u0, (z0, log(x_end)), net)
     # MB validity: stop (retcode Terminated) once a dark occupation number exceeds

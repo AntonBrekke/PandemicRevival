@@ -487,9 +487,10 @@ const LNXN_GRID = range(log(1e-6), log(1e8), length=141)
 const LNXNU_GRID = range(log(3e-6), log(1e3), length=87)
 const LNR_GRID = range(log(1e-5), log(10.0), length=31)
 
-"""Reference parameters of the tables: 10 keV, g = 1e-3, sin^2 2theta = 1e-14 (narrow widths)."""
-reference_params(; mA_over_mN=2.5, mphi_over_mN=100.0) =
-    rate_params(1e-5, 1e-3, 1e-14; mA_over_mN=mA_over_mN, mphi_over_mN=mphi_over_mN)
+"""Reference parameters of the tables: 10 keV, g = 1e-3, sin^2 2theta = 1e-14 (narrow widths),
+N1-N2 splitting `delta` (rate_params)."""
+reference_params(; mA_over_mN=2.5, mphi_over_mN=100.0, delta=0.0) =
+    rate_params(1e-5, 1e-3, 1e-14; mA_over_mN=mA_over_mN, mphi_over_mN=mphi_over_mN, delta=delta)
 
 """
     build_rate_tables(; mA_over_mN, mphi_over_mN, reactions, lnxN, lnxnu, lnr, verbose)
@@ -499,9 +500,9 @@ NamedTuple (p_ref, grids, dark::Dict(name => (lnRf, lnRr)), portal::Dict(name
 => (lnRf, lnRr, lnQf, lnQr, ratio_Rf, ratio_Rr, ratio_Qf, ratio_Qr))) ready for
 `save_rate_tables`; a portal rate is exp(ln...) * ratio_... (`portal_point`).
 """
-function build_rate_tables(; mA_over_mN=2.5, mphi_over_mN=100.0, reactions=REACTIONS,
+function build_rate_tables(; mA_over_mN=2.5, mphi_over_mN=100.0, delta=0.0, reactions=REACTIONS,
                            lnxN=LNXN_GRID, lnxnu=LNXNU_GRID, lnr=LNR_GRID, verbose=true)
-    p = reference_params(; mA_over_mN=mA_over_mN, mphi_over_mN=mphi_over_mN)
+    p = reference_params(; mA_over_mN=mA_over_mN, mphi_over_mN=mphi_over_mN, delta=delta)
     m = p.m1
     T_max = m * exp(-min(first(lnxN), first(lnxnu) - last(lnr)))
     dark = Dict{Symbol,Any}()
@@ -528,12 +529,13 @@ function build_rate_tables(; mA_over_mN=2.5, mphi_over_mN=100.0, reactions=REACT
         end
         verbose && (println(rpad(r.name, 14), " ", round(time() - t0; digits=1), " s"); flush(stdout))
     end
-    return (p_ref=p, mA_over_mN=mA_over_mN, mphi_over_mN=mphi_over_mN,
+    return (p_ref=p, mA_over_mN=mA_over_mN, mphi_over_mN=mphi_over_mN, delta=delta,
             lnxN=collect(lnxN), lnxnu=collect(lnxnu), lnr=collect(lnr), dark=dark, portal=portal)
 end
 
-rate_table_path(dir; mA_over_mN=2.5, mphi_over_mN=100.0) =
-    joinpath(dir, "rate_tables_mA$(mA_over_mN)_mphi$(mphi_over_mN).jls")
+"""File of a table set; tables with an N1-N2 splitting carry `_delta<delta>`."""
+rate_table_path(dir; mA_over_mN=2.5, mphi_over_mN=100.0, delta=0.0) =
+    joinpath(dir, "rate_tables_mA$(mA_over_mN)_mphi$(mphi_over_mN)" * (delta > 0 ? "_delta$(delta)" : "") * ".jls")
 
 save_rate_tables(path, tabs) = (mkpath(dirname(path)); Serialization.serialize(path, tabs); path)
 load_rate_tables(path) = Serialization.deserialize(path)
@@ -551,6 +553,7 @@ struct RateInterpolants
     lnr::Tuple{Float64,Float64}
     dark::Dict{Symbol,Any}
     portal::Dict{Symbol,Any}
+    delta::Float64
 end
 
 function RateInterpolants(tabs)
@@ -561,17 +564,21 @@ function RateInterpolants(tabs)
     itp2(v) = extrapolate(scale(interpolate(v, BSpline(Cubic(Line(OnGrid())))), rnu, rr), Line())
     dark = Dict{Symbol,Any}(k => map(itp1, v) for (k, v) in tabs.dark if all(isfinite, v.lnRf))
     portal = Dict{Symbol,Any}(k => map(itp2, v) for (k, v) in tabs.portal)
-    return RateInterpolants(tabs.p_ref, extrema(rN), extrema(rnu), extrema(rr), dark, portal)
+    return RateInterpolants(tabs.p_ref, extrema(rN), extrema(rnu), extrema(rr), dark, portal,
+                            haskey(tabs, :delta) ? tabs.delta : 0.0)
 end
 
 
 """(m_A'/m_N, m_phi/m_N) of a table set."""
 mass_ratios(itp::RateInterpolants) = (itp.p_ref.mA / itp.p_ref.m1, itp.p_ref.mphi / itp.p_ref.m1)
 
-"""rate_params at (m_N, g, sin^2 2theta) with the mass ratios of the table set `itp`."""
+"""N1-N2 splitting delta of a table set (0 for tables built before it existed)."""
+table_delta(itp::RateInterpolants) = itp.delta
+
+"""rate_params at (m_N, g, sin^2 2theta) with the mass ratios and splitting of the table set `itp`."""
 function table_params(itp::RateInterpolants, m_N, g, sin2_2theta)
     rA, rphi = mass_ratios(itp)
-    return rate_params(m_N, g, sin2_2theta; mA_over_mN=rA, mphi_over_mN=rphi)
+    return rate_params(m_N, g, sin2_2theta; mA_over_mN=rA, mphi_over_mN=rphi, delta=table_delta(itp))
 end
 
 """ln of the rate and energy normalisation of every reaction at parameters `p` (see `ln_norm`)."""

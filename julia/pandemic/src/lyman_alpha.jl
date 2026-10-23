@@ -118,22 +118,24 @@ struct DarkHistory{B,F}
     fin::NTuple{4,Float64}    # (T, gap1, gap2, n1) at z_f
 end
 
-function DarkHistory(bg, N1, m_A, g, sol, state)
+function DarkHistory(bg, N1, m_A, g, sol, state; delta=0.0)
     z_f = sol.t[end]
     fin = state(sol.u[end], z_f)[1:4]
-    return DarkHistory(bg, N1, state, sol, CkdTable(N1.m, m_A, g), sol.t[1], z_f, scale_factor_z(bg, z_f), fin)
+    return DarkHistory(bg, N1, state, sol, CkdTable(N1.m, m_A, g; delta=delta), sol.t[1], z_f,
+                       scale_factor_z(bg, z_f), fin)
 end
 
-"""History of a fluid solution (fluid.jl): one T_N and one chemical potential for N1 and N2."""
+"""History of a fluid solution (fluid.jl): one T_N and one chemical potential for N1 and N2
+(with a splitting the N2 gap is larger by (m_N2 - m_N1)/T_N)."""
 function DarkHistory(pan::FluidSolver, sol)
     function state(u, z)
         T, gap = N_temp_gap(pan, u)
         xi = xi_from_eta(pan, u[4], u[3])
         gA = gap_A_from_eta(u[4])
-        return (T, gap, gap, number_density(pan.N1, T, 0.0; gap=gap),
+        return (T, gap, N2_gap(pan, u), number_density(pan.N1, T, 0.0; gap=gap),
                 pressure_dens(pan, T, xi; gap_A=gA), energy_dens(pan, T, xi; gap_A=gA))
     end
-    return DarkHistory(pan, pan.N1, pan.A.m, pan.mp.y, sol, state)
+    return DarkHistory(pan, pan.N1, pan.A.m, pan.mp.y, sol, state; delta=pan.N2.m / pan.N1.m - 1)
 end
 
 """History of a network solution (network.jl): MB species, separate N1 and N2 densities."""
@@ -144,7 +146,8 @@ function DarkHistory(net::Network, sol)
         gap(k) = log(n_scaled_safe(net.masses[k], net.dofs[k], T) / n[k])
         return (T, gap(1), gap(2), n[1], sum(n) * T, sum(net.masses[k] * n[k] for k in 1:NSPECIES) + kappa)
     end
-    return DarkHistory(net, Particle{Float64}(net.p.m1, 0, dof=2), net.masses[3], net.p.g, sol, state)
+    return DarkHistory(net, Particle{Float64}(net.p.m1, 0, dof=2), net.masses[3], net.p.g, sol, state;
+                       delta=splitting(net.p))
 end
 
 """(T, gap1, gap2, n1) at z: from the solution, then non-relativistic with conserved number."""
@@ -153,6 +156,43 @@ function dark_state(h::DarkHistory, z)
     r = h.a_f / scale_factor_z(h.bg, z)
     T, g1, g2, n1 = h.fin
     return (T * r^2, g1, g2, n1 * r^3)
+end
+
+"""
+    f_N2_final(h, itp, p, m2; frozen_at_end, z_hi)
+
+N2/(N1 + N2) after N1 N1 <-> N2 N2 freezes out, for a splitting m_N2 = m2 > m_N1 (h.N1.m).
+The relaxation rate of N2/N1, lambda = (forward rate per N1) + (reverse rate per N2) from the
+tables at parameters `p`, is followed against H on a grid from the start of the history to
+z_hi; freeze-out is the last z with lambda >= H, and the composition is the history's there.
+After the solution the dark sector is continued as `dark_state` does (T ∝ a^-2), with N2/N1 at
+its equilibrium (m2/m1)^(3/2) e^(-(m2 - m1)/T) (equal chemical potentials, MB) and the heat of
+the conversions neglected. `frozen_at_end`: a history that follows N2 itself (the network) keeps
+its final value if lambda < H there. The fluid holds N1 <-> N2 in equilibrium throughout and
+takes the value at freeze-out. Returns (f_N2, x at freeze-out; NaN if never in equilibrium).
+"""
+function f_N2_final(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_at_end, z_hi, dz=0.02)
+    m1 = h.N1.m
+    r = reaction(:N1N1_N2N2)
+    t = itp.dark[r.name]
+    lnR = ln_norm(r, p, itp.p_ref)
+    # (N2/N1, lambda/H) at z
+    function ratio_rate(z)
+        T, g1, g2, _ = dark_state(h, z)
+        z > h.z_f && (g2 = g1 + (m2 - m1) / T)
+        nh1, nh2 = n_scaled_safe(m1, 2, T), n_scaled_safe(m2, 2, T)
+        lx = log(m1 / T)
+        # G_f/n1 = R_f e^(-2 g1)/(nh1 e^(-g1)), G_r/n2 likewise; each reaction converts two
+        lam = 2 * exp(t.lnRf(lx) + lnR - g1) / nh1 + 2 * exp(t.lnRr(lx) + lnR - g2) / nh2
+        return nh2 / nh1 * exp(g1 - g2), lam / h.bg.H_interp_z(z)
+    end
+    R_end, lam_end = ratio_rate(h.z_f)
+    frozen_at_end && lam_end < 1 && return R_end / (1 + R_end), NaN
+    zs = range(h.z_i, z_hi, length=max(2, ceil(Int, (z_hi - h.z_i) / dz) + 1))
+    i = findlast(z -> ratio_rate(z)[2] >= 1, zs)
+    i === nothing && return R_end / (1 + R_end), NaN
+    R = ratio_rate(zs[i])[1]
+    return R / (1 + R), exp(zs[i])
 end
 
 """Gamma_kd/H of N1 at z."""
@@ -265,28 +305,42 @@ Network solve at (m_N [GeV], g, sin^2 2theta) and its Lyman-alpha lengths:
 solve fails.
 """
 function lyman_alpha_network(itp, tT_rel, m, g, s2)
-    net = Network(itp, table_params(itp, m, g, s2), tT_rel)
+    p = table_params(itp, m, g, s2)
+    net = Network(itp, p, tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
-    sol = solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
+    # with a splitting the conversions can run past x = 100: follow N2 to the end of the portal tables
+    delta = table_delta(itp)
+    sol = solve_network(net, dw, tT_rel; x_end=delta > 0 ? 1e3 : 100.0, maxiters=20_000)
     sol.retcode == DE.ReturnCode.Success || return failed_lengths()
     n, _ = state_densities(net, sol.u[end], sol.t[end])
-    return (; lyman_alpha_lengths(DarkHistory(net, sol), tT_rel)...,
-            omega_h2=network_omega_h2(net, sol.u[end], sol.t[end]), f_N2=n[2] / (n[1] + n[2]))
+    h = DarkHistory(net, sol)
+    f2, x_fo = n[2] / (n[1] + n[2]), NaN
+    delta > 0 && ((f2, x_fo) = f_N2_final(h, itp, p, p.m2; frozen_at_end=true, z_hi=log(m / tT_rel.T_nu_grid[end])))
+    return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=network_omega_h2(net, sol.u[end], sol.t[end]),
+            f_N2=f2, x_fo=x_fo)
 end
 
-"""As `lyman_alpha_network` for the fluid (`solve_relic`; f_N2 = 1/2 by construction)."""
+"""As `lyman_alpha_network` for the fluid (`solve_relic`; f_N2 = 1/2 for equal masses, else at
+the freeze-out of N1 N1 <-> N2 N2, `f_N2_final`)."""
 function lyman_alpha_fluid(itp, tT_rel, m, g, s2; pan=FluidSolver(m, tT_rel, itp))
     sol, om, plateau = solve_relic(pan, tT_rel, g, s2)
     plateau || return failed_lengths()
-    return (; lyman_alpha_lengths(DarkHistory(pan, sol), tT_rel)..., omega_h2=om, f_N2=0.5)
+    h = DarkHistory(pan, sol)
+    f2, x_fo = 0.5, NaN
+    table_delta(itp) > 0 && ((f2, x_fo) = f_N2_final(h, itp, fluid_rates!(pan), pan.N2.m; frozen_at_end=false,
+                                                     z_hi=log(m / tT_rel.T_nu_grid[end])))
+    return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=om, f_N2=f2, x_fo=x_fo)
 end
 
 failed_lengths() = (lambda_fs=NaN, x_c=NaN, x_kd=NaN, lambda_fs_pre=NaN, lambda_fs_kd=NaN, r_s=NaN,
-                    coupled=false, omega_h2=NaN, f_N2=NaN)
+                    coupled=false, omega_h2=NaN, f_N2=NaN, x_fo=NaN)
 
+"""Columns of the Lyman-alpha CSVs; x_fo (freeze-out of N1 N1 <-> N2 N2, `f_N2_final`) only for
+tables with a splitting."""
 const LYMAN_ALPHA_HEADER = "m_N,y,sin2_2theta,omega_h2,lambda_fs_Mpc,x_c,x_kd,lambda_fs_pre_Mpc,lambda_fs_kd_Mpc,r_s_Mpc,coupled,f_N2"
+lyman_alpha_header(delta) = delta > 0 ? LYMAN_ALPHA_HEADER * ",x_fo" : LYMAN_ALPHA_HEADER
 
-"""One CSV row of `LYMAN_ALPHA_HEADER`."""
-lyman_alpha_row(m, g, s2, r) =
+"""One CSV row of `lyman_alpha_header(delta)`."""
+lyman_alpha_row(m, g, s2, r; delta=0.0) =
     join((@sprintf("%.6g", v) for v in (m, g, s2, r.omega_h2, r.lambda_fs, r.x_c, r.x_kd,
-          r.lambda_fs_pre, r.lambda_fs_kd, r.r_s, Int(r.coupled), r.f_N2)), ",")
+          r.lambda_fs_pre, r.lambda_fs_kd, r.r_s, Int(r.coupled), r.f_N2, (delta > 0 ? (r.x_fo,) : ())...)), ",")

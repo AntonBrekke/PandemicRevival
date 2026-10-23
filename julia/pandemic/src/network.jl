@@ -109,6 +109,7 @@ struct Network{FH,FS,FX}
     dx_dt_interp_z::FX
     dw::Union{Nothing,DWHistory}   # DW production as a source term (nothing: all at T_dw)
     w_phi::Float64                 # N per phi after its decays (`phi_weight`)
+    w_phi2::Float64                # of which N2 (`phi_weight`)
 end
 
 """Age of the Universe [s]."""
@@ -127,17 +128,28 @@ function phi_weight(p)
     return (4w[1] + 2w[2] + w[3]) / tot
 end
 
+"""Number of N2 per phi after its decays (2 per phi -> A'A'; 0 if phi outlives the Universe)."""
+function phi_weight_N2(p)
+    w = (width(:phi_AA, p), width(:phi_N1N1, p), width(:phi_N1nu, p))
+    tot = sum(w)
+    tot * T_AGE / hbar < 1 && return 0.0
+    return 2w[1] / tot
+end
+
 function Network(itp::RateInterpolants, p, tT_rel::TimeTempRelation; dw=nothing)
     m = p.m1
     all(isapprox.((p.mA / m, p.mphi / m), mass_ratios(itp); rtol=1e-12)) ||
         error("parameters have m_A'/m_N, m_phi/m_N = $((p.mA / m, p.mphi / m)) but the tables $(mass_ratios(itp)): use table_params")
+    isapprox(splitting(p), table_delta(itp); atol=1e-12) ||
+        error("parameters have N1-N2 splitting $(splitting(p)) but the tables $(table_delta(itp)): use table_params")
     z_grid = log.(x_grid_of(m, tT_rel.T_nu_grid))
     masses = ntuple(k -> field_mass(DARK_SPECIES[k], p), 4)
     dofs = ntuple(k -> field_dof(DARK_SPECIES[k]), 4)
     return Network(p, itp, rate_norms(itp, p), masses, dofs,
                    z_interpolation(z_grid, tT_rel.hubble_grid),
                    z_interpolation(z_grid, tT_rel.ent_grid),
-                   z_interpolation(z_grid, dx_dt_grid_of(m, tT_rel.T_nu_grid, tT_rel.dT_nu_dt_grid)), dw, phi_weight(p))
+                   z_interpolation(z_grid, dx_dt_grid_of(m, tT_rel.T_nu_grid, tT_rel.dT_nu_dt_grid)), dw, phi_weight(p),
+                   phi_weight_N2(p))
 end
 
 """
@@ -201,6 +213,9 @@ function unit_rates(net::Network, T_N, T_nu, n1, n2)
     lnz = (log(n1) - lns[1], log(n2) - lns[2], -lns[3], -lns[4])
     side(fs) = sum(lnz[dark_index(f)] for f in fs)
     cnt(fs) = (count(==(:A), fs), count(==(:phi), fs))
+    # beyond the portal grid (x_nu > 1e3) the portal rates are Boltzmann-suppressed to
+    # nothing, and the linear extrapolation of their logs would not be: leave them out
+    portal_on = lxnu <= itp.lnxnu[2]
     out = UnitRate[]
     for r in REACTIONS
         lnR, lnQ = net.norms[r.name]
@@ -209,7 +224,7 @@ function unit_rates(net::Network, T_N, T_nu, n1, n2)
             t = itp.dark[r.name]
             push!(out, UnitRate(delta_N(r), Delta, cnt(r.I), cnt(r.F), t.lnRf(lxN) + lnR + side(r.I),
                                 t.lnRr(lxN) + lnR + side(r.F), 1.0, 1.0, -Inf, -Inf, 0.0, 0.0))
-        elseif haskey(itp.portal, r.name)
+        elseif portal_on && haskey(itp.portal, r.name)
             t = itp.portal[r.name]
             push!(out, UnitRate(delta_N(r), Delta, cnt(r.I), cnt(r.F),
                                 t.lnRf(lxnu, lr) + lnR + side(r.I), t.lnRr(lxnu, lr) + lnR + side(r.F),
@@ -442,15 +457,19 @@ function network_initial_state(net::Network, dw::DodelsonWidrow, tT_rel::TimeTem
 end
 
 """
-    solve_network(net, dw, tT_rel; x_end=100, reltol=1e-6, abstol=1e-8, fmax_stop=0.5)
+    solve_network(net, dw, tT_rel; x_end=100, reltol=1e-6, abstol=1e-8, fmax_stop=0.5, dz_seed)
 
 Integrates the network from the DW initial state to x = x_end. Stops with
 retcode Terminated if the dark sector becomes degenerate (largest MB
 occupation number > `fmax_stop`): the network does not apply there.
+`dz_seed` (`network_initial_state`) defaults to 1e-3 for equal masses and to 1e-9 with an
+N1-N2 splitting: the phi N1 N1 coupling g delta m_N/m_A' then makes a large phi seed, whose
+decays light the A'A' -> phi phi -> 4 A' loop at the first point (CLAUDE.md, network seed).
 """
 function solve_network(net::Network, dw::DodelsonWidrow, tT_rel::TimeTempRelation;
-                       x_end=100.0, reltol=1e-6, abstol=1e-8, fmax_stop=0.5, kw...)
-    u0, z0 = network_initial_state(net, dw, tT_rel)
+                       x_end=100.0, reltol=1e-6, abstol=1e-8, fmax_stop=0.5, dz_seed=nothing, kw...)
+    dz_seed = something(dz_seed, table_delta(net.itp) > 0 ? 1e-9 : 1e-3)
+    u0, z0 = network_initial_state(net, dw, tT_rel; dz_seed=dz_seed)
     prob = DE.ODEProblem(network_rhs!, u0, (z0, log(x_end)), net)
     # MB validity: stop (retcode Terminated) once a dark occupation number exceeds
     # fmax_stop; beyond it Pauli blocking / Bose enhancement matter and the MB rates,
@@ -463,12 +482,16 @@ function solve_network(net::Network, dw::DodelsonWidrow, tT_rel::TimeTempRelatio
                     isoutofdomain=bad, callback=degenerate, kw...)
 end
 
-"""Omega h^2 of the state u at z, counting each A' as the two N it decays into
-and each phi with its weight `w_phi` (4 for phi -> A'A')."""
+"""Omega h^2 of the state u at z, counting each A' as the N1 N2 pair it decays into
+and each phi with its weight `w_phi` (4 for phi -> A'A'), of which `w_phi2` are N2. With
+an N1-N2 splitting every N2 carries m_N2 = m_N1 + dm."""
 function network_omega_h2(net::Network, u, z)
     s = net.ent_interp_z(z)
-    # u[1] = ln(Y_N1 + Y_N2)
-    return net.p.m1 * (exp(u[1]) + 2exp(u[3]) + net.w_phi * exp(u[4])) * s0 / rho_crit0_h2
+    # u[1] = ln(Y_N1 + Y_N2), u[2] = ln(Y_N2/Y_N1)
+    m1, dm = net.masses[1], net.masses[2] - net.masses[1]
+    Y2 = exp(u[1]) / (1 + exp(-u[2]))
+    return (m1 * (exp(u[1]) + 2exp(u[3]) + net.w_phi * exp(u[4])) +
+            dm * (Y2 + exp(u[3]) + net.w_phi2 * exp(u[4]))) * s0 / rho_crit0_h2
 end
 
 """Diagnostics along a solution: T_N, T_nu, largest MB occupation number per species, Omega h^2."""

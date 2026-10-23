@@ -5,7 +5,7 @@ one-fluid solver (tmp/fluid_scan) for y >= y_switch, on the base grid and, where
 the finer one of plot/fine_g_seeds.py (tmp/*_scan_fine). Where the fluid root search did
 not settle but the network (valid in the overlap) has a root, the network root is used.
 
-    python plot/combined_scan_dir.py [out_dir] [y_switch] [scan_root]
+    python plot/combined_scan_dir.py [out_dir] [y_switch] [scan_root] [delta]
 
 scan_root (default tmp) holds the <solver>_scan{,_fine} directories, e.g. tmp/mphi_scans/mphi10.
 
@@ -13,7 +13,8 @@ Output (default tmp/combined_scan):
 - roots.csv: m_N,y,sin2_2theta,omega_h2,solver (network / fluid / failed);
 - lyman_alpha.csv: m_N,y,sin2_2theta,lambda_fs_Mpc,lambda_fs_kd_Mpc,r_s_Mpc,f_N2,delta_m,
   from the solvers' lyman_alpha.csv (src/run_*_lyman_alpha.jl), with the N1-N2 mass
-  splitting delta_m = sin^2(theta_1) m_N/m_nu.
+  splitting delta_m = sin^2(theta_1) m_N/m_nu, or the constant `delta` of tables with an N1-N2
+  splitting (rate_params; src/run_build_rate_tables.jl --delta).
 """
 import sys
 import os
@@ -23,6 +24,7 @@ import math
 out = sys.argv[1] if len(sys.argv) > 1 else "tmp/combined_scan"
 y_switch = float(sys.argv[2]) if len(sys.argv) > 2 else 1e-3
 root = sys.argv[3] if len(sys.argv) > 3 else "tmp"
+delta = float(sys.argv[4]) if len(sys.argv) > 4 else 0.0
 os.makedirs(out, exist_ok=True)
 M_NU = 0.1e-9   # GeV, m_nu of rate_params (src/thermal_rates.jl)
 
@@ -54,7 +56,7 @@ for k in sorted(set(net) | set(fl)):
     if l is not None:
         th1 = math.sin(math.asin(math.sqrt(float(s2))) / 2)
         lya.append((m, y, s2, l["lambda_fs_Mpc"], l["lambda_fs_kd_Mpc"], l["r_s_Mpc"], l["f_N2"],
-                    f"{th1**2 * float(m) / M_NU:.6g}"))
+                    f"{delta if delta > 0 else th1**2 * float(m) / M_NU:.6g}"))
 
 with open(os.path.join(out, "roots.csv"), "w") as io:
     io.write("m_N,y,sin2_2theta,omega_h2,solver\n")

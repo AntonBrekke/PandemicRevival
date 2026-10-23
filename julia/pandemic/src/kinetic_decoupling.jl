@@ -29,7 +29,7 @@ import QuadGK
 import SpecialFunctions as SF
 
 isdefined(@__MODULE__, :TreeAmplitudes) || include(joinpath(@__DIR__, "tree_amplitudes.jl"))
-using .TreeAmplitudes: msq_A_N1N2, xyz_N1N2_N1N2, msq_bw
+using .TreeAmplitudes: msq_A_N1N2, xyz_N1N2_N1N2, msq_bw, msq_N1N1_N2N2
 
 """
     sq_amp_NN(s, t, m, m_A, g)
@@ -55,7 +55,23 @@ function sigma_NN(s, m, m_A, g)
     return val / (64 * pi * s * p2)
 end
 
-_kd_params(m, m_A, g) = (g=g, y=0.0, th0=0.0, th1=0.0, mu=0.0, m1=m, m2=m, mA=m_A, mphi=1.0, m0=1.0)
+_kd_params(m, m_A, g; m2=m) = (g=g, y=0.0, th0=0.0, th1=0.0, mu=0.0, m1=m, m2=m2, mA=m_A, mphi=1.0, m0=1.0)
+
+"""
+∫ dt sum|M|^2 / (64 pi s p_in^2) of N1 N1 -> N2 N2 with m_N2 = (1 + delta) m_N1 = (1 + delta) m:
+the general-mass amplitude of tree_amplitudes.jl (process 1), zero below s = 4 m_N2^2. Equal
+to `sigma_NN` for delta = 0.
+"""
+function sigma_NN_split(s, m, delta, m_A, g)
+    m2 = m * (1 + delta)
+    pin2, pout2 = s / 4 - m * m, s / 4 - m2 * m2
+    (pin2 > 0 && pout2 > 0) || return 0.0
+    p = _kd_params(m, m_A, g; m2=m2)
+    # t = m^2 + m2^2 - 2 (E1 E3 - p_in p_out cos), E1 = E3 = sqrt(s)/2
+    t0, w = m * m + m2 * m2 - s / 2, 2 * sqrt(pin2 * pout2)
+    val = QuadGK.quadgk(t -> msq_N1N1_N2N2(s, t, p), t0 - w, t0 + w; rtol=1e-8)[1]
+    return val / (64 * pi * s * pin2)
+end
 
 """
 Width of A' -> N1 N2 for m_N1 = m_N2 = m (A' -> N2 nu is O(sin^2 theta_1) and dropped):
@@ -102,9 +118,11 @@ struct CkdTable
     res_area::Float64      # narrow-width pole of w12 (0 if the pole is on the grid)
 end
 
-function CkdTable(m, m_A, g; per_decade=60, narrow_du=1e-9)
+function CkdTable(m, m_A, g; delta=0.0, per_decade=60, narrow_du=1e-9)
     Gamma_A = width_A(m, m_A, g)
     u = collect(m .* 10 .^ range(-18, 7, length=25 * per_decade + 1))
+    # N1 N1 -> N2 N2 opens at u = 2 delta m: resolve the threshold
+    delta > 0 && append!(u, 2 * delta * m .* (1 .+ 10 .^ range(-8, 1, length=9 * per_decade + 1)))
     u_res, du = m_A - 2m, Gamma_A / 2
     narrow = du < narrow_du * m
     L_in = narrow ? 1e3 * du : 1e-3 * du
@@ -114,7 +132,8 @@ function CkdTable(m, m_A, g; per_decade=60, narrow_du=1e-9)
     sort!(unique!(u))
     narrow && filter!(x -> abs(x - u_res) >= L_in * (1 - 1e-6), u)
     s = @. (2m + u)^2
-    w11 = [2 * si * sigma_NN(si, m, m_A, g) / 2 * (si - 4m^2) for si in s]
+    sig11(si) = delta > 0 ? sigma_NN_split(si, m, delta, m_A, g) : sigma_NN(si, m, m_A, g)
+    w11 = [2 * si * sig11(si) / 2 * (si - 4m^2) for si in s]
     w12 = [2 * si * sigma_NN12(si, m, m_A, g, Gamma_A) * (si - 4m^2) for si in s]
     res_area = 0.0
     if narrow

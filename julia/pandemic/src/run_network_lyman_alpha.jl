@@ -32,12 +32,12 @@ function main(args)
             @warn "failed at m=$m g=$g" exception = (e, catch_backtrace())
             failed_lengths()
         end
-        res[i] = lyman_alpha_row(m, g, s2, r)
+        res[i] = lyman_alpha_row(m, g, s2, r; delta=table_delta(itp))
         k = Threads.atomic_add!(done, 1) + 1
         k % 50 == 0 && (println("[$k/$(length(rows)), $(round((time() - t0) / 60; digits=1)) min]"); flush(stdout))
     end
     open(out, "w") do io
-        println(io, LYMAN_ALPHA_HEADER)
+        println(io, lyman_alpha_header(table_delta(itp)))
         foreach(l -> println(io, l), sort(res; by=l -> parse.(Float64, split(l, ',')[1:2])))
     end
     println("written ", out, " after ", round((time() - t0) / 60; digits=1), " min")

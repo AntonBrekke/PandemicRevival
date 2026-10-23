@@ -7,7 +7,10 @@ fluid in kinetic and chemical equilibrium,
 
     T_N1 = T_N2 = T_A' = T_phi = T_N,   mu_N1 = mu_N2 = mu,   mu_A' = 2 mu,   mu_phi = 4 mu,
 
-with exact Fermi-Dirac / Bose-Einstein thermodynamics. The phi gap is
+with exact Fermi-Dirac / Bose-Einstein thermodynamics. With an N1-N2 splitting (tables built
+with delta > 0, rate_params) N2 has mass (1 + delta) m_N, and mu_N1 = mu_N2 makes
+n_N2/n_N1 = e^(-delta m_N/T_N) once non-relativistic: the fluid assumes N1 N1 <-> N2 N2 fast,
+i.e. the maximal N2 depletion. The phi gap is
     (m_phi - mu_phi)/T_N = (m_phi - 2 m_A')/T_N + 2 (m_A' - mu_A')/T_N,
 positive for m_phi > 2 m_A' whenever the A' gap is: no condensation.
 
@@ -107,7 +110,7 @@ function FluidSolver(m_N::Float64, tT_rel::TimeTempRelation{Float64}, itp::RateI
                      portal_scale=1.0, T_ratio_min=1e-6, T_ratio_max=1e3)
     mA_over_mN, mphi_over_mN = mass_ratios(itp)
     N1 = Particle{Float64}(m_N, 1, dof=2)
-    N2 = Particle{Float64}(m_N, 1, dof=2)
+    N2 = Particle{Float64}(m_N * (1 + table_delta(itp)), 1, dof=2)
     A = Particle{Float64}(mA_over_mN * m_N, -1, dof=3)
     nu = Particle{Float64}(0.0, 1, dof=2)
     phi = Particle{Float64}(mphi_over_mN * m_N, -1, dof=1)
@@ -136,8 +139,7 @@ function fluid_rates!(pan::FluidSolver)
     key = (pan.mp.y, pan.mp.theta)
     if key != pan.rates_key
         s2 = sin(2 * pan.mp.theta)^2
-        pan.p_rates = rate_params(pan.N1.m, pan.mp.y, s2; mA_over_mN=pan.A.m / pan.N1.m,
-                                  mphi_over_mN=pan.phi.m / pan.N1.m)
+        pan.p_rates = table_params(pan.itp, pan.N1.m, pan.mp.y, s2)
         pan.norms = rate_norms(pan.itp, pan.p_rates)
         pan.rates_key = key
     end
@@ -163,12 +165,15 @@ xi_from_eta(pan, eta, ln_x_N) = (pan.A.m / pan.N1.m * exp(ln_x_N) - gap_A_from_e
 """(m_phi - mu_phi)/T_N with mu_phi = 2 mu_A'."""
 gap_phi_of(pan::FluidSolver, T_N, gap_A) = (pan.phi.m - 2 * pan.A.m) / T_N + 2 * gap_A
 
-"""(T_N, (m_N - mu)/T_N) of N1 (= N2) in the state u."""
+"""(T_N, (m_N1 - mu)/T_N) of N1 in the state u (N2: `N2_gap`)."""
 function N_temp_gap(pan::FluidSolver, u)
     x_N = exp(u[3])
     gap = x_N * (1 - pan.A.m / (2 * pan.N1.m)) + gap_A_from_eta(u[4]) / 2
     return T_N_from_ln_x_N(pan, u[3]), gap
 end
+
+"""(m_N2 - mu)/T_N in the state u: the N1 gap plus (m_N2 - m_N1)/T_N (equal for delta = 0)."""
+N2_gap(pan::FluidSolver, u) = N_temp_gap(pan, u)[2] + exp(u[3]) * (pan.N2.m / pan.N1.m - 1)
 
 function num_dens(pan::FluidSolver, T_N, xi_N; gap_A)
     n = number_density(pan.N1, T_N, xi_N) + number_density(pan.N2, T_N, xi_N) +
@@ -205,10 +210,18 @@ function fluid_state(pan::FluidSolver, u)
     return n, T_N, xi_N, gap_A
 end
 
-"""Omega h^2 of state u at z, counting the N that A' and phi decay into."""
+"""Omega h^2 of state u at z, counting the N that A' (N1 N2) and phi (A'A') decay into."""
 function omega_h2_of(pan::FluidSolver, u, z)
     n, _ = fluid_state(pan, u)
-    return pan.N1.m * (n[1] + n[2] + 2n[3] + 4n[4]) / pan.ent_interp_z(z) * s0 / rho_crit0_h2
+    dm = pan.N2.m - pan.N1.m
+    return (pan.N1.m * (n[1] + n[2] + 2n[3] + 4n[4]) + dm * (n[2] + n[3] + 2n[4])) /
+           pan.ent_interp_z(z) * s0 / rho_crit0_h2
+end
+
+"""N2/(N1 + N2) in state u (1/2 for equal masses)."""
+function f_N2_of(pan::FluidSolver, u)
+    n, _ = fluid_state(pan, u)
+    return n[2] / (n[1] + n[2])
 end
 
 """
@@ -257,14 +270,17 @@ const LEGENDRE_KW_AA = (L=16, n_c=24, n_E=12, n_s=8, n_theta=12)
 """
 C_n~ of A'A' <-> N1 N1 and A'A' <-> N2 N2: -2 (C_N1N1 + C_N2N2), the 2 from Delta n~ (an
 A' counts as two N), with C = `coll_12_34_legendre`/4 (the 1/4 for the two pairs of
-identical particles, as in the original code). C_N2N2 = C_N1N1 for m_N1 = m_N2.
+identical particles, as in the original code). C_N2N2 = C_N1N1 for m_N1 = m_N2. With a
+splitting each is computed with its own mass and gap; `sq_amp_AA_NN` then takes the exchanged
+fermion (the other N) at the final-state mass, an O(delta) error in |M|^2.
 """
 function C_n_AA(pan::FluidSolver, T_N, xi_N; gap_A)
-    gap_N = pan.N1.m / T_N - xi_N
-    C_AA_N1N1 = coll_12_34_legendre(pan.mp, pan.A, pan.A, pan.N1, pan.N1, (T_N, T_N, T_N, T_N),
-                                    (2 * xi_N, 2 * xi_N, xi_N, xi_N); gaps=(gap_A, gap_A, gap_N, gap_N),
-                                    LEGENDRE_KW_AA...) / 4
-    return -2 * C_AA_N1N1 - 2 * C_AA_N1N1
+    C(N) = coll_12_34_legendre(pan.mp, pan.A, pan.A, N, N, (T_N, T_N, T_N, T_N),
+                               (2 * xi_N, 2 * xi_N, xi_N, xi_N);
+                               gaps=(gap_A, gap_A, N.m / T_N - xi_N, N.m / T_N - xi_N), LEGENDRE_KW_AA...) / 4
+    C_AA_N1N1 = C(pan.N1)
+    C_AA_N2N2 = pan.N2.m == pan.N1.m ? C_AA_N1N1 : C(pan.N2)
+    return -2 * C_AA_N1N1 - 2 * C_AA_N2N2
 end
 
 """

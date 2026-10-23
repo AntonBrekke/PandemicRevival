@@ -47,7 +47,7 @@ addprocs(min(parse(Int, OPTS["nproc"]), length(todo)); exeflags=["--project=$(Ba
             @warn "Lyman-alpha failed at m=$m g=$g" exception = (e, catch_backtrace())
             failed_lengths()
         end
-        return lyman_alpha_row(m, g, s2, r)
+        return lyman_alpha_row(m, g, s2, r; delta=table_delta(ITP))
     end
 end
 
@@ -60,7 +60,7 @@ t0 = time()
         i > length(todo) && break
         push!(out_rows, remotecall_fetch(lya_job, w, todo[i]...))
         open(OPTS["out"], "w") do io
-            println(io, LYMAN_ALPHA_HEADER)
+            println(io, lyman_alpha_header(table_delta(ITP)))
             foreach(l -> println(io, l), sort(out_rows; by=l -> parse.(Float64, split(l, ',')[1:2])))
         end
         println("[$(length(out_rows))/$(length(todo)), $(round((time() - t0) / 60; digits=1)) min] ", out_rows[end]); flush(stdout)

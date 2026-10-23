@@ -4,7 +4,8 @@
 using Test
 include(joinpath(@__DIR__, "..", "src", "rate_tables.jl"))
 
-path = rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))
+# TABLE_DELTA=<delta> checks the tables built with an N1-N2 splitting (default: equal masses)
+path = rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"); delta=parse(Float64, get(ENV, "TABLE_DELTA", "0")))
 tabs = load_rate_tables(path)
 itp = RateInterpolants(tabs)
 pref = tabs.p_ref
@@ -46,7 +47,7 @@ end
 end
 
 @testset "rescaling to other parameters" begin
-    for p in (rate_params(3e-5, 1e-2, 1e-15), rate_params(2e-6, 3e-4, 1e-11))
+    for p in (table_params(itp, 3e-5, 1e-2, 1e-15), table_params(itp, 2e-6, 3e-4, 1e-11))
         norms = rate_norms(itp, p)
         m = p.m1
         for name in (:N1N1_N2N2, :N2nu_A, :N1nu_N2N2, :N2nu_N1N2)
@@ -66,7 +67,7 @@ end
 end
 
 @testset "collision terms: conservation and equilibrium" begin
-    p = rate_params(1e-5, 1e-3, 1e-13)
+    p = table_params(itp, 1e-5, 1e-3, 1e-13)
     norms = rate_norms(itp, p)
     m = p.m1
     T = 0.6m

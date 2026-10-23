@@ -54,24 +54,43 @@ kallen(a, b, c) = a^2 + b^2 + c^2 - 2a * b - 2a * c - 2b * c
 
 # --------------------------------------------------------------------------- model
 """
-    rate_params(m_N, g, sin2_2theta; m_nu=1e-10, m_0=1e3, mphi_over_mN=100.0, mA_over_mN=2.5)
+    rate_params(m_N, g, sin2_2theta; delta=0, m_nu, m_0, mphi_over_mN=100.0, mA_over_mN=2.5)
 
 Couplings and masses of tree_amplitudes.jl for a relic point (masses in GeV).
 sin(theta_1) from sin^2(2 theta); m_alpha = sqrt(m_nu m_0), sin(theta_0) =
 m_alpha/m_0, m_M = sin(theta_1) m_0 m_D/(sqrt2 m_alpha), mu = m_M/m_0,
 y_+ = sqrt2 m_M/v_phi with v_phi = m_A'/g (draft, benchmark table).
-m_N1 = m_N2 = m_N, as in the solver.
+
+m_N is the mass of N1 (the dark matter), and m_A', m_phi are multiples of it.
+- delta = 0 (default): m_N1 = m_N2 = m_N, m_nu = 0.1 eV, m_0 = 1 TeV, as in the
+  original solver (the splitting sin^2 theta_1 m_N/m_nu that m_nu implies is not
+  carried by the masses).
+- delta > 0: m_N2 = m_D = (1 + delta) m_N, and m_nu = sin^2 theta_1 m_D/delta (draft eq.
+  defdm) so that the couplings match the splitting; m_0 = 10 GeV by default (keeps y_+
+  perturbative). m_nu cannot then be given.
 """
-function rate_params(m_N, g, sin2_2theta; m_nu=1e-10, m_0=1e3, mphi_over_mN=100.0, mA_over_mN=2.5)
+function rate_params(m_N, g, sin2_2theta; delta=0.0, m_nu=nothing, m_0=nothing, mphi_over_mN=100.0, mA_over_mN=2.5)
     th1 = sin(asin(sqrt(sin2_2theta)) / 2)
+    m_D = m_N * (1 + delta)
+    if delta > 0
+        m_nu === nothing || error("rate_params: m_nu follows from delta > 0")
+        m_0 = something(m_0, 10.0)
+        m_nu = th1^2 * m_D / delta
+    else
+        m_0 = something(m_0, 1e3)
+        m_nu = something(m_nu, 1e-10)
+    end
     m_alpha = sqrt(m_nu * m_0)
     th0 = m_alpha / m_0
-    m_M = th1 * m_0 * m_N / (sqrt(2) * m_alpha)
+    m_M = th1 * m_0 * m_D / (sqrt(2) * m_alpha)
     mA = mA_over_mN * m_N
     y = sqrt(2) * m_M / (mA / g)
-    return (g=g, y=y, th0=th0, th1=th1, mu=m_M / m_0, m1=m_N, m2=m_N, mA=mA,
+    return (g=g, y=y, th0=th0, th1=th1, mu=m_M / m_0, m1=m_N, m2=m_D, mA=mA,
             mphi=mphi_over_mN * m_N, m0=m_0)
 end
+
+"""Relative N1-N2 splitting (m_N2 - m_N1)/m_N1 of parameters `p`."""
+splitting(p) = p.m2 / p.m1 - 1
 
 field_mass(f, p) = f === :N1 ? p.m1 : f === :N2 ? p.m2 : f === :A ? p.mA :
                    f === :phi ? p.mphi : f === :N0 ? p.m0 : f === :nu ? 0.0 : error("field $f")

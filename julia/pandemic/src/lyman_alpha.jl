@@ -162,37 +162,61 @@ end
     f_N2_final(h, itp, p, m2; frozen_at_end, z_hi)
 
 N2/(N1 + N2) after N1 N1 <-> N2 N2 freezes out, for a splitting m_N2 = m2 > m_N1 (h.N1.m).
-The relaxation rate of N2/N1, lambda = (forward rate per N1) + (reverse rate per N2) from the
-tables at parameters `p`, is followed against H on a grid from the start of the history to
-z_hi; freeze-out is the last z with lambda >= H, and the composition is the history's there.
-After the solution the dark sector is continued as `dark_state` does (T ∝ a^-2), with N2/N1 at
-its equilibrium (m2/m1)^(3/2) e^(-(m2 - m1)/T) (equal chemical potentials, MB) and the heat of
-the conversions neglected. `frozen_at_end`: a history that follows N2 itself (the network) keeps
-its final value if lambda < H there. The fluid holds N1 <-> N2 in equilibrium throughout and
-takes the value at freeze-out. Returns (f_N2, x at freeze-out; NaN if never in equilibrium).
+With r = n_N2/n_N1 and the total N = n_N1 + n_N2 and T_N of the history,
+
+    dr/dz = (x/xdot) (1 + r) 2 (G_f - G_r)/n_N1,   G_f = R_f (n_N1/nh_N1)^2,  G_r = R_r (n_N2/nh_N2)^2,
+
+the conversions alone (MB, the network's rates from the tables at parameters `p`; nh the MB
+density at zero chemical potential). After the solution the dark sector continues as
+`dark_state` has it (T ∝ a^-2, N ∝ a^-3), without the heat of the conversions.
+- `frozen_at_end = true` (the network, which follows N2 itself): the history's value at its
+  end, continued with this equation if the conversions are still faster than H there.
+- `frozen_at_end = false` (the fluid, which holds N1 <-> N2 in equilibrium): the equation is
+  started from the history at the last z (after x = 1) where the relaxation rate
+  lambda = 2 G_f/n_N1 + 2 G_r/n_N2 exceeds 1e3 H, where the equilibrium still holds.
+Integrated to z_hi. Returns (f_N2, x where lambda last exceeds H; NaN if it never does).
 """
 function f_N2_final(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_at_end, z_hi, dz=0.02)
     m1 = h.N1.m
     r = reaction(:N1N1_N2N2)
     t = itp.dark[r.name]
     lnR = ln_norm(r, p, itp.p_ref)
-    # (N2/N1, lambda/H) at z
-    function ratio_rate(z)
-        T, g1, g2, _ = dark_state(h, z)
-        z > h.z_f && (g2 = g1 + (m2 - m1) / T)
+    # (T, total N, history's r) at z
+    function hist(z)
+        T, g1, g2, n1 = dark_state(h, z)
+        rh = n_scaled_safe(m2, 2, T) / n_scaled_safe(m1, 2, T) * exp(g1 - g2)
+        return T, n1 * (1 + rh), rh
+    end
+    # (G_f/n1, G_r/n1) at z for ratio r: reactions per N1 and time
+    function rates(z, rr)
+        T, N, _ = hist(z)
+        n1 = N / (1 + rr)
         nh1, nh2 = n_scaled_safe(m1, 2, T), n_scaled_safe(m2, 2, T)
         lx = log(m1 / T)
-        # G_f/n1 = R_f e^(-2 g1)/(nh1 e^(-g1)), G_r/n2 likewise; each reaction converts two
-        lam = 2 * exp(t.lnRf(lx) + lnR - g1) / nh1 + 2 * exp(t.lnRr(lx) + lnR - g2) / nh2
-        return nh2 / nh1 * exp(g1 - g2), lam / h.bg.H_interp_z(z)
+        return exp(t.lnRf(lx) + lnR) * n1 / nh1^2, exp(t.lnRr(lx) + lnR) * rr^2 * n1 / nh2^2
     end
-    R_end, lam_end = ratio_rate(h.z_f)
-    frozen_at_end && lam_end < 1 && return R_end / (1 + R_end), NaN
-    zs = range(h.z_i, z_hi, length=max(2, ceil(Int, (z_hi - h.z_i) / dz) + 1))
-    i = findlast(z -> ratio_rate(z)[2] >= 1, zs)
-    i === nothing && return R_end / (1 + R_end), NaN
-    R = ratio_rate(zs[i])[1]
-    return R / (1 + R), exp(zs[i])
+    lam_H(z, rr) = (gf = rates(z, rr); 2 * (gf[1] + gf[2] / rr) / h.bg.H_interp_z(z))
+    zs = collect(range(h.z_i, z_hi, length=max(2, ceil(Int, (z_hi - h.z_i) / dz) + 1)))
+    lam_hist = [lam_H(z, hist(z)[3]) for z in zs]
+    i_fo = findlast(>=(1), lam_hist)
+    x_fo = i_fo === nothing ? NaN : exp(zs[i_fo])
+    if frozen_at_end
+        z0 = h.z_f
+        lam_H(z0, hist(z0)[3]) < 1 && (rh = hist(z0)[3]; return rh / (1 + rh), x_fo)
+    else
+        i0 = findlast(i -> zs[i] >= 0 && lam_hist[i] >= 1e3, eachindex(zs))
+        z0 = i0 === nothing ? max(h.z_i, 0.0) : zs[i0]
+    end
+    # in l = ln r; the rate is stiff (lambda up to 1e3 per unit z at the start)
+    function rhs!(du, u, _, z)
+        rr = exp(u[1])
+        gf, gr = rates(z, rr)
+        du[1] = dt_dz(h.bg, z) * (1 + rr) * 2 * (gf - gr) / rr
+    end
+    prob = DE.ODEProblem(rhs!, [log(hist(z0)[3])], (z0, z_hi))
+    sol = DE.solve(prob, ODER.Rodas4P(autodiff=AutoFiniteDiff()); reltol=1e-6, abstol=1e-8)
+    rr = exp(sol.u[end][1])
+    return rr / (1 + rr), x_fo
 end
 
 """Gamma_kd/H of N1 at z."""

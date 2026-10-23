@@ -116,13 +116,14 @@ struct DarkHistory{B,F}
     z_f::Float64
     a_f::Float64
     fin::NTuple{4,Float64}    # (T, gap1, gap2, n1) at z_f
+    late::Any                 # nothing, or z -> (T, gap1, gap2, n1) after z_f (`with_conversions`)
 end
 
 function DarkHistory(bg, N1, m_A, g, sol, state; delta=0.0)
     z_f = sol.t[end]
     fin = state(sol.u[end], z_f)[1:4]
     return DarkHistory(bg, N1, state, sol, CkdTable(N1.m, m_A, g; delta=delta), sol.t[1], z_f,
-                       scale_factor_z(bg, z_f), fin)
+                       scale_factor_z(bg, z_f), fin, nothing)
 end
 
 """History of a fluid solution (fluid.jl): one T_N and one chemical potential for N1 and N2
@@ -150,73 +151,115 @@ function DarkHistory(net::Network, sol)
                        delta=splitting(net.p))
 end
 
-"""(T, gap1, gap2, n1) at z: from the solution, then non-relativistic with conserved number."""
+"""(T, gap1, gap2, n1) at z: from the solution, then non-relativistic with conserved number
+(and, with an N1-N2 splitting, the late conversions and their heat: `with_conversions`)."""
 function dark_state(h::DarkHistory, z)
     z <= h.z_f && return h.state(h.sol(z)::Vector{Float64}, z)[1:4]
+    h.late === nothing || return h.late(z)
     r = h.a_f / scale_factor_z(h.bg, z)
     T, g1, g2, n1 = h.fin
     return (T * r^2, g1, g2, n1 * r^3)
 end
 
 """
-    f_N2_final(h, itp, p, m2; frozen_at_end, z_hi)
+    with_conversions(h, itp, p, m2; frozen_at_end, z_hi)
 
-N2/(N1 + N2) after N1 N1 <-> N2 N2 freezes out, for a splitting m_N2 = m2 > m_N1 (h.N1.m).
-With r = n_N2/n_N1 and the total N = n_N1 + n_N2 and T_N of the history,
+The late N1 N1 <-> N2 N2 conversions for a splitting m_N2 = m2 > m_N1 (h.N1.m): the history
+`h` with the dark sector after the solution continued with them and their heat, and
+N2/(N1 + N2) today. With r = n_N2/n_N1, N = n_N1 + n_N2 ∝ a^-3 and the MB rates of the
+network (tables at parameters `p`),
 
     dr/dz = (x/xdot) (1 + r) 2 (G_f - G_r)/n_N1,   G_f = R_f (n_N1/nh_N1)^2,  G_r = R_r (n_N2/nh_N2)^2,
+    dT/dz = -2 T dln a/dz - w (2/3) (m2 - m1) (dr/dz)/(1 + r)^2,   w = Gamma_kd/(Gamma_kd + H),
 
-the conversions alone (MB, the network's rates from the tables at parameters `p`; nh the MB
-density at zero chemical potential). After the solution the dark sector continues as
-`dark_state` has it (T ∝ a^-2, N ∝ a^-3), without the heat of the conversions.
-- `frozen_at_end = true` (the network, which follows N2 itself): the history's value at its
-  end, continued with this equation if the conversions are still faster than H there.
-- `frozen_at_end = false` (the fluid, which holds N1 <-> N2 in equilibrium): the equation is
-  started from the history at the last z (after x = 1) where the relaxation rate
-  lambda = 2 G_f/n_N1 + 2 G_r/n_N2 exceeds 1e3 H, where the equilibrium still holds.
-Integrated to z_hi. Returns (f_N2, x where lambda last exceeds H; NaN if it never does).
+nh the MB density at zero chemical potential: each conversion releases m2 - m1 of kinetic energy,
+shared by the (non-relativistic) N while they scatter (Gamma_kd of `kd_ratio`); after kinetic
+decoupling it stays with the converted N1 (a small hot component that is not followed). Beyond
+the table grid (m/T_N > 1e8) the conversions are off. Before the end of the solution T is the
+history's.
+- `frozen_at_end = true` (the network, which follows N2 itself): from the history at its end
+  (the conversions that remain, even slower than H, still deplete N2 by ~10%).
+- `frozen_at_end = false` (the fluid, which holds N1 <-> N2 in equilibrium): r from the last z
+  (after x = 1) where the relaxation rate lambda = 2 G_f/n_N1 + 2 G_r/n_N2 exceeds 1e3 H,
+  where the equilibrium still holds. Up to the end of the solution the fluid's T, which has
+  the heat of its equilibrium conversions; for g >= 1e-3 those are faster than H there.
+Integrated to z_hi. Returns (history, f_N2, x where lambda last exceeds H; NaN if never).
 """
-function f_N2_final(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_at_end, z_hi, dz=0.02)
+function with_conversions(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_at_end, z_hi, dz=0.02)
     m1 = h.N1.m
-    r = reaction(:N1N1_N2N2)
-    t = itp.dark[r.name]
-    lnR = ln_norm(r, p, itp.p_ref)
-    # (T, total N, history's r) at z
+    dm = m2 - m1
+    t = itp.dark[:N1N1_N2N2]
+    lnR = ln_norm(reaction(:N1N1_N2N2), p, itp.p_ref)
+    nh(m, T) = n_scaled_safe(m, 2, T)
+    # (T, N, r) of the history at z (after z_f: adiabatic, without the conversions)
     function hist(z)
         T, g1, g2, n1 = dark_state(h, z)
-        rh = n_scaled_safe(m2, 2, T) / n_scaled_safe(m1, 2, T) * exp(g1 - g2)
+        rh = nh(m2, T) / nh(m1, T) * exp(g1 - g2)
         return T, n1 * (1 + rh), rh
     end
-    # (G_f/n1, G_r/n1) at z for ratio r: reactions per N1 and time
-    function rates(z, rr)
-        T, N, _ = hist(z)
+    # (G_f/n1, G_r/n1): reactions per N1 and time, at (T, N, r); zero beyond the table grid
+    # (m/T_N > 1e8), where the conversions are long frozen and the linear extrapolation of
+    # ln R in ln x_N would grossly overstate the endothermic e^(-2 delta x_N)
+    function rates(T, N, rr)
         n1 = N / (1 + rr)
-        nh1, nh2 = n_scaled_safe(m1, 2, T), n_scaled_safe(m2, 2, T)
         lx = log(m1 / T)
-        return exp(t.lnRf(lx) + lnR) * n1 / nh1^2, exp(t.lnRr(lx) + lnR) * rr^2 * n1 / nh2^2
+        lx > itp.lnxN[2] && return 0.0, 0.0
+        return exp(t.lnRf(lx) + lnR) * n1 / nh(m1, T)^2, exp(t.lnRr(lx) + lnR) * rr^2 * n1 / nh(m2, T)^2
     end
-    lam_H(z, rr) = (gf = rates(z, rr); 2 * (gf[1] + gf[2] / rr) / h.bg.H_interp_z(z))
-    zs = collect(range(h.z_i, z_hi, length=max(2, ceil(Int, (z_hi - h.z_i) / dz) + 1)))
-    lam_hist = [lam_H(z, hist(z)[3]) for z in zs]
-    i_fo = findlast(>=(1), lam_hist)
-    x_fo = i_fo === nothing ? NaN : exp(zs[i_fo])
+    # d ln r/dz without dividing by a vanishing r
+    function dlnr(z, T, N, l)
+        gf, gr = rates(T, N, exp(l))
+        return dt_dz(h.bg, z) * (1 + exp(l)) * 2 * (gf * exp(min(-l, 700.0)) - gr * exp(-l))
+    end
+    lam_H(z, T, N, rr) = (g = rates(T, N, rr); 2 * (g[1] + g[2] / rr) / h.bg.H_interp_z(z))
+    T_f, N_f, r_f = hist(h.z_f)
+    alg = ODER.Rodas4P(autodiff=AutoFiniteDiff())
     if frozen_at_end
-        z0 = h.z_f
-        lam_H(z0, hist(z0)[3]) < 1 && (rh = hist(z0)[3]; return rh / (1 + rh), x_fo)
+        l_f = log(r_f)
     else
-        i0 = findlast(i -> zs[i] >= 0 && lam_hist[i] >= 1e3, eachindex(zs))
-        z0 = i0 === nothing ? max(h.z_i, 0.0) : zs[i0]
+        # equilibrium until lambda ~ 1e3 H, then the conversion equation with the fluid's T and N
+        zs = collect(range(max(h.z_i, 0.0), h.z_f, length=max(2, ceil(Int, (h.z_f - max(h.z_i, 0.0)) / dz) + 1)))
+        i0 = findlast(z -> lam_H(z, hist(z)...) >= 1e3, zs)
+        z0 = i0 === nothing ? zs[1] : zs[i0]
+        s1 = DE.solve(DE.ODEProblem((du, u, _, z) -> (hz = hist(z); du[1] = dlnr(z, hz[1], hz[2], u[1])),
+                                    [log(hist(z0)[3])], (z0, h.z_f)), alg; reltol=1e-6, abstol=1e-8)
+        l_f = s1.u[end][1]
     end
-    # in l = ln r; the rate is stiff (lambda up to 1e3 per unit z at the start)
-    function rhs!(du, u, _, z)
+    # after the solution: r and T together, N ∝ a^-3
+    lna(z) = log(scale_factor_z(h.bg, z))
+    N_of(z) = N_f * exp(3 * (lna(h.z_f) - lna(z)))
+    # the heat is shared by all N only while they scatter faster than H (Gamma_kd of
+    # `kd_ratio`); after kinetic decoupling it stays with the few converted N1 (a small hot
+    # component, not followed): weight Gamma_kd/(Gamma_kd + H)
+    function rhs2!(du, u, _, z)
+        T, N = exp(u[2]), N_of(z)
+        du[1] = dlnr(z, T, N, u[1])
         rr = exp(u[1])
-        gf, gr = rates(z, rr)
-        du[1] = dt_dz(h.bg, z) * (1 + rr) * 2 * (gf - gr) / rr
+        n1 = N / (1 + rr)
+        G = C_kd(h.tab, T, log(nh(m1, T) / n1); gap2=log(nh(m2, T) / (N - n1))) / n1
+        w = G / (G + h.bg.H_interp_z(z))
+        dlna = (lna(z + 1e-4) - lna(z - 1e-4)) / 2e-4
+        du[2] = -2 * dlna - w * (2 / 3) * dm * rr * du[1] / (1 + rr)^2 / T
     end
-    prob = DE.ODEProblem(rhs!, [log(hist(z0)[3])], (z0, z_hi))
-    sol = DE.solve(prob, ODER.Rodas4P(autodiff=AutoFiniteDiff()); reltol=1e-6, abstol=1e-8)
-    rr = exp(sol.u[end][1])
-    return rr / (1 + rr), x_fo
+    s2 = DE.solve(DE.ODEProblem(rhs2!, [l_f, log(T_f)], (h.z_f, z_hi)), alg; reltol=1e-6, abstol=1e-8)
+    function late(z)
+        l, lT = s2(min(z, z_hi))::Vector{Float64}
+        T, N, rr = exp(lT), N_of(z), exp(l)
+        n1 = N / (1 + rr)
+        return (T, log(nh(m1, T) / n1), log(nh(m2, T) / (N - n1)), n1)
+    end
+    h2 = DarkHistory(h.bg, h.N1, h.state, h.sol, h.tab, h.z_i, h.z_f, h.a_f, h.fin, late)
+    # (not `rr`: the closures above assign that name, and would share it)
+    r_end = exp(s2.u[end][1])
+    # freeze-out: the last z at which the conversions are faster than H
+    function converting(z)
+        T, g1, g2, n1 = dark_state(h2, z)
+        n2 = n1 * nh(m2, T) / nh(m1, T) * exp(g1 - g2)
+        return lam_H(z, T, n1 + n2, n2 / n1) >= 1
+    end
+    zs = range(h.z_i, z_hi, length=max(2, ceil(Int, (z_hi - h.z_i) / dz) + 1))
+    i_fo = findlast(converting, zs)
+    return h2, r_end / (1 + r_end), i_fo === nothing ? NaN : exp(zs[i_fo])
 end
 
 """Gamma_kd/H of N1 at z."""
@@ -339,27 +382,28 @@ function lyman_alpha_network(itp, tT_rel, m, g, s2)
     n, _ = state_densities(net, sol.u[end], sol.t[end])
     h = DarkHistory(net, sol)
     f2, x_fo = n[2] / (n[1] + n[2]), NaN
-    delta > 0 && ((f2, x_fo) = f_N2_final(h, itp, p, p.m2; frozen_at_end=true, z_hi=log(m / tT_rel.T_nu_grid[end])))
+    delta > 0 && ((h, f2, x_fo) = with_conversions(h, itp, p, p.m2; frozen_at_end=true,
+                                                   z_hi=log(m / tT_rel.T_nu_grid[end])))
     return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=network_omega_h2(net, sol.u[end], sol.t[end]),
             f_N2=f2, x_fo=x_fo)
 end
 
-"""As `lyman_alpha_network` for the fluid (`solve_relic`; f_N2 = 1/2 for equal masses, else at
-the freeze-out of N1 N1 <-> N2 N2, `f_N2_final`)."""
+"""As `lyman_alpha_network` for the fluid (`solve_relic`; f_N2 = 1/2 for equal masses; with a
+splitting the late conversions and their heat from `with_conversions`)."""
 function lyman_alpha_fluid(itp, tT_rel, m, g, s2; pan=FluidSolver(m, tT_rel, itp))
     sol, om, plateau = solve_relic(pan, tT_rel, g, s2)
     plateau || return failed_lengths()
     h = DarkHistory(pan, sol)
     f2, x_fo = 0.5, NaN
-    table_delta(itp) > 0 && ((f2, x_fo) = f_N2_final(h, itp, fluid_rates!(pan), pan.N2.m; frozen_at_end=false,
-                                                     z_hi=log(m / tT_rel.T_nu_grid[end])))
+    table_delta(itp) > 0 && ((h, f2, x_fo) = with_conversions(h, itp, fluid_rates!(pan), pan.N2.m; frozen_at_end=false,
+                                                              z_hi=log(m / tT_rel.T_nu_grid[end])))
     return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=om, f_N2=f2, x_fo=x_fo)
 end
 
 failed_lengths() = (lambda_fs=NaN, x_c=NaN, x_kd=NaN, lambda_fs_pre=NaN, lambda_fs_kd=NaN, r_s=NaN,
                     coupled=false, omega_h2=NaN, f_N2=NaN, x_fo=NaN)
 
-"""Columns of the Lyman-alpha CSVs; x_fo (freeze-out of N1 N1 <-> N2 N2, `f_N2_final`) only for
+"""Columns of the Lyman-alpha CSVs; x_fo (freeze-out of N1 N1 <-> N2 N2, `with_conversions`) only for
 tables with a splitting."""
 const LYMAN_ALPHA_HEADER = "m_N,y,sin2_2theta,omega_h2,lambda_fs_Mpc,x_c,x_kd,lambda_fs_pre_Mpc,lambda_fs_kd_Mpc,r_s_Mpc,coupled,f_N2"
 lyman_alpha_header(delta) = delta > 0 ? LYMAN_ALPHA_HEADER * ",x_fo" : LYMAN_ALPHA_HEADER

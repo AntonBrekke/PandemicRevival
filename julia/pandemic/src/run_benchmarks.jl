@@ -6,9 +6,9 @@ points of its dense output).
     julia --project=. src/run_benchmarks.jl solver:m_keV:g[:sin2_2theta],... [out_dir] [tables.jls]
 
 solver is `network` or `fluid`; without sin2_2theta the root is taken from
-tmp/<solver>_scan{,_fine}/<solver>_roots.csv (m_phi = 100 m_N). One CSV per point in <out_dir>
-(default tmp/benchmarks), <solver>_m_<m>keV_g_<g>[_mphi<r>].csv (the suffix for tables other than
-m_phi = 100 m_N), with the columns
+tmp/<solver>_scan{,_fine}/<solver>_roots.csv (m_phi = 100 m_N, no splitting). One CSV per point
+in <out_dir> (default tmp/benchmarks), <solver>_m_<m>keV_g_<g>[_mphi<r>][_delta<d>].csv (the
+suffixes for tables other than m_phi = 100 m_N, or with an N1-N2 splitting), with the columns
 - x, TN_Tnu, H_GeV, Y_N1, Y_N2, Y_A, Y_phi (n/s), omega_h2, gap_N1 = (m_N - mu_N1)/T_N;
 - Gamma_kd_H: the momentum-exchange rate of N1 over H (lyman_alpha.jl; sets x_c and x_kd);
 - network: `fwd:<reaction>`, the forward rate per particle of the reaction's first dark
@@ -33,6 +33,13 @@ m_phi = 100 m_N), with the columns
   phi <-> A'A'), which the fluid does not compute: it takes them in equilibrium
   (mu_A' = 2 mu, mu_N1 = mu_N2, mu_phi = 2 mu_A').
   A' and phi enter at the fluid's (equilibrium) densities.
+With an N1-N2 splitting (tables built with --delta) also
+- `conv_H`: lambda/H, the relaxation rate of n_N2/n_N1 through N1 N1 <-> N2 N2 (MB tables;
+  `conversion_lambda_H`), whose last crossing of H is the freeze-out x_fo of N2/N1;
+and after the solution (x = 100) 150 more rows up to x = 1e5 (past any x_fo; f_N2 today and
+x_fo are in the header): the late conversions and their heat (`with_conversions`, as for the
+Lyman-alpha lengths and f_N2 of the scans), n_A' = n_phi = 0 and the solver's rate columns NaN. The fluid holds N1 <-> N2 in equilibrium up to x = 100; its late
+part starts from N2/N1 where lambda last exceeds 1e3 H, so Y_N2 can jump at x = 100.
 Plot with plot/benchmark.py.
 """
 
@@ -60,8 +67,31 @@ end
 fmt(v) = @sprintf("%.9g", v)
 row(x, rest) = join([@sprintf("%.15g", x); fmt.(rest)], ",")
 
+"""
+With a splitting: the rows after the solution of history `h` (solver parameters `p`, m_N2 = m2),
+`ncols` NaN rate columns and conv_H; `frozen_at_end` as in `with_conversions`. Returns
+(rows, f_N2 today, x_fo).
+"""
+function late_rows(h, itp, p, m2, tT_rel, ncols; frozen_at_end, n=150, x_max=1e5)
+    m = h.N1.m
+    z_hi = log(m / tT_rel.T_nu_grid[end])
+    h2, f2, x_fo = with_conversions(h, itp, p, m2; frozen_at_end=frozen_at_end, z_hi=z_hi)
+    rows = String[]
+    for z in range(h.z_f, min(z_hi, log(x_max)), length=n + 1)[2:end]
+        T, g1, g2, n1 = dark_state(h2, z)
+        n2 = n1 * n_scaled_safe(m2, 2, T) / n_scaled_safe(m, 2, T) * exp(g1 - g2)
+        s = h.bg.ent_interp_z(z)
+        push!(rows, row(exp(z), [T / (m * exp(-z)), h.bg.H_interp_z(z), n1 / s, n2 / s, 0.0, 0.0,
+                                 (m * n1 + m2 * n2) / s * s0 / rho_crit0_h2, g1, kd_ratio(h2, z),
+                                 fill(NaN, ncols)..., conversion_lambda_H(h2, itp, p, m2, z)]))
+    end
+    return rows, f2, x_fo
+end
+
 function network_benchmark(itp, tT_rel, m, g, s2)
-    net = Network(itp, table_params(itp, m, g, s2), tT_rel)
+    p = table_params(itp, m, g, s2)
+    split = table_delta(itp) > 0
+    net = Network(itp, p, tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
     sol = solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
     h = DarkHistory(net, sol)
@@ -78,9 +108,14 @@ function network_benchmark(itp, tT_rel, m, g, s2)
         lnA, lnphi = log(n[3]), log(n[4])
         fwd = [abs(exp(ur.lnGf + ur.cI[1] * lnA + ur.cI[2] * lnphi) * ur.xf) / n[k] / H for (ur, k) in zip(urs, first_species)]
         push!(rows, row(exp(z), [T_N / (m * exp(-z)), H, (n ./ s)..., network_omega_h2(net, u, z),
-                                 dark_state(h, z)[2], kd_ratio(h, z), fwd...]))
+                                 dark_state(h, z)[2], kd_ratio(h, z), fwd...,
+                                 (split ? (conversion_lambda_H(h, itp, p, p.m2, z),) : ())...]))
     end
-    return ["fwd:$(r.name)" for r in used], rows, network_omega_h2(net, sol.u[end], sol.t[end])
+    cols = ["fwd:$(r.name)" for r in used]
+    om = network_omega_h2(net, sol.u[end], sol.t[end])
+    split || return cols, rows, om, nothing
+    late, f2, x_fo = late_rows(h, itp, p, p.m2, tT_rel, length(cols); frozen_at_end=true)
+    return [cols; "conv_H"], [rows; late], om, (f2, x_fo)
 end
 
 function fluid_benchmark(itp, tT_rel, m, g, s2)
@@ -88,6 +123,8 @@ function fluid_benchmark(itp, tT_rel, m, g, s2)
     sol, om, plateau = solve_relic(pan, tT_rel, g, s2)
     plateau || error("fluid solve did not settle at m = $m, g = $g")
     h = DarkHistory(pan, sol)
+    p = fluid_rates!(pan)
+    split = table_delta(itp) > 0
     # forward rates from the network's MB unit rates at the fluid state, for the reactions in
     # the fluid's collision term only (its table reactions and FLUID_EXACT; see the header)
     net = Network(itp, table_params(itp, m, g, s2), tT_rel)
@@ -120,9 +157,13 @@ function fluid_benchmark(itp, tT_rel, m, g, s2)
         lnA, lnphi = log(nk[3]), log(nk[4])
         fwd = [abs(exp(ur.lnGf + ur.cI[1] * lnA + ur.cI[2] * lnphi) * ur.xf) / nk[k] / H for (ur, k) in zip(urs, first_species)]
         push!(rows, row(exp(z), [T_N / T_nu, H, (n ./ s)..., omega_h2_of(pan, u, z), N_temp_gap(pan, u)[2],
-                                 kd_ratio(h, z), total, (br[k][1] / (ntilde * H) for k in names)..., fwd...]))
+                                 kd_ratio(h, z), total, (br[k][1] / (ntilde * H) for k in names)..., fwd...,
+                                 (split ? (conversion_lambda_H(h, itp, p, pan.N2.m, z),) : ())...]))
     end
-    return ["net_total"; ["net:$k" for k in names]; ["fwd:$(r.name)" for r in used]], rows, om
+    cols = ["net_total"; ["net:$k" for k in names]; ["fwd:$(r.name)" for r in used]]
+    split || return cols, rows, om, nothing
+    late, f2, x_fo = late_rows(h, itp, p, pan.N2.m, tT_rel, length(cols); frozen_at_end=false)
+    return [cols; "conv_H"], [rows; late], om, (f2, x_fo)
 end
 
 function main(args)
@@ -131,16 +172,19 @@ function main(args)
     tables = length(args) > 2 ? args[3] : rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))
     itp = RateInterpolants(load_rate_tables(tables))
     rphi = mass_ratios(itp)[2]
-    suffix = rphi == 100 ? "" : @sprintf("_mphi%g", rphi)
+    delta = table_delta(itp)
+    suffix = (rphi == 100 ? "" : @sprintf("_mphi%g", rphi)) * (delta > 0 ? @sprintf("_delta%g", delta) : "")
     tT_rel = TimeTempRelation{Float64}()
     for spec in split(args[1], ',')
         f = split(spec, ':')
         solver, m_keV, g = f[1], parse(Float64, f[2]), parse(Float64, f[3])
+        length(f) > 3 || delta == 0 || error("with a splitting give sin^2 2theta explicitly ($spec)")
         s2 = length(f) > 3 ? parse(Float64, f[4]) : stored_root(solver, m_keV, g)
-        t = @elapsed (rate_cols, rows, om) = (solver == "network" ? network_benchmark : fluid_benchmark)(itp, tT_rel, m_keV * 1e-6, g, s2)
+        t = @elapsed (rate_cols, rows, om, conv) = (solver == "network" ? network_benchmark : fluid_benchmark)(itp, tT_rel, m_keV * 1e-6, g, s2)
         path = joinpath(out_dir, @sprintf("%s_m_%gkeV_g_%g%s.csv", solver, m_keV, g, suffix))
         open(path, "w") do io
-            println(io, "# ", solver, " m_N = ", m_keV, " keV, g = ", g, ", sin^2 2theta = ", s2, ", m_phi = ", rphi, " m_N")
+            println(io, "# ", solver, " m_N = ", m_keV, " keV, g = ", g, ", sin^2 2theta = ", s2, ", m_phi = ", rphi, " m_N",
+                    (delta > 0 ? @sprintf(", delta = %g, f_N2 today = %.4g, x_fo = %.4g", delta, conv...) : ""))
             println(io, "x,TN_Tnu,H_GeV,Y_N1,Y_N2,Y_A,Y_phi,omega_h2,gap_N1,Gamma_kd_H,", join(rate_cols, ","))
             foreach(r -> println(io, r), rows)
         end

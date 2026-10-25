@@ -13,5 +13,5 @@ done
 conda run -n pandemic python plot/combined_scan_dir.py $OUT/combined 1e-3 $OUT $D
 mkdir -p figures/delta$D
 conda run -n pandemic python plot/relic_scan_theta.py $OUT/combined figures/delta$D/relic_contours
-conda run -n pandemic python plot/network_n2_fraction.py figures/delta$D/n2_over_n1 $OUT/combined/lyman_alpha.csv
+conda run -n pandemic python plot/n2_fraction.py figures/delta$D/n2_over_n1 "delta = $D=$OUT/combined/lyman_alpha.csv"
 echo "post delta=$D done"

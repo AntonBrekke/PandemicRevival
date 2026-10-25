@@ -21,6 +21,12 @@ by <= 0.2%, while N2 is depleted for g >~ 1e-3 (10 keV).
   (`patch_seeds.py`).
 - `delta1e-4/{network,fluid}_scan{,_fine}/`: roots and `lyman_alpha.csv` (with `x_fo`, the last
   x at which the conversions are faster than H); `delta1e-4/combined/` for the plots.
+- `delta1e-4/benchmarks/`: the nine 10 keV benchmarks of `tmp/benchmarks` at delta = 1e-4
+  (`run_benchmarks.jl`; with the late conversions up to x = 1e5 and `conv_H`). Their roots in
+  `delta1e-4/benchmarks_10keV/` (seeded with the delta = 0 roots):
+  network g = 1e-7 9.27518e-10, 1e-5 7.529e-11, 1e-4 1.21154e-12, 1e-3 3.52303e-15,
+  1.778e-3 8.73241e-16; fluid g = 1e-3 3.51753e-15, 1.778e-3 8.73774e-16, 1e-2 1.34289e-17,
+  0.1 6.01586e-21.
 - `pilot/` (delta = 1e-3) and `pilot4/` (delta = 1e-4): 10.57 keV, g = 1e-4 ... 1e-2.
 - `overlap_check_delta1e-4.txt`: network vs fluid in the overlap (`test/check_delta_overlap.jl`).
 - `*.log`: logs of the runs below.
@@ -36,6 +42,12 @@ The delta = 1e-3 tables are not in the repository (a copy is in
     tmp/delta_runs/run_network_delta.sh 1e-4      # network roots + Lyman-alpha, base and fine
     tmp/delta_runs/run_fluid_delta.sh 1e-4 10     # fluid roots, base and fine
     tmp/delta_runs/run_post_delta.sh 1e-4 12      # fluid Lyman-alpha, combined, figures
+    # benchmarks (roots above), then figures; N2/N1 at the roots, equal masses and delta = 1e-4:
+    julia --project=. -t 4 src/run_benchmarks.jl network:10:1e-4:1.21154e-12,... \
+        tmp/delta_runs/delta1e-4/benchmarks tmp/rate_tables/rate_tables_mA2.5_mphi100.0_delta0.0001.jls
+    conda run -n pandemic python plot/benchmark.py tmp/delta_runs/delta1e-4/benchmarks figures/benchmarks_10keV_delta1e-4
+    conda run -n pandemic python plot/production.py tmp/delta_runs/delta1e-4/benchmarks figures/production_10keV_delta1e-4
+    conda run -n pandemic python plot/n2_fraction.py figures/n2_over_n1
 
 The first network pass used dz_seed = 1e-9 for every solve, which fails at small g;
 `run_network_patch.sh` re-solved those points (and the overlap) after the fix in

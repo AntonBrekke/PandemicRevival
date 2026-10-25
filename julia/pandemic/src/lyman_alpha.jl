@@ -162,6 +162,34 @@ function dark_state(h::DarkHistory, z)
 end
 
 """
+(G_f/n_N1, G_r/n_N1) of N1 N1 <-> N2 N2: reactions per N1 and time at T_N = T,
+N = n_N1 + n_N2, r = n_N2/n_N1, from the MB tables with the normalisation lnR =
+ln_norm(N1N1_N2N2, p, itp.p_ref). Zero beyond the table grid (m/T_N > 1e8), where the
+conversions are long frozen and the linear extrapolation of ln R in ln x_N would grossly
+overstate the endothermic e^(-2 delta x_N).
+"""
+function conversion_rates(itp::RateInterpolants, lnR, m1, m2, T, N, r)
+    t = itp.dark[:N1N1_N2N2]
+    n1 = N / (1 + r)
+    lx = log(m1 / T)
+    lx > itp.lnxN[2] && return 0.0, 0.0
+    return exp(t.lnRf(lx) + lnR) * n1 / n_scaled_safe(m1, 2, T)^2,
+           exp(t.lnRr(lx) + lnR) * r^2 * n1 / n_scaled_safe(m2, 2, T)^2
+end
+
+"""
+lambda/H at z along the history `h` (`with_conversions` for after the solution): the
+relaxation rate of n_N2/n_N1 through N1 N1 <-> N2 N2, lambda = 2 G_f/n_N1 + 2 G_r/n_N2
+(tables at parameters `p`, m_N2 = m2), whose crossing of H is x_fo of `with_conversions`.
+"""
+function conversion_lambda_H(h::DarkHistory, itp::RateInterpolants, p, m2, z)
+    T, g1, g2, n1 = dark_state(h, z)
+    r = n_scaled_safe(m2, 2, T) / n_scaled_safe(h.N1.m, 2, T) * exp(g1 - g2)
+    gf, gr = conversion_rates(itp, ln_norm(reaction(:N1N1_N2N2), p, itp.p_ref), h.N1.m, m2, T, n1 * (1 + r), r)
+    return 2 * (gf + gr / r) / h.bg.H_interp_z(z)
+end
+
+"""
     with_conversions(h, itp, p, m2; frozen_at_end, z_hi)
 
 The late N1 N1 <-> N2 N2 conversions for a splitting m_N2 = m2 > m_N1 (h.N1.m): the history
@@ -188,7 +216,6 @@ Integrated to z_hi. Returns (history, f_N2, x where lambda last exceeds H; NaN i
 function with_conversions(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_at_end, z_hi, dz=0.02)
     m1 = h.N1.m
     dm = m2 - m1
-    t = itp.dark[:N1N1_N2N2]
     lnR = ln_norm(reaction(:N1N1_N2N2), p, itp.p_ref)
     nh(m, T) = n_scaled_safe(m, 2, T)
     # (T, N, r) of the history at z (after z_f: adiabatic, without the conversions)
@@ -197,15 +224,7 @@ function with_conversions(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_a
         rh = nh(m2, T) / nh(m1, T) * exp(g1 - g2)
         return T, n1 * (1 + rh), rh
     end
-    # (G_f/n1, G_r/n1): reactions per N1 and time, at (T, N, r); zero beyond the table grid
-    # (m/T_N > 1e8), where the conversions are long frozen and the linear extrapolation of
-    # ln R in ln x_N would grossly overstate the endothermic e^(-2 delta x_N)
-    function rates(T, N, rr)
-        n1 = N / (1 + rr)
-        lx = log(m1 / T)
-        lx > itp.lnxN[2] && return 0.0, 0.0
-        return exp(t.lnRf(lx) + lnR) * n1 / nh(m1, T)^2, exp(t.lnRr(lx) + lnR) * rr^2 * n1 / nh(m2, T)^2
-    end
+    rates(T, N, rr) = conversion_rates(itp, lnR, m1, m2, T, N, rr)
     # d ln r/dz without dividing by a vanishing r
     function dlnr(z, T, N, l)
         gf, gr = rates(T, N, exp(l))

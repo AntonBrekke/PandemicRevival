@@ -39,6 +39,13 @@ excluded by one of the constraints) and writes <output>_debug.pdf, so the
 production figure is not overwritten. --all-points marks every scanned root
 instead, sub-decade couplings included (small dots coloured by g, on a colour
 bar; open where excluded), and writes <output>_debug_all.pdf.
+
+--n2-fraction shades the plane by N2/N1 today at the roots (f_N2 of lyman_alpha.csv,
+interpolated between them; colour bar from --n2-vmin, default 1e-8, to 1), draws the
+contours in white and hatches the constraint regions instead of tinting them, and writes
+<output>_n2.pdf. For both scans:
+    conda run -n pandemic python plot/relic_scan_theta.py tmp/combined_scan figures/relic_contours_equal --n2-fraction
+    conda run -n pandemic python plot/relic_scan_theta.py tmp/delta_runs/delta1e-4/combined figures/relic_contours_delta1e-4 --n2-fraction
 """
 
 import argparse
@@ -89,6 +96,8 @@ C_LYA = "#D95F02"
 C_RS = "#C9184A"   # the shading is drawn at alpha, so the line/label carry the colour
 C_SI = "#A300CC"
 BOUND_LABEL_SIZE = 9
+# A bound label needs this factor in m_N left of its anchor to fit (right-aligned) in the frame
+LABEL_ROOM = 2.2
 
 # Contours below this coupling are drawn but not labelled: they only enter the
 # frame at m_N ~ 3 keV, inside the Dodelson-Widrow band, where there is no room.
@@ -99,6 +108,12 @@ LABEL_Y_MIN = 1e-6
 # Omega h^2 contour lines, so those stay readable over the shading.
 Z_BOUND = {"lya": -3.5, "r_s": -3.7, "si": -3.9}
 Z_LABEL = 2.5   # all on-plot text, above every shaded region
+
+# --n2-fraction: the N2/N1 field under everything, the contours in one colour over it
+N2_VMIN = 1e-8
+Z_N2 = -6
+C_CONTOUR_N2 = "white"
+HATCH_N2 = {"lya": "//", "r_s": "\\\\", "si": "||"}   # the bounds hatched, not tinted
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -125,6 +140,17 @@ def parse_args():
         "--all-points",
         action="store_true",
         help="mark every scanned root, all y, and write <out>_debug_all.pdf"
+    )
+    p.add_argument(
+        "--n2-fraction",
+        action="store_true",
+        help="shade the plane by N2/N1 today at the roots and write <out>_n2.pdf"
+    )
+    p.add_argument(
+        "--n2-vmin",
+        type=float,
+        default=N2_VMIN,
+        help="lower end of the N2/N1 colour scale (smaller ratios drawn at it)"
     )
     return p.parse_args()
 
@@ -172,12 +198,12 @@ def load_lyman_alpha(scan_dir):
     return lam, r_s, mix
 
 
-def bound_crossings(roots, vals, limit):
+def bound_crossings(roots, vals, limit, with_y=False):
     """For every y, the point (m_N, sin^2 2theta) on its Omega h^2 = 0.12 line
     where the length crosses `limit` downwards for the last time with growing
     m_N, interpolated linearly in log along the line (the lengths fall with
     m_N, so smaller masses are excluded). Lines that are excluded at all their
-    masses give their largest mass, lines that are allowed everywhere none."""
+    masses give their largest mass, lines that are allowed everywhere none. With `with_y`, (m_N, s, y)."""
     crossings = []
     for y in sorted({k[1] for k in roots}):
         pts = sorted(
@@ -186,12 +212,12 @@ def bound_crossings(roots, vals, limit):
         if not pts or all(p[2] <= limit for p in pts):
             continue
         if pts[-1][2] > limit:
-            crossings.append(pts[-1][:2])
+            crossings.append(pts[-1][:2] + ((y,) if with_y else ()))
             continue
         for (m0, s0, l0), (m1, s1, l1) in reversed(list(zip(pts[:-1], pts[1:]))):
             if l0 > limit >= l1:
                 w = np.log(l0 / limit) / np.log(l0 / l1)
-                crossings.append((m0 * (m1 / m0)**w, s0 * (s1 / s0)**w))
+                crossings.append((m0 * (m1 / m0)**w, s0 * (s1 / s0)**w) + ((y,) if with_y else ()))
                 break
     return crossings
 
@@ -207,7 +233,7 @@ def place_label(m, s, m_pad=1.03, s_pad=1.6):
     return m, max(s, S_LIM[0] * s_pad), "bottom"
 
 
-def extend_boundary(m_c, s_c):
+def extend_boundary(m_c, s_c, close_lo=False, close_hi=False):
     """The boundary continued past its end points to beyond the top and bottom
     of the frame, so the shaded region closes on the frame edge instead of on
     the outermost line of constant y that happens to have been scanned.
@@ -218,6 +244,11 @@ def extend_boundary(m_c, s_c):
     stops excluding anything above m_N = 1 keV once y is small enough -- the
     extrapolation walks off the left edge on its own and nothing extra is
     shaded, which is why it is done this way rather than by holding m_N fixed.
+    That holds only where the boundary leaves the frame steeply; where it ends
+    because the next scanned coupling is allowed everywhere (`close_lo` at the
+    bottom, `close_hi` at the top), it is closed at its last crossing instead,
+    horizontally to off the left edge: a straight continuation of a shallow end
+    would shade couplings that no root excludes.
     """
     def step(m0, s0, m1, s1, s_target):
         # (m, s) on the line through the two points, at s = s_target
@@ -227,8 +258,9 @@ def extend_boundary(m_c, s_c):
         m = m1 * (m1 / m0)**w
         return float(np.clip(m, M_LIM[0] * 0.01, M_LIM[1] * 100)), s_target
 
-    lo = step(m_c[1], s_c[1], m_c[0], s_c[0], S_LIM[0] * 0.5)
-    hi = step(m_c[-2], s_c[-2], m_c[-1], s_c[-1], S_LIM[1] * 2.0)
+    m_off = M_LIM[0] * 0.5
+    lo = (m_off, s_c[0]) if close_lo else step(m_c[1], s_c[1], m_c[0], s_c[0], S_LIM[0] * 0.5)
+    hi = (m_off, s_c[-1]) if close_hi else step(m_c[-2], s_c[-2], m_c[-1], s_c[-1], S_LIM[1] * 2.0)
     return (np.concatenate(([lo[0]], m_c, [hi[0]])),
             np.concatenate(([lo[1]], s_c, [hi[1]])))
 
@@ -241,24 +273,31 @@ def plot_bound(
         color,
         label,
         zorder,
-        frac=0.5
+        frac=0.5,
+        hatch=None
     ):
     """Shade the region of smaller m_N than the crossings of `limit` and label
     the boundary inside the shaded side, `frac` of the way up its visible part
-    (0.5 is halfway; lower it to dodge a busy part of the figure)."""
-    crossings = sorted(bound_crossings(roots, vals, limit), key=lambda c: c[1])
+    (0.5 is halfway; lower it to dodge a busy part of the figure). With `hatch`
+    the region is hatched in `color` instead of tinted (over the N2/N1 field).
+    A label with no room left of its anchor is set inside the frame from the
+    left edge instead."""
+    crossings = sorted(bound_crossings(roots, vals, limit, with_y=True), key=lambda c: c[1])
     if len(crossings) < 2:
         return False
     m_c = np.array([c[0] for c in crossings])
     s_c = np.array([c[1] for c in crossings])
-    m_e, s_e = extend_boundary(m_c, s_c)
+    # the boundary ends inside the scan where scanned couplings beyond those with
+    # a crossing (larger at the bottom, smaller at the top) are allowed everywhere
+    ys = [k[1] for k in roots if k in vals]
+    y_c = [c[2] for c in crossings]
+    m_e, s_e = extend_boundary(m_c, s_c, close_lo=max(y_c) < max(ys), close_hi=min(y_c) > min(ys))
     m_lo = M_LIM[0] * 0.5   # off the left edge, so the shading is flush with it
-    ax.fill(
-        np.concatenate(([m_lo], m_e, [m_lo])),
-        np.concatenate(([s_e[0]], s_e, [s_e[-1]])),
-        color=color, alpha=0.25, lw=0,
-        zorder=zorder
-    )
+    region = (np.concatenate(([m_lo], m_e, [m_lo])), np.concatenate(([s_e[0]], s_e, [s_e[-1]])))
+    if hatch:
+        ax.fill(*region, facecolor="none", edgecolor=color, hatch=hatch, lw=0, zorder=zorder)
+    else:
+        ax.fill(*region, color=color, alpha=0.25, lw=0, zorder=zorder)
     ax.plot(m_e, s_e, color=color, lw=1.3, zorder=zorder + 0.1)
 
     # Label offset into the excluded (left) side and below the anchor, so it
@@ -271,8 +310,14 @@ def plot_bound(
         mid = int(np.argmax(m_c))
     m_t = float(np.clip(m_c[mid] * 0.88, M_LIM[0] * 1.06, M_LIM[1] / 1.06))
     s_t = float(np.clip(s_c[mid] * 0.70, S_LIM[0] * 4.0, S_LIM[1] / 2.0))
+    ha = "right"
+    if m_t < M_LIM[0] * LABEL_ROOM:
+        m_t, ha = M_LIM[0] * 1.06, "left"
+    # over a hatched region the label needs a white outline to stay readable
+    import matplotlib.patheffects as pe
     ax.text(m_t, s_t, label, color=color, fontsize=BOUND_LABEL_SIZE,
-            ha="right", va="top", zorder=Z_LABEL)
+            ha=ha, va="top", zorder=Z_LABEL,
+            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")] if hatch else None)
     return True
 
 
@@ -369,6 +414,39 @@ def scaled_xray_limit(roots, mix):
     return m, s_b
 
 
+def plot_n2_fraction(fig, ax, roots, mix, vmin, n=400):
+    """
+    The plane shaded by N2/N1 today at the roots (--n2-fraction): at each scanned mass linear
+    in log sin^2 2theta between its roots, and linear in log m_N between scanned masses, of
+    log(N2/N1) and of the ends of the range of roots (blank outside it, and between masses
+    without roots). Ratios below vmin are drawn at vmin.
+    """
+    from matplotlib.colors import LogNorm
+    cols = {}
+    for k in roots:
+        if k in mix:
+            f2 = mix[k][0]
+            cols.setdefault(k[0], []).append((np.log(roots[k]), np.log(max(f2 / (1 - f2), vmin))))
+    ms = np.array(sorted(cols))
+    tabs = [np.array(sorted(cols[m])).T for m in ms]
+    m_g = np.exp(np.linspace(np.log(M_LIM[0]), np.log(M_LIM[1]), n))
+    ls_g = np.linspace(np.log(S_LIM[0]), np.log(S_LIM[1]), n)
+    z = np.full((n, n), np.nan)
+    for j, m in enumerate(m_g):
+        if not ms[0] <= m <= ms[-1]:
+            continue
+        i = min(np.searchsorted(ms, m, side="right") - 1, len(ms) - 2)
+        t = (np.log(m) - np.log(ms[i])) / (np.log(ms[i + 1]) - np.log(ms[i]))
+        lo = (1 - t) * tabs[i][0][0] + t * tabs[i + 1][0][0]
+        hi = (1 - t) * tabs[i][0][-1] + t * tabs[i + 1][0][-1]
+        v = (1 - t) * np.interp(ls_g, *tabs[i]) + t * np.interp(ls_g, *tabs[i + 1])
+        z[:, j] = np.where((ls_g >= lo) & (ls_g <= hi), np.exp(v), np.nan)
+    norm = LogNorm(vmin=vmin, vmax=1.0)
+    pc = ax.pcolormesh(m_g, np.exp(ls_g), z, norm=norm, cmap="viridis", shading="nearest",
+                       rasterized=True, zorder=Z_N2)
+    fig.colorbar(pc, ax=ax, pad=0.02, label=r"$n_{N_2}/n_{N_1}$ today")
+
+
 def plot_xrays(ax, m, s):
     ax.fill_between(m, s, 1.0, color="white", lw=0, zorder=-3)
     ax.fill_between(m, s, 1.0, color="black", alpha=0.25, lw=0, zorder=-3)
@@ -376,14 +454,18 @@ def plot_xrays(ax, m, s):
     ax.text(10**1.45, 1e-13, "X-rays", color="black")
 
 
-def plot_contours(ax, roots, excluded, debug):
-    """The Omega h^2 = 0.12 lines, drawn for whole decades of y only."""
+def plot_contours(ax, roots, excluded, debug, mono=None):
+    """The Omega h^2 = 0.12 lines, drawn for whole decades of y only; all in colour `mono`
+    with a dark outline if given (over the N2/N1 field), else coloured by y."""
+    import matplotlib.patheffects as pe
     masses = np.array(sorted({k[0] for k in roots}))
     ys = np.array(sorted({k[1] for k in roots}))
     decade_ys = np.array(
         [y for y in ys if abs(np.log10(y) - round(np.log10(y))) < 1e-6]
     )
-    colors = plt.cm.viridis(np.linspace(0.0, 0.85, len(decade_ys)))
+    colors = ([mono] * len(decade_ys) if mono else
+              plt.cm.viridis(np.linspace(0.0, 0.85, len(decade_ys))))
+    outline = [pe.withStroke(linewidth=2.2, foreground="0.15")] if mono else None
     first = [True]   # the first line that gets a label carries the "g =" prefix
     for y, c in zip(decade_ys, colors):
         m_line = np.array([m for m in masses if (m, y) in roots])
@@ -405,7 +487,8 @@ def plot_contours(ax, roots, excluded, debug):
                     np.exp(PchipInterpolator(lm, ls)(lm_fine)),
                     color=c,
                     lw=1.0,
-                    zorder=-1
+                    zorder=-1,
+                    path_effects=outline
                 )
             if debug:
                 # Open markers where a root is excluded by one of the
@@ -461,7 +544,8 @@ def plot_contours(ax, roots, excluded, debug):
                 y_label(y, first=first[0]),
                 color=c,
                 ha="left", va=va,
-                zorder=Z_LABEL
+                zorder=Z_LABEL,
+                path_effects=outline
             )
             first[0] = False
 
@@ -496,7 +580,8 @@ def main():
     roots = load_roots(args.scan_dir)
     lam, r_s, mix = load_lyman_alpha(args.scan_dir)
     sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, *mix[k]) for k in roots if k in mix}
-    out = args.out + ("_debug_all" if args.all_points else "_debug" if args.debug else "")
+    out = args.out + ("_n2" if args.n2_fraction else "") + \
+        ("_debug_all" if args.all_points else "_debug" if args.debug else "")
 
     set_style()
     fig = plt.figure(figsize=get_figsize(COLUMNWIDTH, wf=1.0, hf=0.9), dpi=150)
@@ -507,6 +592,8 @@ def main():
     for axis in ["top", "bottom", "left", "right"]:
         ax.spines[axis].set_linewidth(0.5)
 
+    hatch = HATCH_N2 if args.n2_fraction else {}
+    plt.rcParams["hatch.linewidth"] = 0.5
     plot_dodelson_widrow(ax)
     m_x, s_x = scaled_xray_limit(roots, mix)
     plot_xrays(ax, m_x, s_x)
@@ -516,16 +603,19 @@ def main():
     # its boundary, clear of the ragged X-ray curve.
     n_lya = plot_bound(
         ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
-        r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28
+        r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28,
+        hatch=hatch.get("lya")
     )
     # The r_s label sits on the upper part of its boundary, above the
     # lambda_fs line. Both label positions depend on the data: recheck them
     # (and those of Ly-alpha (lambda_fs) and self-int.) when the bounds move.
     plot_bound(
         ax, roots, r_s, R_S_MAX_MPC, C_RS,
-        r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.45
+        r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.45,
+        hatch=hatch.get("r_s")
     )
-    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"], frac=0.55)
+    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"], frac=0.55,
+               hatch=hatch.get("si"))
 
     excluded = {
         k: (
@@ -535,7 +625,10 @@ def main():
             or sig_m.get(k, 0.0) > SIGMA_M_MAX
         ) for k in roots
     }
-    plot_contours(ax, roots, excluded, args.debug and not args.all_points)
+    plot_contours(ax, roots, excluded, args.debug and not args.all_points,
+                  mono=C_CONTOUR_N2 if args.n2_fraction else None)
+    if args.n2_fraction:
+        plot_n2_fraction(fig, ax, roots, mix, args.n2_vmin)
     if args.all_points:
         plot_all_points(fig, ax, roots, excluded)
 

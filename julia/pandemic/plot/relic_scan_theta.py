@@ -42,7 +42,8 @@ bar; open where excluded), and writes <output>_debug_all.pdf.
 
 --n2-fraction shades the plane by N2/N1 today at the roots (f_N2 of lyman_alpha.csv,
 interpolated between them; colour bar from --n2-vmin, default 1e-8, to 1), draws the
-contours in white and hatches the constraint regions instead of tinting them, and writes
+contours in white and hatches the constraint regions, X-rays included, instead of tinting them
+(the field shows through), and writes
 <output>_n2.pdf. For both scans:
     conda run -n pandemic python plot/relic_scan_theta.py tmp/combined_scan figures/relic_contours_equal --n2-fraction
     conda run -n pandemic python plot/relic_scan_theta.py tmp/delta_runs/delta1e-4/combined figures/relic_contours_delta1e-4 --n2-fraction
@@ -113,7 +114,7 @@ Z_LABEL = 2.5   # all on-plot text, above every shaded region
 N2_VMIN = 1e-8
 Z_N2 = -6
 C_CONTOUR_N2 = "white"
-HATCH_N2 = {"lya": "//", "r_s": "\\\\", "si": "||"}   # the bounds hatched, not tinted
+HATCH_N2 = {"lya": "//", "r_s": "\\\\", "si": "||", "xray": "xx"}   # the bounds hatched, not tinted
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -447,11 +448,19 @@ def plot_n2_fraction(fig, ax, roots, mix, vmin, n=400):
     fig.colorbar(pc, ax=ax, pad=0.02, label=r"$n_{N_2}/n_{N_1}$ today")
 
 
-def plot_xrays(ax, m, s):
-    ax.fill_between(m, s, 1.0, color="white", lw=0, zorder=-3)
-    ax.fill_between(m, s, 1.0, color="black", alpha=0.25, lw=0, zorder=-3)
+def plot_xrays(ax, m, s, hatch=None):
+    """The X-ray region: grey over an opaque white underlay that hides the
+    bounds below it, or with `hatch` (over the N2/N1 field) hatched in black
+    and transparent."""
+    import matplotlib.patheffects as pe
+    if hatch:
+        ax.fill_between(m, s, 1.0, facecolor="none", edgecolor="black", hatch=hatch, lw=0, zorder=-3)
+    else:
+        ax.fill_between(m, s, 1.0, color="white", lw=0, zorder=-3)
+        ax.fill_between(m, s, 1.0, color="black", alpha=0.25, lw=0, zorder=-3)
     ax.plot(m, s, color="black", lw=1.3, zorder=-2)
-    ax.text(10**1.45, 1e-13, "X-rays", color="black")
+    ax.text(10**1.45, 1e-13, "X-rays", color="black", zorder=Z_LABEL if hatch else None,
+            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")] if hatch else None)
 
 
 def plot_contours(ax, roots, excluded, debug, mono=None):
@@ -596,7 +605,7 @@ def main():
     plt.rcParams["hatch.linewidth"] = 0.5
     plot_dodelson_widrow(ax)
     m_x, s_x = scaled_xray_limit(roots, mix)
-    plot_xrays(ax, m_x, s_x)
+    plot_xrays(ax, m_x, s_x, hatch=hatch.get("xray"))
     # Both Lyman-alpha bounds are labelled by the length that sets them.
     # Both bounds are Lyman-alpha; the length in brackets says which one, as in
     # Bringmann et al. (2206.10630). Ly-alpha (lambda_fs) is labelled low on

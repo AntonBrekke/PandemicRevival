@@ -11,7 +11,7 @@ Defaults: tmp/benchmarks -> figures/production. Against x = m_N/T_nu:
 - right: the reaction rates per DM particle [keV], as in the draft (C/n_d), and H: the
   forward rate of each reaction per n~ (its rate per first initial particle times
   n_first/n~), the same quantity for both solvers. The net change of the DM is the
-  abundance history.
+  abundance history. N2N2 -> A'A' dashed (it often lies on N1N1 -> A'A').
   network: every reaction, as the network computes it.
   fluid:   only the reactions in its collision term (the `fwd:` columns of run_benchmarks.jl).
            A' <-> N1N2, N1N1 <-> N2N2 and phi <-> A'A' are absent: the fluid does not compute
@@ -36,7 +36,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, FixedFormatter, NullFormatter
-from benchmark import LABELS, RATE_COLOURS, SPECIES_COLOURS, SPECIES_LS, omega_parts
+from benchmark import LABELS, RATE_COLOURS, RATE_LS, SPECIES_COLOURS, SPECIES_LS, omega_parts
 
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
@@ -203,7 +203,7 @@ def plot(path, fig_dir, min_moved):
         if moved < min_moved:
             continue
         c = RATE_COLOURS.get(name, "0.3")
-        a3.loglog(x, np.where(r > 0, r * H, np.nan), color=c, zorder=-4)
+        a3.loglog(x, np.where(r > 0, r * H, np.nan), color=c, ls=RATE_LS.get(name, "-"), zorder=-4)
         curves.append((x, np.abs(r) * H, LABELS.get(name, name), c))
         rmax = max(rmax, np.nanmax(np.abs(r) * H))
     a3.loglog(x, H, color=C_H, lw=2.0, zorder=0)

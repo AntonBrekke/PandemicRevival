@@ -12,7 +12,7 @@ Defaults: tmp/benchmarks -> figures/benchmarks. Panels, against x = m_N/T_nu, on
 4. the rates the solver computes, in GeV, with H as the thick black line (one colour per
    reaction, RATE_COLOURS, the same for both solvers and in production.py):
    network: forward rate per particle of every reaction (solid: dark sector, dashed:
-            with a neutrino);
+            with a neutrino, and N2N2 -> A'A', which often lies on N1N1 -> A'A');
    fluid:   the collision term of every process over n~ at the solver's steps (solid:
             produces n~, dashed: removes it; n~ = n_N1 + n_N2 + 2 n_A' + 4 n_phi), and
             in black the net rate of change of n~ that the solver integrated. For a
@@ -40,6 +40,7 @@ LABELS = {
 }
 SPECIES_COLOURS = {"N1": "#7bc043", "N2": "#2e7d32", "A": "#f37736", "phi": "#8e44ad"}
 SPECIES_LS = {"N2": "--"}   # N2 often lies on N1
+RATE_LS = {"N2N2_AA": "--"}   # N2N2 -> A'A' often lies on N1N1 -> A'A'
 # one colour per reaction, the same for both solvers and in every figure (the first five are the
 # draft's); NN_AA is the fluid's N1N1_AA + N1N2_AA + N2N2_AA
 RATE_COLOURS = {
@@ -120,7 +121,7 @@ def plot(path, fig_dir):
         lab = LABELS.get(name, name) + (" (exact)" if solver == "fluid" and name in FLUID_EXACT else "")
         c = RATE_COLOURS.get(name, "0.3")
         if solver == "network":
-            a4.plot(x, np.where(r > FLOOR, r * H, np.nan), ls="--" if name in PORTAL else "-", color=c, lw=1.2,
+            a4.plot(x, np.where(r > FLOOR, r * H, np.nan), ls=RATE_LS.get(name, "--" if name in PORTAL else "-"), color=c, lw=1.2,
                     label=lab)
         else:
             a4.plot(x, np.where(r > FLOOR, r * H, np.nan), "-", color=c, lw=0.9, alpha=0.8, label=lab)

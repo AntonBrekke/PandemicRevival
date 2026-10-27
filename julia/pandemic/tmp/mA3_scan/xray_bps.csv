@@ -1,0 +1,4 @@
+name,m_keV,g,sin2_2theta,solver,note
+BP1,10.57,1.333e-4,7.328e-13,network,f_N1 s2 4.9x below the current X-ray limit; 12x above Athena and eXTP
+BP2,13.72,3.162e-4,1.072e-13,network,6.9x below the current limit; 6.1x above eXTP
+BP3,17.81,4.217e-4,6.016e-14,network,3.3x below the current limit; 7.3x above eXTP

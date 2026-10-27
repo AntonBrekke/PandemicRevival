@@ -1,0 +1,3 @@
+name,m_keV,g,sin2_2theta,solver,f_N2,lambda_fs_kd_Mpc,r_s_Mpc,sigma_m_cm2_g,now_margin,reach_margin,reached_by
+BP1,10.57,0.0001333,6.1783e-13,network,0.494737,0.177118,0.0452396,1.96155e-06,5.76752,10.2837,Athena+eXTP
+BP2,13.72,0.0003162,8.88363e-14,network,0.5,0.110037,0.0556118,2.84026e-05,8.26245,5.06554,eXTP

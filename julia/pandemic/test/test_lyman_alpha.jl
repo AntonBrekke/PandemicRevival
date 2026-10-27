@@ -77,3 +77,26 @@ end
         @test isapprox(lam, lam_py; rtol=1e-2)
     end
 end
+
+@testset "splitting at fixed m_nu" begin
+    # mnu_splitting inverts m_nu = sin^2 theta_1 m_D/delta, m_D = (1 + delta) m_N
+    for (m, s2, m_nu) in ((1e-5, 1e-12, 1e-10), (6e-7, 1.5e-7, 1e-10), (3e-4, 1e-20, 1e-14))
+        d = mnu_splitting(m, s2; m_nu=m_nu)
+        th1 = sin(asin(sqrt(s2)) / 2)
+        @test th1^2 * m * (1 + d) / d ≈ m_nu rtol = 1e-10
+    end
+    # N2 N2 -> N1 N1 from the equal-mass tables (ln_conversion_shift) vs the delta = 1e-4 tables
+    dir = joinpath(@__DIR__, "..", "tmp", "rate_tables")
+    t0 = RateInterpolants(load_rate_tables(rate_table_path(dir)))
+    t4 = RateInterpolants(load_rate_tables(rate_table_path(dir; delta=1e-4)))
+    m = 1.057e-5
+    r = reaction(:N1N1_N2N2)
+    l0, l4 = (ln_norm(r, table_params(t, m, 1e-3, 3.6e-15), t.p_ref) for t in (t0, t4))
+    a, b = t0.dark[:N1N1_N2N2], t4.dark[:N1N1_N2N2]
+    err = maximum(range(t0.lnxN..., length=200)) do lx
+        T = m / exp(lx)
+        abs(b.lnRr(lx) + l4 - (a.lnRr(lx) + l0 + ln_conversion_shift(m, m * (1 + 1e-4), T)))
+    end
+    println("  max |ln R_r(tables, delta = 1e-4) - ln R_r(equal-mass tables + shift)| = $err")
+    @test err < 0.01
+end

@@ -2,7 +2,7 @@
 Production figures in the style of the draft's Fig. (evolution), from the benchmark CSVs of
 src/run_benchmarks.jl: one PDF per point, for either solver.
 
-    python plot/production.py [csv | dir] [fig_dir] [--min 1e-2]
+    python plot/production.py [csv | dir] [fig_dir] [--min 1e-2] [--mA 2.5]
 
 Defaults: tmp/benchmarks -> figures/production. Against x = m_N/T_nu:
 - top left: m_N n/s [keV] of each species, counting the N it decays into (A' -> 2 N,
@@ -135,7 +135,7 @@ def sci_tex(v):
     return rf"{m}\times 10^{{{int(e)}}}" if m != "1.00" else rf"10^{{{int(e)}}}"
 
 
-def plot(path, fig_dir, min_moved):
+def plot(path, fig_dir, min_moved, mA=2.5):
     title = open(path).readline().lstrip("# ").strip()
     solver = title.split()[0]
     m_keV = float(re.search(r"m_N = ([\d.eE+-]+) keV", title).group(1))
@@ -223,7 +223,7 @@ def plot(path, fig_dir, min_moved):
     for a in (a2, a3):
         a.set_xlim(*xlim)
 
-    fig.suptitle(rf"$m_N = {m_keV:g}\,\mathrm{{keV}},\ m_{{A'}} = 2.5\, m_N,\ m_\phi = {mphi:g}\, m_N,\ "
+    fig.suptitle(rf"$m_N = {m_keV:g}\,\mathrm{{keV}},\ m_{{A'}} = {mA:g}\, m_N,\ m_\phi = {mphi:g}\, m_N,\ "
                  rf"g = {sci_tex(g)},\ \sin^2 2\theta = {sci_tex(s2)}$", y=0.99)
     fig.tight_layout()
     place_labels(a1, a1_curves)
@@ -241,8 +241,13 @@ if __name__ == "__main__":
         i = args.index("--min")
         min_moved = float(args[i + 1])
         del args[i:i + 2]
+    mA = 2.5
+    if "--mA" in args:
+        i = args.index("--mA")
+        mA = float(args[i + 1])
+        del args[i:i + 2]
     src = args[0] if len(args) > 0 else "tmp/benchmarks"
     fig_dir = args[1] if len(args) > 1 else "figures/production"
     os.makedirs(fig_dir, exist_ok=True)
     for p in sorted(glob.glob(os.path.join(src, "*.csv"))) if os.path.isdir(src) else [src]:
-        plot(p, fig_dir, min_moved)
+        plot(p, fig_dir, min_moved, mA)

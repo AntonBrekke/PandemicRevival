@@ -13,8 +13,10 @@ Output (default tmp/combined_scan):
 - roots.csv: m_N,y,sin2_2theta,omega_h2,solver (network / fluid / failed);
 - lyman_alpha.csv: m_N,y,sin2_2theta,lambda_fs_Mpc,lambda_fs_kd_Mpc,r_s_Mpc,f_N2,delta_m,
   from the solvers' lyman_alpha.csv (src/run_*_lyman_alpha.jl), with the N1-N2 mass
-  splitting delta_m = sin^2(theta_1) m_N/m_nu, or the constant `delta` of tables with an N1-N2
-  splitting (rate_params; src/run_build_rate_tables.jl --delta).
+  splitting delta_m: their column `delta` where they have it (the splitting at fixed m_nu that
+  the post-processing used, `mnu_splitting`), else the constant `delta` of tables with an N1-N2
+  splitting (rate_params; src/run_build_rate_tables.jl --delta), else sin^2(theta_1) m_N/m_nu at
+  m_nu = 0.1 eV.
 """
 import sys
 import os
@@ -26,7 +28,7 @@ y_switch = float(sys.argv[2]) if len(sys.argv) > 2 else 1e-3
 root = sys.argv[3] if len(sys.argv) > 3 else "tmp"
 delta = float(sys.argv[4]) if len(sys.argv) > 4 else 0.0
 os.makedirs(out, exist_ok=True)
-M_NU = 0.1e-9   # GeV, m_nu of rate_params (src/thermal_rates.jl)
+M_NU = 0.1e-9   # GeV, M_NU of src/thermal_rates.jl
 
 key = lambda m, y: (round(float(m) * 1e6, 3), round(math.log10(float(y)), 3))
 
@@ -55,8 +57,8 @@ for k in sorted(set(net) | set(fl)):
     roots.append((m, y, s2, om, solver))
     if l is not None:
         th1 = math.sin(math.asin(math.sqrt(float(s2))) / 2)
-        lya.append((m, y, s2, l["lambda_fs_Mpc"], l["lambda_fs_kd_Mpc"], l["r_s_Mpc"], l["f_N2"],
-                    f"{delta if delta > 0 else th1**2 * float(m) / M_NU:.6g}"))
+        d = float(l["delta"]) if "delta" in l else delta if delta > 0 else th1**2 * float(m) / M_NU
+        lya.append((m, y, s2, l["lambda_fs_Mpc"], l["lambda_fs_kd_Mpc"], l["r_s_Mpc"], l["f_N2"], f"{d:.6g}"))
 
 with open(os.path.join(out, "roots.csv"), "w") as io:
     io.write("m_N,y,sin2_2theta,omega_h2,solver\n")

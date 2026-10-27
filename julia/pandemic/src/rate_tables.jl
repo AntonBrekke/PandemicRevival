@@ -575,10 +575,14 @@ mass_ratios(itp::RateInterpolants) = (itp.p_ref.mA / itp.p_ref.m1, itp.p_ref.mph
 """N1-N2 splitting delta of a table set (0 for tables built before it existed)."""
 table_delta(itp::RateInterpolants) = itp.delta
 
-"""rate_params at (m_N, g, sin^2 2theta) with the mass ratios and splitting of the table set `itp`."""
-function table_params(itp::RateInterpolants, m_N, g, sin2_2theta)
+"""rate_params at (m_N, g, sin^2 2theta) with the mass ratios and splitting of the table set `itp`;
+m_nu [GeV] (couplings at equal masses, e.g. the phi N1 N1 Yukawa ∝ g sin^2 theta_1/m_nu) only for
+equal-mass tables, where a splitting does not fix it."""
+function table_params(itp::RateInterpolants, m_N, g, sin2_2theta; m_nu=M_NU)
     rA, rphi = mass_ratios(itp)
-    return rate_params(m_N, g, sin2_2theta; mA_over_mN=rA, mphi_over_mN=rphi, delta=table_delta(itp))
+    d = table_delta(itp)
+    return rate_params(m_N, g, sin2_2theta; mA_over_mN=rA, mphi_over_mN=rphi, delta=d,
+                       m_nu=(d > 0 ? nothing : m_nu))
 end
 
 """ln of the rate and energy normalisation of every reaction at parameters `p` (see `ln_norm`)."""

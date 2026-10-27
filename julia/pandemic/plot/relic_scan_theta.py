@@ -7,7 +7,9 @@ for which Omega h^2 = 0.12, from a scan directory written by plot/combined_scan_
 labelled on the plot. The X-ray region is one line: the minimum over the current limits
 (PandemicRevival/xray_constraints/plot_xray.py), rescaled by the N1 fraction of the dark matter
 at each root (`scaled_xray_limit`), since only N1 decays to nu gamma. It is drawn over the
-constraint bounds below; projected sensitivities are left out.
+constraint bounds below. Projected sensitivities (eROSITA, Athena, eXTP, rescaled the same way)
+only with --xray-proj, which writes <out>_xproj.pdf; --bp marks benchmark points; --mA sets
+m_A'/m_N (sigma/m and the label) for scans other than 2.5.
 
 The roots are those of the freeze-in branch (the root searches only follow it). The
 lines are monotone (PCHIP) interpolations in log-log between the scanned masses and
@@ -61,7 +63,14 @@ XRAY_DIR = os.path.join(ROOT, "..", "..", "xray_constraints")
 DW_DIR = os.path.join(ROOT, "data", "dw")
 
 OMEGA_TARGET = 0.12
-M_A_OVER_M_N = 2.5
+M_A_OVER_M_N = 2.5   # default of --mA
+
+# Projected X-ray sensitivities (--xray-proj), as in Fig. 3 of 2206.10630: file in XRAY_DIR: label
+XRAY_PROJECTIONS = {
+    "eROSITA_projection_2103.13241.dat": "eROSITA",
+    "Athena_projection_2103.13242.dat": "Athena",
+    "eXTP_projection_2001.07014.dat": "eXTP",
+}
 
 # The abundance the digitized Dodelson-Widrow curves of hep-ph/0612182 Fig. 5
 # were drawn for, the same for the central line and both band edges. Combining
@@ -125,6 +134,22 @@ def parse_args():
         "--all-points",
         action="store_true",
         help="mark every scanned root, all y, and write <out>_debug_all.pdf"
+    )
+    p.add_argument(
+        "--mA",
+        type=float,
+        default=M_A_OVER_M_N,
+        help="m_A'/m_N of the scan (sigma/m and the label; default 2.5)"
+    )
+    p.add_argument(
+        "--xray-proj",
+        action="store_true",
+        help="draw the projected X-ray reach (XRAY_PROJECTIONS) and write <out>_xproj.pdf"
+    )
+    p.add_argument(
+        "--bp",
+        default=None,
+        help="CSV (name,m_keV,sin2_2theta,...) of benchmark points to mark as stars"
     )
     return p.parse_args()
 
@@ -346,15 +371,16 @@ def f_N1_field(roots, mix):
     return f
 
 
-def scaled_xray_limit(roots, mix):
+def scaled_xray_limit(roots, mix, limit=None):
     """
     The X-ray boundary in the relic plane. Only N1 mixes with nu and decays to nu gamma, so a root
     is excluded if f_N1 sin^2 2theta exceeds the limit L(m), which assumes that all the DM decays.
     f_N1 depends on the root (from 1 for DW-produced N1 at small g to 1/2 where N1 and N2 are in
     chemical equilibrium), so the boundary at each mass is the s with s f_N1(m, s) = L(m): s lies in
-    [L, 2L] and s f_N1(m, s) grows with s, found by bisection in log s.
+    [L, 2L] and s f_N1(m, s) grows with s, found by bisection in log s. `limit` = (m [keV], L)
+    replaces the combined current limit (e.g. a projection).
     """
-    m, L = load_xray_limit()
+    m, L = load_xray_limit() if limit is None else limit
     f = f_N1_field(roots, mix)
     s_b = np.empty_like(L)
     for i in range(len(m)):
@@ -367,6 +393,34 @@ def scaled_xray_limit(roots, mix):
                 lo = mid
         s_b[i] = np.exp((lo + hi) / 2)
     return m, s_b
+
+
+def load_xray_projections():
+    """{label: (m_N [keV], sin^2 2theta)} of the projected sensitivities (all DM decaying)."""
+    out = {}
+    for f, label in XRAY_PROJECTIONS.items():
+        d = np.loadtxt(os.path.join(XRAY_DIR, f), comments="#")
+        out[label] = (1e6 * d[:, 0], d[:, 1])
+    return out
+
+
+def plot_xray_projections(ax, roots, mix):
+    """The projected reach, rescaled by f_N1 as the current limit (`scaled_xray_limit`)."""
+    for (label, lim), ls in zip(load_xray_projections().items(), ("--", "-.", ":")):
+        m, s = scaled_xray_limit(roots, mix, lim)
+        ax.plot(m, s, color="black", lw=1.0, ls=ls, zorder=-2, label=label)
+    ax.legend(loc="lower left", fontsize=7, frameon=True, framealpha=0.8, edgecolor="0.8",
+              title="projected X-ray reach", title_fontsize=7)
+
+
+def plot_benchmarks(ax, path):
+    """Red stars at the benchmark points of `path` (CSV: name, m_keV, sin2_2theta, ...)."""
+    import csv
+    for r in csv.DictReader(open(path)):
+        m, s = float(r["m_keV"]), float(r["sin2_2theta"])
+        ax.plot(m, s, marker="*", ms=9, color="red", mec="darkred", mew=0.5, zorder=4)
+        ax.annotate(r["name"], (m, s), xytext=(4, 3), textcoords="offset points", fontsize=7,
+                    color="darkred", zorder=4)
 
 
 def plot_xrays(ax, m, s):
@@ -495,8 +549,9 @@ def main():
     args = parse_args()
     roots = load_roots(args.scan_dir)
     lam, r_s, mix = load_lyman_alpha(args.scan_dir)
-    sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], M_A_OVER_M_N, *mix[k]) for k in roots if k in mix}
-    out = args.out + ("_debug_all" if args.all_points else "_debug" if args.debug else "")
+    sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], args.mA, *mix[k]) for k in roots if k in mix}
+    out = args.out + ("_debug_all" if args.all_points else "_debug" if args.debug else
+                      "_xproj" if args.xray_proj else "")
 
     set_style()
     fig = plt.figure(figsize=get_figsize(COLUMNWIDTH, wf=1.0, hf=0.9), dpi=150)
@@ -538,6 +593,10 @@ def main():
     plot_contours(ax, roots, excluded, args.debug and not args.all_points)
     if args.all_points:
         plot_all_points(fig, ax, roots, excluded)
+    if args.xray_proj:
+        plot_xray_projections(ax, roots, mix)
+    if args.bp:
+        plot_benchmarks(ax, args.bp)
 
     ax.set_xscale("log")
     ax.set_yscale("log")
@@ -563,7 +622,7 @@ def main():
     )
     ax.text(
         0.97, 0.96, 
-        rf"$m_{{A'}} = {M_A_OVER_M_N}\,m_{{N_1}}$",
+        rf"$m_{{A'}} = {args.mA:g}\,m_{{N_1}}$",
         transform=ax.transAxes,
         ha="right", va="top", bbox=props
     )

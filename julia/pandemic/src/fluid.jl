@@ -97,17 +97,19 @@ mutable struct FluidSolver{FdX, FEnt, FH}
     norms::Dict{Symbol,Tuple{Float64,Float64}}
     # factor on the portal 2 -> 2 table rates (1: as tabulated)
     portal_scale::Float64
+    # light-neutrino mass of the couplings (`table_params`; equal-mass tables only)
+    m_nu::Float64
 end
 
 """
-    FluidSolver(m_N, tT_rel, itp; portal_scale=1)
+    FluidSolver(m_N, tT_rel, itp; portal_scale=1, m_nu=M_NU)
 
 `itp` = RateInterpolants of the tables; the mass ratios m_A'/m_N, m_phi/m_N are theirs. Needs
 m_phi > 2 m_A': mu_phi = 2 mu_A' holds only while phi <-> A'A' is open (and fast). The couplings
-are set through `pan.mp = ModelParams{Float64}(g, theta_1)`.
+are set through `pan.mp = ModelParams{Float64}(g, theta_1)`, with m_nu [GeV] (`table_params`).
 """
 function FluidSolver(m_N::Float64, tT_rel::TimeTempRelation{Float64}, itp::RateInterpolants;
-                     portal_scale=1.0, T_ratio_min=1e-6, T_ratio_max=1e3)
+                     portal_scale=1.0, m_nu=M_NU, T_ratio_min=1e-6, T_ratio_max=1e3)
     mA_over_mN, mphi_over_mN = mass_ratios(itp)
     N1 = Particle{Float64}(m_N, 1, dof=2)
     N2 = Particle{Float64}(m_N * (1 + table_delta(itp)), 1, dof=2)
@@ -131,7 +133,8 @@ function FluidSolver(m_N::Float64, tT_rel::TimeTempRelation{Float64}, itp::RateI
     H_i = z_interpolation(z_grid, tT_rel.hubble_grid)
     return FluidSolver{typeof(dx_i),typeof(ent_i),typeof(H_i)}(
         ModelParams{Float64}(1e-3, 1e-8), N1, N2, A, nu, phi, T_ratio_min, T_ratio_max, Inf,
-        dx_i, ent_i, H_i, itp, reactions, (NaN, NaN), nothing, Dict{Symbol,Tuple{Float64,Float64}}(), portal_scale)
+        dx_i, ent_i, H_i, itp, reactions, (NaN, NaN), nothing, Dict{Symbol,Tuple{Float64,Float64}}(), portal_scale,
+        m_nu)
 end
 
 """rate_params and table normalisations for the current pan.mp (cached)."""
@@ -139,7 +142,7 @@ function fluid_rates!(pan::FluidSolver)
     key = (pan.mp.y, pan.mp.theta)
     if key != pan.rates_key
         s2 = sin(2 * pan.mp.theta)^2
-        pan.p_rates = table_params(pan.itp, pan.N1.m, pan.mp.y, s2)
+        pan.p_rates = table_params(pan.itp, pan.N1.m, pan.mp.y, s2; m_nu=pan.m_nu)
         pan.norms = rate_norms(pan.itp, pan.p_rates)
         pan.rates_key = key
     end

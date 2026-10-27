@@ -5,8 +5,10 @@ y >= ymin, starting from the seed's sin^2 2theta. Distributed over worker proces
 
     julia --project=. src/run_fluid_scan.jl [--nproc 8] [--ymin 1e-3] [--out tmp/fluid_scan]
         [--points tmp/network_scan/network_roots.csv] [--only m_keV:y,...] [--portal-scale 1.0]
-        [--tables tmp/rate_tables/rate_tables_mA2.5_mphi100.0.jls]
+        [--tables tmp/rate_tables/rate_tables_mA2.5_mphi100.0.jls] [--min-step 0.3]
 
+--min-step: smallest step in ln sin^2 2theta before the root is bracketed (`fluid_root`);
+smaller than the default 0.3 for seeds that are already close (e.g. 0.03 for seeds within ~5%).
 --points: CSV with columns m_N,y,s2_reduced,omega_reduced,s2_network,..,status (the
 network scan's output, whose s2_reduced is the reduced-solver root; plot/fine_g_seeds.py
 writes seeds in the same format). Output: <out>/fluid_roots.csv, one row per point: the
@@ -26,7 +28,7 @@ rate_table_path_default() = joinpath(@__DIR__, "..", "tmp", "rate_tables", "rate
 
 function parse_opts(args)
     o = Dict("nproc" => "8", "ymin" => "1e-3", "out" => joinpath(@__DIR__, "..", "tmp", "fluid_scan"),
-             "portal-scale" => "1.0", "only" => "",
+             "portal-scale" => "1.0", "only" => "", "min-step" => "0.3",
              "tables" => rate_table_path_default(),
              "points" => joinpath(@__DIR__, "..", "tmp", "network_scan", "network_roots.csv"))
     i = 1
@@ -49,6 +51,7 @@ addprocs(parse(Int, OPTS["nproc"]); exeflags="--project=$(Base.active_project())
     const ITP = RateInterpolants(load_rate_tables(TABLES))
     const PANS = Dict{Float64,Any}()
     const PORTAL_SCALE = Ref(1.0)
+    const MIN_STEP = Ref(0.3)
     fluid_pan(m) = get!(() -> FluidSolver(m, TT_REL, ITP; portal_scale=PORTAL_SCALE[]), PANS, m)
 
     """Diagnostics of a solution: max T_N/T_nu, min over x <= 3 of Gamma(A'A' <-> NN per N at mu = 0)/H (see the header)."""
@@ -113,9 +116,9 @@ addprocs(parse(Int, OPTS["nproc"]); exeflags="--project=$(Base.active_project())
                     (lo[1] + hi[1]) / 2
             elseif isfinite(hi[1])
                 # d ln Omega / d ln s2 ~ 5 on the freeze-in branch (a failed solve: the largest step)
-                l = hi[1] - clamp(hi[2] / 5, 0.3, 3.0)
+                l = hi[1] - clamp(hi[2] / 5, MIN_STEP[], 3.0)
             else
-                l = lo[1] + clamp(-lo[2] / 5, 0.3, 3.0)
+                l = lo[1] + clamp(-lo[2] / 5, MIN_STEP[], 3.0)
             end
         end
         return exp(l), NaN, :failed, nsolve, nothing
@@ -154,6 +157,8 @@ function main()
     end
     ps = parse(Float64, OPTS["portal-scale"])
     @everywhere PORTAL_SCALE[] = $ps
+    mstep = parse(Float64, OPTS["min-step"])
+    @everywhere MIN_STEP[] = $mstep
     println(length(pts), " points on ", nworkers(), " workers"); flush(stdout)
     header = "m_N,y,s2_reduced,omega_reduced,s2_network,status_network,s2_fluid,omega_fluid,status,n_solves,seconds,TN_Tnu_max,rate_AA_min_over_H"
     partial = joinpath(out, "fluid_roots_partial.csv")

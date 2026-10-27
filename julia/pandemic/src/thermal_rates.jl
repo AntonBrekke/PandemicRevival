@@ -52,6 +52,9 @@ using .TreeAmplitudes: TREE_PROCESSES, msq_bw
 
 kallen(a, b, c) = a^2 + b^2 + c^2 - 2a * b - 2a * c - 2b * c
 
+"""Light-neutrino mass [GeV] of the equal-mass parameters (`rate_params`, delta = 0): 0.1 eV."""
+const M_NU = 1e-10
+
 # --------------------------------------------------------------------------- model
 """
     rate_params(m_N, g, sin2_2theta; delta=0, m_nu, m_0, mphi_over_mN=100.0, mA_over_mN=2.5)
@@ -62,9 +65,9 @@ m_alpha/m_0, m_M = sin(theta_1) m_0 m_D/(sqrt2 m_alpha), mu = m_M/m_0,
 y_+ = sqrt2 m_M/v_phi with v_phi = m_A'/g (draft, benchmark table).
 
 m_N is the mass of N1 (the dark matter), and m_A', m_phi are multiples of it.
-- delta = 0 (default): m_N1 = m_N2 = m_N, m_nu = 0.1 eV, m_0 = 1 TeV, as in the
-  original solver (the splitting sin^2 theta_1 m_N/m_nu that m_nu implies is not
-  carried by the masses).
+- delta = 0 (default): m_N1 = m_N2 = m_N, m_nu = M_NU = 0.1 eV, m_0 = 1 TeV, as in the
+  original solver (the splitting `mnu_splitting` that m_nu implies is not carried by the
+  masses of the solvers; the post-processing takes it per point, lyman_alpha.jl).
 - delta > 0: m_N2 = m_D = (1 + delta) m_N, and m_nu = sin^2 theta_1 m_D/delta (draft eq.
   defdm) so that the couplings match the splitting; m_0 = 10 GeV by default (keeps y_+
   perturbative). m_nu cannot then be given.
@@ -78,7 +81,7 @@ function rate_params(m_N, g, sin2_2theta; delta=0.0, m_nu=nothing, m_0=nothing, 
         m_nu = th1^2 * m_D / delta
     else
         m_0 = something(m_0, 1e3)
-        m_nu = something(m_nu, 1e-10)
+        m_nu = something(m_nu, M_NU)
     end
     m_alpha = sqrt(m_nu * m_0)
     th0 = m_alpha / m_0
@@ -91,6 +94,19 @@ end
 
 """Relative N1-N2 splitting (m_N2 - m_N1)/m_N1 of parameters `p`."""
 splitting(p) = p.m2 / p.m1 - 1
+
+"""
+    mnu_splitting(m_N, sin2_2theta; m_nu=M_NU)
+
+Relative N1-N2 splitting delta at fixed m_nu [GeV]: m_nu = sin^2 theta_1 m_D/delta (draft eq.
+defdm) with m_D = (1 + delta) m_N, i.e. delta = a/(1 - a), a = sin^2 theta_1 m_N/m_nu. With
+m_nu = 0.1 eV it is <= 2.2e-4 at every relic root of the scans (<= 1e-6 for g >= 1e-4).
+"""
+function mnu_splitting(m_N, sin2_2theta; m_nu=M_NU)
+    a = sin(asin(sqrt(sin2_2theta)) / 2)^2 * m_N / m_nu
+    a < 1 || error("mnu_splitting: sin^2 theta_1 m_N/m_nu = $a >= 1")
+    return a / (1 - a)
+end
 
 field_mass(f, p) = f === :N1 ? p.m1 : f === :N2 ? p.m2 : f === :A ? p.mA :
                    f === :phi ? p.mphi : f === :N0 ? p.m0 : f === :nu ? 0.0 : error("field $f")

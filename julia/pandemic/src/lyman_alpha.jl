@@ -127,20 +127,24 @@ function DarkHistory(bg, N1, m_A, g, sol, state; delta=0.0)
 end
 
 """History of a fluid solution (fluid.jl): one T_N and one chemical potential for N1 and N2
-(with a splitting the N2 gap is larger by (m_N2 - m_N1)/T_N)."""
-function DarkHistory(pan::FluidSolver, sol)
+(with a splitting the N2 gap is larger by (m_N2 - m_N1)/T_N). `delta` other than the solver's
+(a per-point splitting on equal-mass tables, `mnu_splitting`) adds (delta m_N - (m_N2 - m_N1))/T_N
+to the N2 gap, which keeps mu_N2 = mu_N1, and is the splitting of Gamma_kd."""
+function DarkHistory(pan::FluidSolver, sol; delta=pan.N2.m / pan.N1.m - 1)
+    dm_extra = delta * pan.N1.m - (pan.N2.m - pan.N1.m)
     function state(u, z)
         T, gap = N_temp_gap(pan, u)
         xi = xi_from_eta(pan, u[4], u[3])
         gA = gap_A_from_eta(u[4])
-        return (T, gap, N2_gap(pan, u), number_density(pan.N1, T, 0.0; gap=gap),
+        return (T, gap, N2_gap(pan, u) + dm_extra / T, number_density(pan.N1, T, 0.0; gap=gap),
                 pressure_dens(pan, T, xi; gap_A=gA), energy_dens(pan, T, xi; gap_A=gA))
     end
-    return DarkHistory(pan, pan.N1, pan.A.m, pan.mp.y, sol, state; delta=pan.N2.m / pan.N1.m - 1)
+    return DarkHistory(pan, pan.N1, pan.A.m, pan.mp.y, sol, state; delta=delta)
 end
 
-"""History of a network solution (network.jl): MB species, separate N1 and N2 densities."""
-function DarkHistory(net::Network, sol)
+"""History of a network solution (network.jl): MB species, separate N1 and N2 densities.
+`delta` (default the solver's) is the splitting of Gamma_kd; the densities are the solver's."""
+function DarkHistory(net::Network, sol; delta=splitting(net.p))
     function state(u, z)
         n, kappa = state_densities(net, u, z)
         T = dark_temperature(net, n, kappa)
@@ -148,7 +152,7 @@ function DarkHistory(net::Network, sol)
         return (T, gap(1), gap(2), n[1], sum(n) * T, sum(net.masses[k] * n[k] for k in 1:NSPECIES) + kappa)
     end
     return DarkHistory(net, Particle{Float64}(net.p.m1, 0, dof=2), net.masses[3], net.p.g, sol, state;
-                       delta=splitting(net.p))
+                       delta=delta)
 end
 
 """(T, gap1, gap2, n1) at z: from the solution, then non-relativistic with conserved number
@@ -159,6 +163,19 @@ function dark_state(h::DarkHistory, z)
     r = h.a_f / scale_factor_z(h.bg, z)
     T, g1, g2, n1 = h.fin
     return (T * r^2, g1, g2, n1 * r^3)
+end
+
+"""
+ln R_r(m2)/R_r(m2 = m1) of N2 N2 -> N1 N1 (the table rate per (n/nh)^2) at T for a splitting
+m2 - m1 << m1, from equal-mass tables: the same matrix element with the s-wave threshold factor
+<p_f/p_i> = u e^u K_1(u) (u = (m2 - m1)/T; the reaction releases 2(m2 - m1)), i.e. 1 + u for
+u << 1 and sqrt(pi u/2) for u >> 1. N1 N1 -> N2 N2 then follows from detailed balance,
+R_f = R_r e^(-2u), as in tables with a splitting. Reproduces the delta = 1e-4 tables to 4e-4
+in ln R over their whole grid (u <= 1e4; test_lyman_alpha.jl).
+"""
+function ln_conversion_shift(m1, m2, T)
+    u = (m2 - m1) / T
+    return 2 * log(n_scaled_safe(m2, 2, T) / n_scaled_safe(m1, 2, T)) + (u < 1e-8 ? u : log(u * besselkx_safe(1, u)))
 end
 
 """
@@ -188,6 +205,9 @@ Integrated to z_hi. Returns (history, f_N2, x where lambda last exceeds H; NaN i
 function with_conversions(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_at_end, z_hi, dz=0.02)
     m1 = h.N1.m
     dm = m2 - m1
+    # a splitting other than the tables' (per point at fixed m_nu, on equal-mass tables)
+    per_point = !isapprox(dm / m1, table_delta(itp); rtol=1e-6, atol=1e-14)
+    per_point && table_delta(itp) > 0 && error("with_conversions: splitting $(dm / m1) on tables with delta = $(table_delta(itp))")
     t = itp.dark[:N1N1_N2N2]
     lnR = ln_norm(reaction(:N1N1_N2N2), p, itp.p_ref)
     nh(m, T) = n_scaled_safe(m, 2, T)
@@ -204,7 +224,12 @@ function with_conversions(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_a
         n1 = N / (1 + rr)
         lx = log(m1 / T)
         lx > itp.lnxN[2] && return 0.0, 0.0
-        return exp(t.lnRf(lx) + lnR) * n1 / nh(m1, T)^2, exp(t.lnRr(lx) + lnR) * rr^2 * n1 / nh(m2, T)^2
+        lnRf, lnRr = t.lnRf(lx) + lnR, t.lnRr(lx) + lnR
+        if per_point
+            lnRr += ln_conversion_shift(m1, m2, T)
+            lnRf = lnRr - 2dm / T
+        end
+        return exp(lnRf) * n1 / nh(m1, T)^2, exp(lnRr) * rr^2 * n1 / nh(m2, T)^2
     end
     # d ln r/dz without dividing by a vanishing r
     function dlnr(z, T, N, l)
@@ -365,52 +390,67 @@ end
 
 # --------------------------------------------------------------------------- per relic root
 """
-    lyman_alpha_network(itp, tT_rel, m, g, s2)
+Splitting of the post-processing at (m_N, sin^2 2theta): the tables' if they have one, else
+`mnu_splitting` at m_nu [GeV] (the solvers then run with equal masses: at m_nu = 0.1 eV the
+splitting is far too small to change the relic abundance; notes/fixed_mnu.md of the PhD folder,
+test/check_mnu_threshold.jl), or 0 for m_nu = nothing.
+"""
+function postproc_splitting(itp, m, s2, m_nu)
+    table_delta(itp) > 0 && return table_delta(itp)
+    return m_nu === nothing ? 0.0 : mnu_splitting(m, s2; m_nu=m_nu)
+end
+
+"""
+    lyman_alpha_network(itp, tT_rel, m, g, s2; m_nu=nothing)
 
 Network solve at (m_N [GeV], g, sin^2 2theta) and its Lyman-alpha lengths:
-`lyman_alpha_lengths` plus `omega_h2` and `f_N2` = N2/(N1 + N2) today. NaN lengths if the
-solve fails.
+`lyman_alpha_lengths` plus `omega_h2`, `f_N2` = N2/(N1 + N2) today, and the splitting `delta`
+(`postproc_splitting`). NaN lengths if the solve fails.
 """
-function lyman_alpha_network(itp, tT_rel, m, g, s2)
+function lyman_alpha_network(itp, tT_rel, m, g, s2; m_nu=nothing)
     p = table_params(itp, m, g, s2)
     net = Network(itp, p, tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
     # with a splitting the late conversions and their heat are followed by `with_conversions`
     # from x = 100 on, as for the fluid: the network's single dark temperature would give the
     # bulk all of their heat even after kinetic decoupling
-    delta = table_delta(itp)
+    delta = postproc_splitting(itp, m, s2, m_nu)
     sol = solve_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
     sol.retcode == DE.ReturnCode.Success || return failed_lengths()
     n, _ = state_densities(net, sol.u[end], sol.t[end])
-    h = DarkHistory(net, sol)
+    h = DarkHistory(net, sol; delta=delta)
     f2, x_fo = n[2] / (n[1] + n[2]), NaN
-    delta > 0 && ((h, f2, x_fo) = with_conversions(h, itp, p, p.m2; frozen_at_end=true,
+    delta > 0 && ((h, f2, x_fo) = with_conversions(h, itp, p, m * (1 + delta); frozen_at_end=true,
                                                    z_hi=log(m / tT_rel.T_nu_grid[end])))
     return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=network_omega_h2(net, sol.u[end], sol.t[end]),
-            f_N2=f2, x_fo=x_fo)
+            f_N2=f2, x_fo=x_fo, delta=delta)
 end
 
 """As `lyman_alpha_network` for the fluid (`solve_relic`; f_N2 = 1/2 for equal masses; with a
 splitting the late conversions and their heat from `with_conversions`)."""
-function lyman_alpha_fluid(itp, tT_rel, m, g, s2; pan=FluidSolver(m, tT_rel, itp))
+function lyman_alpha_fluid(itp, tT_rel, m, g, s2; pan=FluidSolver(m, tT_rel, itp), m_nu=nothing)
     sol, om, plateau = solve_relic(pan, tT_rel, g, s2)
     plateau || return failed_lengths()
-    h = DarkHistory(pan, sol)
+    delta = postproc_splitting(itp, m, s2, m_nu)
+    h = DarkHistory(pan, sol; delta=delta)
     f2, x_fo = 0.5, NaN
-    table_delta(itp) > 0 && ((h, f2, x_fo) = with_conversions(h, itp, fluid_rates!(pan), pan.N2.m; frozen_at_end=false,
-                                                              z_hi=log(m / tT_rel.T_nu_grid[end])))
-    return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=om, f_N2=f2, x_fo=x_fo)
+    delta > 0 && ((h, f2, x_fo) = with_conversions(h, itp, fluid_rates!(pan), m * (1 + delta); frozen_at_end=false,
+                                                   z_hi=log(m / tT_rel.T_nu_grid[end])))
+    return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=om, f_N2=f2, x_fo=x_fo, delta=delta)
 end
 
 failed_lengths() = (lambda_fs=NaN, x_c=NaN, x_kd=NaN, lambda_fs_pre=NaN, lambda_fs_kd=NaN, r_s=NaN,
-                    coupled=false, omega_h2=NaN, f_N2=NaN, x_fo=NaN)
+                    coupled=false, omega_h2=NaN, f_N2=NaN, x_fo=NaN, delta=NaN)
 
-"""Columns of the Lyman-alpha CSVs; x_fo (freeze-out of N1 N1 <-> N2 N2, `with_conversions`) only for
-tables with a splitting."""
+"""Columns of the Lyman-alpha CSVs; x_fo (freeze-out of N1 N1 <-> N2 N2, `with_conversions`) only
+with a splitting: for tables with one (`delta` > 0), and with `delta` (per point) as well for a
+splitting at fixed m_nu (`per_point`)."""
 const LYMAN_ALPHA_HEADER = "m_N,y,sin2_2theta,omega_h2,lambda_fs_Mpc,x_c,x_kd,lambda_fs_pre_Mpc,lambda_fs_kd_Mpc,r_s_Mpc,coupled,f_N2"
-lyman_alpha_header(delta) = delta > 0 ? LYMAN_ALPHA_HEADER * ",x_fo" : LYMAN_ALPHA_HEADER
+lyman_alpha_header(delta; per_point=false) =
+    per_point ? LYMAN_ALPHA_HEADER * ",x_fo,delta" : delta > 0 ? LYMAN_ALPHA_HEADER * ",x_fo" : LYMAN_ALPHA_HEADER
 
-"""One CSV row of `lyman_alpha_header(delta)`."""
-lyman_alpha_row(m, g, s2, r; delta=0.0) =
+"""One CSV row of `lyman_alpha_header(delta; per_point)`."""
+lyman_alpha_row(m, g, s2, r; delta=0.0, per_point=false) =
     join((@sprintf("%.6g", v) for v in (m, g, s2, r.omega_h2, r.lambda_fs, r.x_c, r.x_kd,
-          r.lambda_fs_pre, r.lambda_fs_kd, r.r_s, Int(r.coupled), r.f_N2, (delta > 0 ? (r.x_fo,) : ())...)), ",")
+          r.lambda_fs_pre, r.lambda_fs_kd, r.r_s, Int(r.coupled), r.f_N2,
+          (per_point ? (r.x_fo, r.delta) : delta > 0 ? (r.x_fo,) : ())...)), ",")

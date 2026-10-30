@@ -13,11 +13,12 @@ nothing at 0.1 eV: N2 is not depleted anywhere). Everything else as the main sca
 - `network_scan{,_fine}/`: roots and `lyman_alpha.csv` (with `x_fo`, `delta`). 483/654 and
   420/420 converged; the others are degenerate or failed at g >~ 3e-3 (fluid domain), except
   75.36 keV at g = 1e-3.
-- `fluid_scan/`: roots (base grid only; 222 converged, 12 bracketed) and `lyman_alpha.csv`.
+- `fluid_scan/`: roots (base grid; 222 converged, 12 bracketed) and `lyman_alpha.csv`.
   `fluid_roots_pass1.csv`: the 6 roots of the first pass (g = 0.1778), merged into fluid_roots.csv.
-  **The fine fluid grid was not run** (out of time); `combined/` therefore has the fine network
-  grid but only the base fluid grid (4 values of g per decade above 1e-3 instead of 8).
-- `combined/`: `plot/combined_scan_dir.py tmp/mA3_scan/combined 1e-3 tmp/mA3_scan`.
+- `fluid_scan_fine/` (2026-10-30, ThinkStation, 12 workers: 127 min + 36 min Lyman-alpha): roots of
+  the fine grid (200 converged, 8 bracketed) and `lyman_alpha.csv`.
+- `combined/`: `plot/combined_scan_dir.py tmp/mA3_scan/combined 1e-3 tmp/mA3_scan`: 852 network and
+  422 fluid roots, 1274 with Lyman-alpha lengths (both grids, 8 values of g per decade throughout).
 - `xray_bps.csv`: benchmark points allowed by every current bound and inside the projected reach of
   Athena/eXTP (`plot/xray_benchmarks.py tmp/mA3_scan/combined ... --mA 3`). Histories in
   `benchmarks_xray/`; standard histories at 10.57 keV in `benchmarks/`.
@@ -41,7 +42,7 @@ nothing at 0.1 eV: N2 is not depleted anywhere). Everything else as the main sca
     python tmp/mA3_scan/rescale_fluid_seeds_g.py tmp/mA3_scan/fluid_scan/fluid_roots_pass1.csv _fine
     ./tmp/mA3_scan/run_mA3_fluid.sh 11    # fluid base grid, Lyman-alpha, figures (fine grid: stopped)
 
-To add the fine fluid grid (~2.5 h + ~1 h Lyman-alpha on the P14s):
+Fine fluid grid (~2 h + ~0.6 h Lyman-alpha on the ThinkStation with 12 workers):
 
     julia --project=. src/run_fluid_scan.jl --nproc 11 --points tmp/mA3_scan/seeds/fluid_points_scaled2_fine.csv \
         --out tmp/mA3_scan/fluid_scan_fine --tables tmp/rate_tables/rate_tables_mA3.0_mphi100.0.jls --min-step 0.03

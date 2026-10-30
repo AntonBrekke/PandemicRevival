@@ -42,61 +42,6 @@ include(joinpath(@__DIR__, "rate_tables.jl"))
 
 const NSPECIES = 4
 
-"""
-DW production history: the fraction F(T) of the final DW yield produced above
-T, from Fig. 3 of hep-ph/0612182 (computed at 10 keV; rescaled to other masses
-with T_dw(m)/T_dw(10 keV), as `O_h2_dw_Tevo`), made monotonic and
-interpolated with a monotone cubic (PCHIP) in ln T so that the source term
-dF/dz is continuous. Each N1 is produced with the DW mean momentum of today,
-`avg_mom_0_dw` (Fig. 8), redshifted back with the entropy scale factor,
-p(z) = p_0 (s(z)/s_0)^(1/3), as the fluid solver's initial condition does.
-(Not r_q 3.15 T_nu: r_q = <q>/<q_active> compares with active neutrinos at late
-times, which the QCD-era entropy release has heated relative to the
-free-streaming N1, by (g_s(T)/g_s,late)^(1/3) ~ 1.7.)
-"""
-struct DWHistory
-    lnT::Vector{Float64}       # ascending, rescaled to 10 keV
-    F::Vector{Float64}
-    dF::Vector{Float64}        # PCHIP slopes dF/dlnT
-    scale::Float64             # T_dw(m)/T_dw(10 keV)
-    Y_final::Float64           # final DW yield n/s
-    p0::Float64                # mean comoving momentum today
-end
-
-function DWHistory(m, Y_final)
-    data = _load_table(joinpath(_DW_DIR, "0612182_dw_fig_3.dat"); skipstart=2)
-    lnT = log.(data[:, 1])
-    F = data[:, 2] ./ data[1, 2]
-    for i in 2:length(F)            # production only adds: F non-increasing in T
-        F[i] = min(F[i], F[i-1])
-    end
-    # Fritsch-Carlson slopes
-    h = diff(lnT)
-    del = diff(F) ./ h
-    d = zeros(length(F))
-    for i in 2:length(F)-1
-        if del[i-1] * del[i] > 0
-            w1, w2 = 2h[i] + h[i-1], h[i] + 2h[i-1]
-            d[i] = (w1 + w2) / (w1 / del[i-1] + w2 / del[i])
-        end
-    end
-    return DWHistory(lnT, F, d, T_d_dw(m) / T_d_dw(1e-5), Y_final, avg_mom_0_dw(m))
-end
-
-"""(F, dF/dln T) of the DW history at plasma temperature T."""
-function dw_fraction(h::DWHistory, T)
-    l = log(T / h.scale)
-    l <= h.lnT[1] && return 1.0, 0.0
-    l >= h.lnT[end] && return 0.0, 0.0
-    i = searchsortedlast(h.lnT, l)
-    dx = h.lnT[i+1] - h.lnT[i]
-    t = (l - h.lnT[i]) / dx
-    h00, h10, h01, h11 = 2t^3 - 3t^2 + 1, t^3 - 2t^2 + t, -2t^3 + 3t^2, t^3 - t^2
-    F = h00 * h.F[i] + h10 * dx * h.dF[i] + h01 * h.F[i+1] + h11 * dx * h.dF[i+1]
-    dF = ((6t^2 - 6t) * h.F[i] + (3t^2 - 4t + 1) * dx * h.dF[i] + (-6t^2 + 6t) * h.F[i+1] + (3t^2 - 2t) * dx * h.dF[i+1]) / dx
-    return F, dF
-end
-
 """Model and background for one network solve."""
 struct Network{FH,FS,FX}
     p::Any                         # rate_params(m_N, g, sin^2 2theta; ...)
@@ -107,7 +52,6 @@ struct Network{FH,FS,FX}
     H_interp_z::FH                 # background interpolants keyed on z
     ent_interp_z::FS
     dx_dt_interp_z::FX
-    dw::Union{Nothing,DWHistory}   # DW production as a source term (nothing: all at T_dw)
     w_phi::Float64                 # N per phi after its decays (`phi_weight`)
     w_phi2::Float64                # of which N2 (`phi_weight`)
 end
@@ -136,7 +80,7 @@ function phi_weight_N2(p)
     return 2w[1] / tot
 end
 
-function Network(itp::RateInterpolants, p, tT_rel::TimeTempRelation; dw=nothing)
+function Network(itp::RateInterpolants, p, tT_rel::TimeTempRelation)
     m = p.m1
     all(isapprox.((p.mA / m, p.mphi / m), mass_ratios(itp); rtol=1e-12)) ||
         error("parameters have m_A'/m_N, m_phi/m_N = $((p.mA / m, p.mphi / m)) but the tables $(mass_ratios(itp)): use table_params")
@@ -148,8 +92,7 @@ function Network(itp::RateInterpolants, p, tT_rel::TimeTempRelation; dw=nothing)
     return Network(p, itp, rate_norms(itp, p), masses, dofs,
                    z_interpolation(z_grid, tT_rel.hubble_grid),
                    z_interpolation(z_grid, tT_rel.ent_grid),
-                   z_interpolation(z_grid, dx_dt_grid_of(m, tT_rel.T_nu_grid, tT_rel.dT_nu_dt_grid)), dw, phi_weight(p),
-                   phi_weight_N2(p))
+                   z_interpolation(z_grid, dx_dt_grid_of(m, tT_rel.T_nu_grid, tT_rel.dT_nu_dt_grid)), phi_weight(p), phi_weight_N2(p))
 end
 
 """
@@ -389,18 +332,6 @@ function network_rhs!(du, u, net::Network, z)
     end
     P = sum(neff) * T_N
     du[5] = xfac * (H * (kappa - 3P) + CK) / kappa
-    if net.dw !== nothing
-        # DW production of N1 (T = T_nu before neutrino decoupling; dln T_nu/dz = -1)
-        _, dF = dw_fraction(net.dw, T_nu)
-        S = -net.dw.Y_final * dF                     # dY_N1/dz
-        if S > 0
-            p = net.dw.p0 * (s / s0)^(1 / 3)
-            Ekin = sqrt(p^2 + net.masses[1]^2) - net.masses[1]
-            du[1] += S * s / (n[1] + n[2])
-            du[2] -= S * s / n[1]
-            du[5] += S * s * Ekin / kappa
-        end
-    end
     return nothing
 end
 
@@ -416,23 +347,10 @@ that their initial d ln n/dz is ~1/dz_seed; N1 and N2 are then rescaled so
 that the number of N after all decays is the DW number. Zero is not representable in log variables,
 and a tiny seed gives rates whose time step is below the resolution of z.
 """
-function network_initial_state(net::Network, dw::DodelsonWidrow, tT_rel::TimeTempRelation; dz_seed=1e-3,
-                               F_start=2e-3)
-    if net.dw === nothing
-        z0 = log(net.p.m1 / tT_rel.T_nu_grid[dw.i_ic])
-        n1 = dw.n_ic
-        rho1 = dw.rho_ic
-    else
-        # start where the DW history has produced F_start of the yield, with that much N1
-        h = net.dw
-        i = findlast(>=(F_start), h.F)
-        T0 = exp(h.lnT[i]) * h.scale
-        z0 = log(net.p.m1 / T0)
-        F0, _ = dw_fraction(h, T0)
-        n1 = F0 * h.Y_final * net.ent_interp_z(z0)
-        p = h.p0 * (net.ent_interp_z(z0) / s0)^(1 / 3)
-        rho1 = n1 * sqrt(p^2 + net.masses[1]^2)
-    end
+function network_initial_state(net::Network, dw::DodelsonWidrow, tT_rel::TimeTempRelation; dz_seed=1e-3)
+    z0 = log(net.p.m1 / tT_rel.T_nu_grid[dw.i_ic])
+    n1 = dw.n_ic
+    rho1 = dw.rho_ic
     s = net.ent_interp_z(z0)
     x0 = exp(z0)
     xfac = x0 / net.dx_dt_interp_z(z0)

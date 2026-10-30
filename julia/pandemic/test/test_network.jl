@@ -57,21 +57,3 @@ end
     end
 end
 
-@testset "DW production history" begin
-    h = DWHistory(1e-5, 1.0)
-    Ts = exp.(range(log(5e-3), log(2.0), length=400))
-    Fs = [dw_fraction(h, T)[1] for T in Ts]
-    @test all(0 .<= Fs .<= 1)
-    @test all(diff(Fs) .<= 1e-12)                     # produced above T: non-increasing in T
-    @test dw_fraction(h, 5e-3)[1] == 1.0 && dw_fraction(h, 2.0)[1] == 0.0
-    @test isapprox(dw_fraction(h, T_d_dw(1e-5))[1], 0.15; atol=0.03)   # ~15% exists at T_dw (10 keV)
-    for T in (0.1, 0.2, 0.3, 0.5)                     # PCHIP derivative vs finite differences
-        e = 1e-6
-        fd = (dw_fraction(h, T * exp(e))[1] - dw_fraction(h, T * exp(-e))[1]) / 2e
-        @test isapprox(dw_fraction(h, T)[2], fd; rtol=1e-4, atol=1e-8)
-    end
-    # production momentum = the fluid solver's initial condition at T_dw
-    dw = DodelsonWidrow{Float64}(1e-5, 1e-7, tT_rel)
-    s_ic = net.ent_interp_z(log(1e-5 / tT_rel.T_nu_grid[dw.i_ic]))
-    @test isapprox(h.p0 * (s_ic / s0)^(1 / 3), dw.rho_ic / dw.n_ic; rtol=1e-10)
-end

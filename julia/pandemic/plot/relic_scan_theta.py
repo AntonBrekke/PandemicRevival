@@ -232,13 +232,19 @@ def place_label(m, s, m_pad=1.03, s_pad=1.6):
     return m, max(s, S_LIM[0] * s_pad), "bottom"
 
 
-def extend_boundary(m_c, s_c):
+def extend_boundary(m_c, s_c, base_dex=0.5):
     """The boundary continued past its end points to beyond the top and bottom
     of the frame, so the shaded region closes on the frame edge instead of on
     the outermost line of constant y that happens to have been scanned.
 
     The continuation is a straight line in (log m_N, log sin^2 2theta) through
-    the two outermost crossings. Where the bound really does run out -- the
+    the outermost crossing and the nearest one at least `base_dex` decades
+    of sin^2 2theta further in (the farthest one if none is). Not through the
+    two outermost ones: at small y the lines all run into the Dodelson-Widrow
+    line and their crossings pile up at nearly the same sin^2 2theta with
+    jittering m_N, so that the direction through two neighbours is noise (the
+    Lyman-alpha boundary was sent off the left edge at the top, leaving the
+    excluded low-mass corner white). Where the bound really does run out -- the
     self-interaction boundary leaves the frame on the left, because sigma/m
     stops excluding anything above m_N = 1 keV once y is small enough -- the
     extrapolation walks off the left edge on its own and nothing extra is
@@ -252,8 +258,18 @@ def extend_boundary(m_c, s_c):
         m = m1 * (m1 / m0)**w
         return float(np.clip(m, M_LIM[0] * 0.01, M_LIM[1] * 100)), s_target
 
-    lo = step(m_c[1], s_c[1], m_c[0], s_c[0], S_LIM[0] * 0.5)
-    hi = step(m_c[-2], s_c[-2], m_c[-1], s_c[-1], S_LIM[1] * 2.0)
+    def inner(order):
+        # index of the crossing that sets the direction at the end order[0]
+        end = order[0]
+        for i in order[1:]:
+            if abs(np.log10(s_c[i] / s_c[end])) >= base_dex:
+                return i
+        return order[-1]
+
+    idx = list(range(len(s_c)))
+    i_lo, i_hi = inner(idx), inner(idx[::-1])
+    lo = step(m_c[i_lo], s_c[i_lo], m_c[0], s_c[0], S_LIM[0] * 0.5)
+    hi = step(m_c[i_hi], s_c[i_hi], m_c[-1], s_c[-1], S_LIM[1] * 2.0)
     return (np.concatenate(([lo[0]], m_c, [hi[0]])),
             np.concatenate(([lo[1]], s_c, [hi[1]])))
 

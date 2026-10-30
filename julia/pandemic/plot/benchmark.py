@@ -20,9 +20,13 @@ Defaults: tmp/benchmarks -> figures/benchmarks. Panels, against x = m_N/T_nu, on
             of a near-cancellation: only its size is meaningful;
    both:    Gamma_kd (thick grey), the momentum exchange that sets the coupled phase
             of the Lyman-alpha lengths.
+With an N1-N2 splitting (`_delta` CSVs): the history continues past the solver's end (x = 100,
+dash-dotted) with the late conversions, up to x = 1e5; the relaxation rate lambda of N2/N1
+through N1 N1 <-> N2 N2 (dotted), whose last crossing of H is x_fo (thin dotted line).
 """
 import sys
 import os
+import re
 import glob
 import numpy as np
 import matplotlib
@@ -132,6 +136,16 @@ def plot(path, fig_dir):
         a4.plot(x, np.where(tot < -FLOOR, -tot * H, np.nan), "k--", lw=1.5)
     a4.plot(x, d["Gamma_kd_H"] * H, color="0.6", lw=4, alpha=0.7, label=r"$\Gamma_\mathrm{kd}$", zorder=1)
     a4.plot(x, H, color="k", lw=3.5, label=r"$H$", zorder=10)
+    split = "conv_H" in d.dtype.names
+    if split:
+        a4.plot(x, np.where(d["conv_H"] > FLOOR, d["conv_H"] * H, np.nan), ":", color=RATE_COLOURS["N1N1_N2N2"],
+                lw=2.2, label=r"$\lambda$: $N_1N_1\leftrightarrow N_2N_2$ relaxation")
+        # the solver's end: after it the late conversions (with_conversions), rates of the solver absent
+        x_fo = re.search(r"x_fo = ([\d.eE+-]+|NaN)", title)
+        for a in (a1, a2, a3, a4):
+            a.axvline(100, color="0.4", ls="-.", lw=0.8)
+            if x_fo and np.isfinite(float(x_fo.group(1))):
+                a.axvline(float(x_fo.group(1)), color=RATE_COLOURS["N1N1_N2N2"], ls=":", lw=1)
     a4.set_yscale("log")
     top = max(np.nanmax(np.abs(d[n]) * H) for n in rate_cols + ["Gamma_kd_H"] + (["net_total"] if solver == "fluid" else []))
     a4.set_ylim(FLOOR * H.min(), 30 * top)

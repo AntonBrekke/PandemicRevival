@@ -24,6 +24,10 @@ Defaults: tmp/benchmarks -> figures/production. Against x = m_N/T_nu:
            plotted: in equilibrium they are residuals of near-cancellations.
   n~ = n_N1 + n_N2 + 2 n_A' + w_phi n_phi is the number of N after all decays. A reaction is
   drawn only if it ever runs: if int (rate/H) d ln x over the history reaches --min.
+With an N1-N2 splitting (`_delta` CSVs, run_benchmarks.jl) the history goes on past the solver's
+end (x = 100) with the late conversions up to x = 1e5, and the right panel also shows (dotted)
+the relaxation rate lambda of N2/N1 through N1 N1 <-> N2 N2: not a rate per DM particle, but
+its crossing of H is the freeze-out of N2/N1.
 The first network point is the seed state (network_initial_state) and is left out: its
 seeds of N2, A' and phi relax within the first step.
 """
@@ -141,7 +145,8 @@ def plot(path, fig_dir, min_moved, mA=2.5):
     m_keV = float(re.search(r"m_N = ([\d.eE+-]+) keV", title).group(1))
     g = float(re.search(r"g = ([\d.eE+-]+)", title).group(1))
     s2 = float(re.search(r"2theta = ([\d.eE+-]+)", title).group(1))
-    mphi = re.search(r"_mphi([\d.]+)\.csv$", path)
+    mphi = re.search(r"_mphi([\d.]+)(_delta[\d.eE+-]+)?\.csv$", path)
+    delta = re.search(r"delta = ([\d.eE+-]+)", title)
     mphi = float(mphi.group(1)) if mphi else 100.0
     d = np.genfromtxt(path, delimiter=",", names=True, skip_header=1, deletechars="")
     om1, om2, omA, omphi, w_phi = omega_parts(d)
@@ -199,13 +204,19 @@ def plot(path, fig_dir, min_moved, mA=2.5):
         name = n.split(":", 1)[1]
         first = next(col for sp, col in FIRST if name.startswith(sp))
         r = d[n] * d[first] / Yt   # over H
-        moved = np.sum(0.5 * (np.abs(r[1:]) + np.abs(r[:-1])) * np.diff(lx))
+        moved = np.nansum(0.5 * (np.abs(r[1:]) + np.abs(r[:-1])) * np.diff(lx))
         if moved < min_moved:
             continue
         c = RATE_COLOURS.get(name, "0.3")
         a3.loglog(x, np.where(r > 0, r * H, np.nan), color=c, ls=RATE_LS.get(name, "-"), zorder=-4)
         curves.append((x, np.abs(r) * H, LABELS.get(name, name), c))
         rmax = max(rmax, np.nanmax(np.abs(r) * H))
+    if "conv_H" in d.dtype.names:
+        lam = np.where(d["conv_H"] > 0, d["conv_H"] * H, np.nan)
+        c = RATE_COLOURS["N1N1_N2N2"]
+        a3.loglog(x, lam, color=c, ls=":", lw=1.5, zorder=-3)
+        curves.append((x, lam, r"$\lambda_{N_2/N_1}$", c))
+        rmax = max(rmax, np.nanmax(lam))
     a3.loglog(x, H, color=C_H, lw=2.0, zorder=0)
     curves.insert(0, (x, H, r"$H$", C_H))
     rlo, rhi = 1e-2 * H.min(), 30 * rmax
@@ -224,7 +235,8 @@ def plot(path, fig_dir, min_moved, mA=2.5):
         a.set_xlim(*xlim)
 
     fig.suptitle(rf"$m_N = {m_keV:g}\,\mathrm{{keV}},\ m_{{A'}} = {mA:g}\, m_N,\ m_\phi = {mphi:g}\, m_N,\ "
-                 rf"g = {sci_tex(g)},\ \sin^2 2\theta = {sci_tex(s2)}$", y=0.99)
+                 rf"g = {sci_tex(g)},\ \sin^2 2\theta = {sci_tex(s2)}"
+                 + (rf",\ \delta = {sci_tex(float(delta.group(1)))}" if delta else "") + "$", y=0.99)
     fig.tight_layout()
     place_labels(a1, a1_curves)
     place_labels(a3, curves)

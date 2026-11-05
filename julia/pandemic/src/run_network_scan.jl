@@ -2,7 +2,11 @@
 Relic roots of the species-resolved network at every (m_N, y) of a set of seed roots,
 starting from the seed's sin^2 2theta. Threaded over points.
 
-    julia --project=. -t 8 src/run_network_scan.jl [tables.jls] [out_dir] [seeds.csv]
+    julia --project=. -t 8 src/run_network_scan.jl [tables.jls] [out_dir] [seeds.csv] [--full]
+
+The solver is the reduced network (network_reduced.jl, A' and phi eliminated), or the full
+network (network.jl) with --full or where the tables have phi -> A'A' closed (m_phi < 2 m_A'),
+which the reduced network cannot describe (`network_solver`).
 
 Default seeds: the roots of the original reduced-solver scan, stored in
 tmp/reduced_roots (one m_N_<keV>keV.csv per mass: m_N,y,sin2_2theta,omega_h2,...;
@@ -16,7 +20,7 @@ in ln sin^2 2theta; degenerate = the dark sector became degenerate at the
 seed and the MB network stopped; failed) and the number of solves.
 """
 
-include(joinpath(@__DIR__, "network.jl"))
+include(joinpath(@__DIR__, "network_reduced.jl"))
 using Printf
 
 const SCAN_DIR = joinpath(@__DIR__, "..", "tmp", "reduced_roots")
@@ -47,6 +51,19 @@ function solve_omega(itp, tT_rel, m, g, s2)
     return NaN, sol.retcode == DE.ReturnCode.Terminated ? :degenerate : :failed
 end
 
+"""As `solve_omega` with A' and phi eliminated (network_reduced.jl)."""
+function solve_omega_reduced(itp, tT_rel, m, g, s2)
+    net = Network(itp, table_params(itp, m, g, s2), tT_rel)
+    dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
+    sol = try
+        solve_reduced_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
+    catch e
+        return NaN, :failed
+    end
+    sol.retcode == DE.ReturnCode.Success && return reduced_omega_h2(net, sol.u[end], sol.t[end]), :ok
+    return NaN, sol.retcode == DE.ReturnCode.Terminated ? :degenerate : :failed
+end
+
 """
 Root of ln(Omega/0.12) in ln sin^2 2theta from the seed s2_0: secant steps (at most a factor
 e^0.5) until the root is bracketed, then safeguarded false position, or bisection when the upper
@@ -59,14 +76,14 @@ returned with status :bracketed once the bracket is narrower than 1e-6 in ln sin
 :degenerate (:failed) if the upper end of that bracket is a degenerate (failed) solve, i.e. the
 root lies where the network does not apply. Returns (s2, Omega, status, number of solves).
 """
-function network_root(itp, tT_rel, m, g, s2_0; tol=1e-3, maxit=30)
+function network_root(itp, tT_rel, m, g, s2_0; tol=1e-3, maxit=30, solve=solve_omega)
     lnf(om) = log(om / omega_d0)
     lo = (-Inf, -Inf, NaN, :ok)       # (ln s2, f, Omega, status) with f < 0
     hi = (Inf, Inf, NaN, :ok)         # f > 0, or a degenerate / failed solve (f = Inf)
     l, lp, fp = log(s2_0), NaN, NaN
     nbad = 0
     for nsolve in 1:maxit+1
-        om, st = solve_omega(itp, tT_rel, m, g, exp(l))
+        om, st = solve(itp, tT_rel, m, g, exp(l))
         nbad = st === :ok ? 0 : nbad + 1
         nbad >= 6 && return exp(l), NaN, st, nsolve
         f = st === :ok ? lnf(om) : Inf
@@ -92,11 +109,25 @@ function network_root(itp, tT_rel, m, g, s2_0; tol=1e-3, maxit=30)
     return exp(l), NaN, :failed, maxit + 1
 end
 
+"""
+:reduced, or :full with `full` or where the tables have a decay closed that the reduced network
+eliminates (`reduced_applies`).
+"""
+function network_solver(itp; full=false)
+    full && return :full
+    reduced_applies(table_params(itp, 1e-5, 1e-4, 1e-12)) && return :reduced
+    println("phi -> A'A' (or A' -> N1 N2) closed in these tables: full network")
+    return :full
+end
+
 function main(args)
+    full = "--full" in args
+    args = filter(a -> !(a in ("--full", "--reduced")), args)
     path = length(args) > 0 ? args[1] : rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))
     out_dir = length(args) > 1 ? args[2] : joinpath(@__DIR__, "..", "tmp", "network_scan")
     mkpath(out_dir)
     itp = RateInterpolants(load_rate_tables(path))
+    solve = network_solver(itp; full=full) === :reduced ? solve_omega_reduced : solve_omega
     tT_rel = TimeTempRelation{Float64}()
     pts = length(args) > 2 ? seed_roots([args[3]]) : seed_roots()
     # cheap points first is irrelevant; interleave masses so progress is representative
@@ -106,13 +137,14 @@ function main(args)
         n = parse(Int, ENV["NETWORK_SCAN_LIMIT"])
         pts = pts[round.(Int, range(1, length(pts), length=n))]
     end
-    println(length(pts), " points on ", Threads.nthreads(), " threads"); flush(stdout)
+    println(length(pts), " points on ", Threads.nthreads(), " threads, ",
+            solve === solve_omega_reduced ? "reduced" : "full", " network"); flush(stdout)
     res = Vector{Any}(undef, length(pts))
     done = Threads.Atomic{Int}(0)
     t0 = time()
     Threads.@threads :dynamic for i in eachindex(pts)
         m, y, s2r, omr = pts[i]
-        t = @elapsed (s2n, omn, st, ns) = network_root(itp, tT_rel, m, y, s2r)
+        t = @elapsed (s2n, omn, st, ns) = network_root(itp, tT_rel, m, y, s2r; solve=solve)
         res[i] = (m, y, s2r, omr, s2n, omn, st, ns, t)
         k = Threads.atomic_add!(done, 1) + 1
         k % 20 == 0 && (@printf("%d/%d done, %.1f min\n", k, length(pts), (time() - t0) / 60); flush(stdout))

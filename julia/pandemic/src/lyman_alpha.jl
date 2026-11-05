@@ -36,7 +36,7 @@ c_s^2 = 5T/(3m + 7.5T).
 """
 
 include(joinpath(@__DIR__, "fluid.jl"))
-include(joinpath(@__DIR__, "network.jl"))
+include(joinpath(@__DIR__, "network_reduced.jl"))
 include(joinpath(@__DIR__, "kinetic_decoupling.jl"))
 using Printf
 
@@ -150,6 +150,19 @@ function DarkHistory(net::Network, sol; delta=splitting(net.p))
         T = dark_temperature(net, n, kappa)
         gap(k) = log(n_scaled_safe(net.masses[k], net.dofs[k], T) / n[k])
         return (T, gap(1), gap(2), n[1], sum(n) * T, sum(net.masses[k] * n[k] for k in 1:NSPECIES) + kappa)
+    end
+    return DarkHistory(net, Particle{Float64}(net.p.m1, 0, dof=2), net.masses[3], net.p.g, sol, state;
+                       delta=delta)
+end
+
+"""History of a reduced network solution (network_reduced.jl), as for the network."""
+function reduced_history(net::Network, sol; delta=splitting(net.p))
+    function state(u, z)
+        n1, n2, lnA, lnphi, T = reduced_closure(net, reduced_state(net, u, z)...)
+        n = (n1, n2, exp(lnA), exp(lnphi))
+        gap(k) = log(n_scaled_safe(net.masses[k], net.dofs[k], T) / n[k])
+        rho = sum(n[k] * (net.masses[k] + kinetic_per_particle(net.masses[k], T)) for k in 1:NSPECIES)
+        return (T, gap(1), gap(2), n1, sum(n) * T, rho)
     end
     return DarkHistory(net, Particle{Float64}(net.p.m1, 0, dof=2), net.masses[3], net.p.g, sol, state;
                        delta=delta)
@@ -445,6 +458,23 @@ function lyman_alpha_network(itp, tT_rel, m, g, s2; m_nu=nothing)
     delta > 0 && ((h, f2, x_fo) = with_conversions(h, itp, p, m * (1 + delta); frozen_at_end=true,
                                                    z_hi=log(m / tT_rel.T_nu_grid[end])))
     return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=network_omega_h2(net, sol.u[end], sol.t[end]),
+            f_N2=f2, x_fo=x_fo, delta=delta)
+end
+
+"""As `lyman_alpha_network` with A' and phi eliminated (network_reduced.jl)."""
+function lyman_alpha_reduced(itp, tT_rel, m, g, s2; m_nu=nothing)
+    p = table_params(itp, m, g, s2)
+    net = Network(itp, p, tT_rel)
+    dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
+    delta = postproc_splitting(itp, m, s2, m_nu)
+    sol = solve_reduced_network(net, dw, tT_rel; x_end=100.0, maxiters=20_000)
+    sol.retcode == DE.ReturnCode.Success || return failed_lengths()
+    n = reduced_diagnostics(net, sol.u[end], sol.t[end]).n
+    h = reduced_history(net, sol; delta=delta)
+    f2, x_fo = n[2] / (n[1] + n[2]), NaN
+    delta > 0 && ((h, f2, x_fo) = with_conversions(h, itp, p, m * (1 + delta); frozen_at_end=true,
+                                                   z_hi=log(m / tT_rel.T_nu_grid[end])))
+    return (; lyman_alpha_lengths(h, tT_rel)..., omega_h2=reduced_omega_h2(net, sol.u[end], sol.t[end]),
             f_N2=f2, x_fo=x_fo, delta=delta)
 end
 

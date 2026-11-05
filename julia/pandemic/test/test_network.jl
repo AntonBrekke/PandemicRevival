@@ -57,3 +57,29 @@ end
     end
 end
 
+@testset "QSS species take their number from the N" begin
+    # with A' (phi) eliminated, n_N1 + n_N2 + 2 n_A' + w_phi n_phi changes only through the
+    # reactions that change it: the N pay for what the state of A' (phi) gains
+    z = log(3.0)
+    s = net.ent_interp_z(z)
+    n = (2e-15, 1e-15, 3e-16, 1e-25)
+    kappa = sum(n[k] * kinetic_per_particle(net.masses[k], 0.4m) for k in 1:4)
+    u = state_vector(n, kappa, s)
+    du = zeros(5)
+    for (wA, wphi) in ((1.0, 0.0), (1.0, 1.0), (0.3, 0.7))
+        du .= [0.1, -0.2, 2.0, -3.0, 0.5]
+        du0 = copy(du)
+        reservoir_correction!(du, net, n, kappa, wA, wphi)
+        # change of n_k per unit z (without dilution) is n_k du_k
+        dN(d) = (n[1] + n[2]) * d[1]
+        @test isapprox(dN(du) - dN(du0), -(2wA * n[3] * du0[3] + wphi * net.w_phi * n[4] * du0[4]); rtol=1e-12)
+        # kappa gives up the rest mass left over: m_A' - m_N1 - m_N2 per A', m_phi - w_phi m_N per phi
+        m1, m2, mA, mphi = net.masses
+        dE = (mA - m1 - m2) * wA * n[3] * du0[3] +
+             (mphi - (net.w_phi - net.w_phi2) * m1 - net.w_phi2 * m2) * wphi * n[4] * du0[4]
+        @test isapprox(kappa * (du[5] - du0[5]), -dE; rtol=1e-12)
+        # the N2 share: one per A', w_phi2 per phi
+        d2(d) = (n[1] + n[2]) * (n[2] / (n[1] + n[2])) * (d[1] + n[1] / (n[1] + n[2]) * d[2])
+        @test isapprox(d2(du) - d2(du0), -(wA * n[3] * du0[3] + wphi * net.w_phi2 * n[4] * du0[4]); rtol=1e-10)
+    end
+end

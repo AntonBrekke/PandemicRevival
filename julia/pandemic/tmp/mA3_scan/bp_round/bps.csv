@@ -1,0 +1,3 @@
+name,m_keV,g,sin2_2theta,solver
+BP1,10,2e-4,2.63317e-13,network
+BP2,20,1e-3,5.34841e-15,network

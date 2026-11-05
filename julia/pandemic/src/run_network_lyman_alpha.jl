@@ -1,7 +1,10 @@
 """
 Lyman-alpha lengths at the network's relic roots (lyman_alpha.jl), threaded over roots.
 
-    julia --project=. -t 8 src/run_network_lyman_alpha.jl [network_roots.csv] [out.csv] [tables.jls] [m_nu_eV]
+    julia --project=. -t 8 src/run_network_lyman_alpha.jl [network_roots.csv] [out.csv] [tables.jls] [m_nu_eV] [--full]
+
+The solver is the reduced network (network_reduced.jl), or the full network with --full or where
+the tables have phi -> A'A' closed, as in run_network_scan.jl. Use the one the roots came from.
 
 Defaults: tmp/network_scan/network_roots.csv -> tmp/network_scan/lyman_alpha.csv, one row
 per converged root (`LYMAN_ALPHA_HEADER`), with the m_phi = 100 m_N tables. With equal-mass
@@ -12,11 +15,15 @@ tables the late N1 N1 <-> N2 N2 conversions are followed with the splitting at f
 include(joinpath(@__DIR__, "lyman_alpha.jl"))
 
 function main(args)
+    full = "--full" in args
+    args = filter(a -> !(a in ("--full", "--reduced")), args)
     dir = joinpath(@__DIR__, "..", "tmp", "network_scan")
     roots = length(args) > 0 ? args[1] : joinpath(dir, "network_roots.csv")
     out = length(args) > 1 ? args[2] : joinpath(dir, "lyman_alpha.csv")
     tables = length(args) > 2 ? args[3] : rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))
     itp = RateInterpolants(load_rate_tables(tables))
+    full = full || !reduced_applies(table_params(itp, 1e-5, 1e-4, 1e-12))
+    lengths = full ? lyman_alpha_network : lyman_alpha_reduced
     m_nu = length(args) > 3 ? parse(Float64, args[4]) * 1e-9 : M_NU
     m_nu = (m_nu > 0 && table_delta(itp) == 0) ? m_nu : nothing
     per_point = m_nu !== nothing
@@ -25,7 +32,7 @@ function main(args)
     col(name) = findfirst(==(name), hdr)
     rows = [split(l, ',') for l in readlines(roots)[2:end]]
     rows = filter(c -> c[col("status")] == "converged", rows)
-    println(length(rows), " converged roots on ", Threads.nthreads(), " threads",
+    println(length(rows), " converged roots on ", Threads.nthreads(), " threads, ", full ? "full" : "reduced", " network",
             per_point ? ", splitting at m_nu = $(m_nu * 1e9) eV" : ""); flush(stdout)
     res = Vector{String}(undef, length(rows))
     done = Threads.Atomic{Int}(0)
@@ -33,7 +40,7 @@ function main(args)
     Threads.@threads :dynamic for i in eachindex(rows)
         m, g, s2 = (parse(Float64, rows[i][col(k)]) for k in ("m_N", "y", "s2_network"))
         r = try
-            lyman_alpha_network(itp, tT_rel, m, g, s2; m_nu=m_nu)
+            lengths(itp, tT_rel, m, g, s2; m_nu=m_nu)
         catch e
             @warn "failed at m=$m g=$g" exception = (e, catch_backtrace())
             failed_lengths()

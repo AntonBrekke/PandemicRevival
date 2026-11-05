@@ -16,15 +16,19 @@ positive for m_phi > 2 m_A' whenever the A' gap is: no condensation.
 
 STATE
 =====
-u = [ln Y_n, ln Y_rho, ln x_N, eta] against z = ln(m_N/T_nu), with Y_n = n~/s,
-Y_rho = rho/s^(4/3), x_N = m_N/T_N and e^eta = (m_A' - mu_A')/T_N. The last two are
-algebraic (mass matrix diag(1, 1, 0, 0)): (T_N, mu) such that the equilibrium n~ and rho
-equal the state. n~ = n_N1 + n_N2 + 2 n_A' + 4 n_phi is the number of N after all decays;
+u = [ln Y_n, ln Y_k, ln x_N, eta] against z = ln(m_N/T_nu), with Y_n = n~/s,
+Y_k = kappa~/s^(4/3), kappa~ = rho - m_N1 n~, x_N = m_N/T_N and e^eta = (m_A' - mu_A')/T_N.
+kappa~ rather than rho: non-relativistically rho is nearly all rest mass, and the tolerance
+on ln rho would be as large as the kinetic part that sets T_N (as in network_reduced.jl).
+kappa~ is the kinetic energy plus the rest mass that the decays of A', phi (and, with a
+splitting, N2) will release: it is the kinetic energy once everything has decayed. The last two
+state components are algebraic (mass matrix diag(1, 1, 0, 0)): (T_N, mu) such that the
+equilibrium n~ and kappa~ equal the state. n~ = n_N1 + n_N2 + 2 n_A' + 4 n_phi is the number of N after all decays;
 A' -> N1 N2, phi -> A'A' and N1 N1 <-> N2 N2 do not change it. Per reaction,
 Delta n~ = sum_F w - sum_I w with w = (1, 1, 2, 4) for (N1, N2, A', phi) (0 for nu).
 
     d ln Y_n/dz   = (x/xdot) C_n~ / n~,
-    d ln Y_rho/dz = (x/xdot) [H (rho - 3P) + C_rho] / rho.
+    d ln Y_k/dz = (x/xdot) [H (kappa~ - 3P) + C_rho - m_N1 C_n~] / kappa~.
 
 COLLISION TERMS
 ===============
@@ -196,6 +200,33 @@ function rho_3P(pan::FluidSolver, T_N, xi_N; gap_A)
     return rho_3P_diff(pan.N1, T_N, xi_N) + rho_3P_diff(pan.N2, T_N, xi_N) +
            rho_3P_diff(pan.A, T_N, 2 * xi_N; gap=gap_A) +
            rho_3P_diff(pan.phi, T_N, 4 * xi_N; gap=gap_phi_of(pan, T_N, gap_A))
+end
+
+"""
+kappa~ = rho - m_N1 n~ of the fluid: the kinetic energy of each species (integrated directly,
+`kinetic_density`) and the rest mass each A', phi and N2 has above the N1 it ends as.
+"""
+function kappa_dens(pan::FluidSolver, T_N, xi_N; gap_A)
+    m1 = pan.N1.m
+    gap_phi = gap_phi_of(pan, T_N, gap_A)
+    kin = kinetic_density(pan.N1, T_N, xi_N) + kinetic_density(pan.N2, T_N, xi_N) +
+          kinetic_density(pan.A, T_N, 2 * xi_N; gap=gap_A) + kinetic_density(pan.phi, T_N, 4 * xi_N; gap=gap_phi)
+    dm2 = pan.N2.m - m1
+    return kin + (dm2 == 0 ? 0.0 : dm2 * number_density(pan.N2, T_N, xi_N)) +
+           (pan.A.m - 2m1) * number_density(pan.A, T_N, 2 * xi_N; gap=gap_A) +
+           (pan.phi.m - 4m1) * number_density(pan.phi, T_N, 4 * xi_N; gap=gap_phi)
+end
+
+"""kappa~ - 3 P, from the species' `kinetic_minus_3P` and the rest-mass terms of `kappa_dens`."""
+function kappa_3P(pan::FluidSolver, T_N, xi_N; gap_A)
+    m1 = pan.N1.m
+    gap_phi = gap_phi_of(pan, T_N, gap_A)
+    kin = kinetic_minus_3P(pan.N1, T_N, xi_N) + kinetic_minus_3P(pan.N2, T_N, xi_N) +
+          kinetic_minus_3P(pan.A, T_N, 2 * xi_N; gap=gap_A) + kinetic_minus_3P(pan.phi, T_N, 4 * xi_N; gap=gap_phi)
+    dm2 = pan.N2.m - m1
+    return kin + (dm2 == 0 ? 0.0 : dm2 * number_density(pan.N2, T_N, xi_N)) +
+           (pan.A.m - 2m1) * number_density(pan.A, T_N, 2 * xi_N; gap=gap_A) +
+           (pan.phi.m - 4m1) * number_density(pan.phi, T_N, 4 * xi_N; gap=gap_phi)
 end
 
 """Pressure of the fluid, (rho - (rho - 3P))/3."""
@@ -377,36 +408,37 @@ function fluid_rhs!(du, u, pan::FluidSolver, z)
     ent = pan.ent_interp_z(z)
     dx_dt = pan.dx_dt_interp_z(z)
     n = exp(u[1]) * ent
-    rho = exp(u[2]) * ent^(4 / 3)
+    kappa = exp(u[2]) * ent^(4 / 3)
     T_nu = pan.N1.m / x
     T_N = T_N_from_ln_x_N(pan, u[3])
     xi_N = xi_from_eta(pan, u[4], u[3])
     gap_A = gap_A_from_eta(u[4])
     coll_n, coll_rho = collision_terms(pan, T_nu, T_N, xi_N; gap_A=gap_A)
     du[1] = x * coll_n / (n * dx_dt)
-    du[2] = x * (H * rho_3P(pan, T_N, xi_N; gap_A=gap_A) + coll_rho) / (rho * dx_dt)
+    du[2] = x * (H * kappa_3P(pan, T_N, xi_N; gap_A=gap_A) + coll_rho - pan.N1.m * coll_n) / (kappa * dx_dt)
     du[3] = u[1] - log(num_dens(pan, T_N, xi_N; gap_A=gap_A) / ent)
-    du[4] = u[2] - log(energy_dens(pan, T_N, xi_N; gap_A=gap_A) / ent^(4 / 3))
+    du[4] = u[2] - log(kappa_dens(pan, T_N, xi_N; gap_A=gap_A) / ent^(4 / 3))
     return nothing
 end
 
-"""How far the equilibrium (n~, rho) at u = (ln x_N, eta) is from (n_ic, rho_ic), in logs."""
-function n_rho_root(u, params)
+"""How far the equilibrium (n~, kappa~) at u = (ln x_N, eta) is from (n_ic, kappa_ic), in logs."""
+function n_kappa_root(u, params)
     pan = params.pan
     check_deadline(pan)
     T_N = T_N_from_ln_x_N(pan, u[1])
     xi_N = xi_from_eta(pan, u[2], u[1])
     gap_A = gap_A_from_eta(u[2])
     return [log(num_dens(pan, T_N, xi_N; gap_A=gap_A) / params.n_ic),
-            log(energy_dens(pan, T_N, xi_N; gap_A=gap_A) / params.rho_ic)]
+            log(kappa_dens(pan, T_N, xi_N; gap_A=gap_A) / params.kappa_ic)]
 end
 
 """Thermal start at T_dw with the DW number and energy density."""
 function initial_conditions(tT_rel, dw, pan::FluidSolver)
     z_0 = log(pan.N1.m / tT_rel.T_nu_grid[dw.i_ic])
     ent0 = pan.ent_interp_z(z_0)
-    sol = NLS.solve(NLS.NonlinearProblem(n_rho_root, [z_0, 0.0], (pan=pan, n_ic=dw.n_ic, rho_ic=dw.rho_ic)))
-    return [log(dw.n_ic / ent0), log(dw.rho_ic / ent0^(4 / 3)), sol.u[1], sol.u[2]]
+    kappa_ic = dw.rho_ic - pan.N1.m * dw.n_ic
+    sol = NLS.solve(NLS.NonlinearProblem(n_kappa_root, [z_0, 0.0], (pan=pan, n_ic=dw.n_ic, kappa_ic=kappa_ic)))
+    return [log(dw.n_ic / ent0), log(kappa_ic / ent0^(4 / 3)), sol.u[1], sol.u[2]]
 end
 
 """Solve from T_dw to x_end of `dw`."""

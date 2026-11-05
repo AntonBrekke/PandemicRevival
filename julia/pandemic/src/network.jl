@@ -322,6 +322,8 @@ function network_rhs!(du, u, net::Network, z)
         w > 0 || continue
         du[k] = (1 - w) * du[k] - w * min(lam, LAMBDA_HI) * (u[k] - uq)
     end
+    du[5] = xfac * (H * (kappa - 3sum(neff) * T_N) + CK) / kappa
+    reservoir_correction!(du, net, n, kappa, wA, wphi)
     # N2/N1 ratio: relaxed by the conversions to n_N2/n_N1 = n^_N2/n^_N1 (detailed balance
     # of N1 N1 <-> N2 N2 alone; 1 for equal masses); quasi-static like A' when fast
     lamc = xfac * 2 * (Gcf + Gcr) * (1 / n[1] + 1 / n[2])
@@ -330,8 +332,32 @@ function network_rhs!(du, u, net::Network, z)
         ueq = log(n_scaled_safe(net.masses[2], net.dofs[2], T_N) / n_scaled_safe(net.masses[1], net.dofs[1], T_N))
         du[2] = (1 - w) * du[2] - w * min(lamc, LAMBDA_HI) * (u[2] - ueq)
     end
-    P = sum(neff) * T_N
-    du[5] = xfac * (H * (kappa - 3P) + CK) / kappa
+    return nothing
+end
+
+"""True if phi outlives the Universe (`phi_weight` is then its mass in units of m_N)."""
+phi_stable(net::Network) = net.w_phi2 == 0 && isapprox(net.w_phi, net.masses[4] / net.masses[1]; rtol=1e-12)
+
+"""
+The number and energy that a quasi-static species takes up. At its QSS root C_k = 0, so the
+collision terms do not pay for the change of its own density: as n_q rises at the pandemic
+take-off, A' would fill up without taking anything from the N (2 n_A'/n_N reaches 0.45 at
+189 keV, g = 7.5e-4: Omega h^2 9% low). With weight w, the N give up w times what the state of
+A' (phi) gains, by the N1 and N2 it ends as (A': one each; phi: `w_phi` N of which `w_phi2` N2),
+and kappa the rest mass that this leaves over. Then n_N1 + n_N2 + 2 n_A' + w_phi n_phi is
+conserved by the eliminated reactions, as in network_reduced.jl. A stable phi (DM itself) has no
+such weights and is not corrected.
+"""
+function reservoir_correction!(du, net::Network, n, kappa, wA, wphi)
+    m1, m2, mA, mphi = net.masses
+    for (k, w, a1, a2) in ((3, wA, 1.0, 1.0), (4, wphi, net.w_phi - net.w_phi2, net.w_phi2))
+        (w > 0 && !(k == 4 && phi_stable(net))) || continue
+        dnk = w * n[k] * du[k]                  # (dn_k/dt + 3H n_k) per unit z, of the state
+        dn1, dn2 = a1 * dnk, a2 * dnk
+        du[1] -= (dn1 + dn2) / (n[1] + n[2])
+        du[2] -= dn2 / n[2] - dn1 / n[1]
+        du[5] -= (net.masses[k] - a1 * m1 - a2 * m2) * dnk / kappa
+    end
     return nothing
 end
 

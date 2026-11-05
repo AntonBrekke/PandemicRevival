@@ -5,8 +5,10 @@
 THREADS=${THREADS:-8}
 D=tmp/reduced_network
 T=tmp/rate_tables
-scan() { # name tables
-    julia --project=. -t "$THREADS" src/run_network_scan.jl "$2" "$D/$1" "$D/seeds/$1.csv" --reduced 2>&1 | tail -1
+scan() { # name tables; progress in <name>/scan.log
+    mkdir -p "$D/$1"
+    julia --project=. -t "$THREADS" src/run_network_scan.jl "$2" "$D/$1" "$D/seeds/$1.csv" > "$D/$1/scan.log" 2>&1
+    tail -1 "$D/$1/scan.log"
 }
 scan base_network "$T/rate_tables_mA2.5_mphi100.0.jls"
 julia --project=. -t "$THREADS" src/run_network_lyman_alpha.jl "$D/base_network/network_roots.csv" "$D/base_network/lyman_alpha.csv" \

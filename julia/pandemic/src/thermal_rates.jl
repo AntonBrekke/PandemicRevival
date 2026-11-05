@@ -52,8 +52,9 @@ using .TreeAmplitudes: TREE_PROCESSES, msq_bw
 
 kallen(a, b, c) = a^2 + b^2 + c^2 - 2a * b - 2a * c - 2b * c
 
-"""Light-neutrino mass [GeV] of the equal-mass parameters (`rate_params`, delta = 0): 0.1 eV."""
-const M_NU = 1e-10
+"""Light-neutrino mass [GeV] of the equal-mass parameters (`rate_params`, delta = 0): 0.01 eV
+(0.1 eV before 2026-11-05; the scans stored before then were made with 0.1 eV)."""
+const M_NU = 1e-11
 
 # --------------------------------------------------------------------------- model
 """
@@ -65,7 +66,7 @@ m_alpha/m_0, m_M = sin(theta_1) m_0 m_D/(sqrt2 m_alpha), mu = m_M/m_0,
 y_+ = sqrt2 m_M/v_phi with v_phi = m_A'/g (draft, benchmark table).
 
 m_N is the mass of N1 (the dark matter), and m_A', m_phi are multiples of it.
-- delta = 0 (default): m_N1 = m_N2 = m_N, m_nu = M_NU = 0.1 eV, m_0 = 1 TeV, as in the
+- delta = 0 (default): m_N1 = m_N2 = m_N, m_nu = M_NU = 0.01 eV, m_0 = 1 TeV, as in the
   original solver (the splitting `mnu_splitting` that m_nu implies is not carried by the
   masses of the solvers; the post-processing takes it per point, lyman_alpha.jl).
 - delta > 0: m_N2 = m_D = (1 + delta) m_N, and m_nu = sin^2 theta_1 m_D/delta (draft eq.
@@ -100,7 +101,8 @@ splitting(p) = p.m2 / p.m1 - 1
 
 Relative N1-N2 splitting delta at fixed m_nu [GeV]: m_nu = sin^2 theta_1 m_D/delta (draft eq.
 defdm) with m_D = (1 + delta) m_N, i.e. delta = a/(1 - a), a = sin^2 theta_1 m_N/m_nu. With
-m_nu = 0.1 eV it is <= 2.2e-4 at every relic root of the scans (<= 1e-6 for g >= 1e-4).
+m_nu = 0.1 eV it is <= 2.2e-4 at every relic root of the m_A' = 2.5 scans (<= 1e-6 for g >= 1e-4),
+10 times that at the default 0.01 eV.
 """
 function mnu_splitting(m_N, sin2_2theta; m_nu=M_NU)
     a = sin(asin(sqrt(sin2_2theta)) / 2)^2 * m_N / m_nu

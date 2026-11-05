@@ -23,6 +23,20 @@ Defaults: tmp/benchmarks -> figures/benchmarks. Panels, against x = m_N/T_nu, on
 With an N1-N2 splitting (`_delta` CSVs): the history continues past the solver's end (x = 100,
 dash-dotted) with the late conversions, up to x = 1e5; the relaxation rate lambda of N2/N1
 through N1 N1 <-> N2 N2 (dotted), whose last crossing of H is x_fo (thin dotted line).
+
+Validity (`validity`, also used by production.py). The solvers start at T_dw with the whole DW
+yield in a thermal spectrum at one T_N. Neither holds at first, so every line is drawn over the
+whole solution but faded where its assumptions do not hold yet, solid from then on:
+- dark grey band: DW production not finished (x < x_DW, `dw_end_x`, 90% of the yield);
+- light grey band, up to the arrow "dark thermalisation": the dark sector is not thermal yet
+  (x < x_c, the first Gamma_kd > H; the DW spectrum is colder than thermal);
+- N1 (and Omega h^2) solid from x_DW if Omega h^2 changes by < 1% before x_c (the DW number is then
+  all that matters), else from x_c; N2, A', phi, T_N, the gap and all rates from x_c; H always;
+- fluid: N1 and N2 only from where also N1 N1 <-> N2 N2 relaxes N2/N1 faster than H (conv_H > 1:
+  its mu_N1 = mu_N2), since it splits n~ by that;
+- thin dotted line: kinetic decoupling x_kd (last Gamma_kd > H). After it the N keep a thermal
+  shape with T ∝ a^-2, so nothing is faded.
+If the dark sector never thermalises (x_c absent), everything but N1, Omega h^2 and H stays faded.
 """
 import sys
 import os
@@ -59,6 +73,106 @@ FLUID_EXACT = {"N2nu_A", "N1nu_phi", "NN_AA"}
 PORTAL = {"N2nu_A", "N1nu_phi", "N2nu_N1N2", "N1nu_N2N2", "N1nu_AA", "N2nu_Aphi", "N1nu_phiphi"}
 FLOOR = 1e-6   # rate curves that never exceed this (in units of H) are left out
 W_PHI = 4      # N per phi for m_phi > 2 m_A' (`phi_weight` in network.jl)
+FADE = 0.28    # opacity of a line where its assumptions do not hold yet
+C_DW, C_NT = "0.82", "0.92"   # bands: DW production, not thermal
+
+
+def dw_end_x(m_keV, frac=0.9):
+    """
+    x = m_N/T_nu at which DW production has made `frac` of its yield. The DW rate per Hubble time,
+    d ln Y/d ln T ∝ y^3/(1 + y^6/3)^2 with y = T/T_dw (thermal potential ∝ p T^5 against
+    m^2; one momentum, constant g*), peaks at T_dw = 133 MeV (m_N/keV)^(1/3) (T_d_dw in
+    constants_functions.jl, the solvers' start). With w = y^3 the yield still to come below y is
+    ∫_0^w dw'/(1 + w'^2/3)^2 over its total 3^(1/2) pi/4; frac = 0.9 is y = 0.515.
+    """
+    a = np.sqrt(3.0)
+
+    def below(w):   # ∫_0^w dw/(1 + w^2/3)^2
+        return a / 2 * (np.arctan(w / a) + (w / a) / (1 + (w / a) ** 2))
+    total = a * np.pi / 4
+    lo, hi = 0.0, 50.0
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if below(mid) < (1 - frac) * total else (lo, mid)
+    y = lo ** (1 / 3)
+    return m_keV * 1e-6 / (y * 0.133 * m_keV ** (1 / 3))
+
+
+def _first_above(x, r):
+    i = np.flatnonzero(r >= 1)
+    return x[i[0]] if len(i) else None
+
+
+def validity(d, title, solver):
+    """
+    Where each line of a benchmark holds (see the header): (bands, start) with bands =
+    (x0, x_DW, x_c, x_kd) (x_c, x_kd None if absent) and start[key] the x from which line `key`
+    ("N1", "N2", "A", "phi", "omega", "T", "rates") is valid (np.inf: never).
+    """
+    x = d["x"]
+    m_keV = float(re.search(r"m_N = ([\d.eE+-]+) keV", title).group(1))
+    x0, x_dw = x[0], dw_end_x(m_keV)
+    kd = d["Gamma_kd_H"]
+    x_c = _first_above(x, kd)
+    x_kd = None
+    if x_c is not None:
+        on = np.flatnonzero(kd >= 1)
+        x_kd = x[on[-1] + 1] if on[-1] + 1 < len(x) else None
+    # nothing holds before DW production has finished: the state there assumes it has
+    therm = max(x_c, x_dw) if x_c is not None else np.inf
+    # the DW number alone matters until thermalisation if Omega h^2 does not move before it
+    om = d["omega_h2"]
+    i_dw = min(np.searchsorted(x, x_dw), len(x) - 1)
+    i_c = min(np.searchsorted(x, therm), len(x) - 1)
+    quiet = abs(om[i_c] / om[i_dw] - 1) < 0.01
+    n_start = max(x_dw, x0) if quiet else therm
+    start = {"omega": n_start, "N1": n_start, "N2": therm, "A": therm, "phi": therm, "T": therm, "rates": therm}
+    if solver == "fluid" and "conv_H" in d.dtype.names:   # (CSVs before 2026-11-05 lack it: not checked)
+        x_conv = _first_above(x, d["conv_H"])
+        split_ok = max(therm, x_conv if x_conv is not None else np.inf)
+        start["N1"] = max(start["N1"], split_ok)
+        start["N2"] = split_ok
+    return (x0, x_dw, x_c, x_kd), start
+
+
+def plot_valid(ax, x, y, x_from, **kw):
+    """y against x: faded (FADE) before x_from, as given from it on (both include the joint)."""
+    if x_from <= x[0]:
+        return ax.plot(x, y, **kw)
+    i = np.searchsorted(x, x_from)
+    kw_f = dict(kw, alpha=FADE * kw.get("alpha", 1.0))
+    kw_f.pop("label", None)
+    ax.plot(x[:min(i + 1, len(x))], y[:min(i + 1, len(x))], **kw_f)
+    if i < len(x):
+        return ax.plot(x[max(i - 1, 0):], y[max(i - 1, 0):], **kw)
+    return ax.plot([], [], **kw)   # never valid: only the legend entry
+
+
+def shade_validity(axes, bands, x_end, label_ax=None):
+    """Bands (DW production, not thermal) and the kinetic-decoupling line on `axes`; labels on label_ax."""
+    x0, x_dw, x_c, x_kd = bands
+    nt_end = x_c if x_c is not None else x_end
+    for a in axes:
+        if x_dw > x0:
+            a.axvspan(x0, min(x_dw, x_end), color=C_DW, lw=0, zorder=-10)
+        if nt_end > max(x_dw, x0):
+            a.axvspan(max(x_dw, x0), nt_end, color=C_NT, lw=0, zorder=-10)
+        if x_kd is not None:
+            a.axvline(x_kd, color="0.45", ls=":", lw=0.8, zorder=-5)
+    if label_ax is None:
+        return
+    tr = label_ax.get_xaxis_transform()
+    kw = dict(transform=tr, fontsize=7, color="0.3", va="top")
+    if x_dw > x0:
+        label_ax.text(np.sqrt(x0 * min(x_dw, x_end)), 0.97, "DW", ha="center", **kw)
+    if nt_end > max(x_dw, x0):
+        label_ax.text(np.sqrt(max(x_dw, x0) * nt_end), 0.97, "not thermal" if x_c is not None else "never thermal",
+                      ha="center", **kw)
+    if x_c is not None and x_c > max(x_dw, x0):   # (thermal already during DW production: no arrow)
+        label_ax.annotate("dark\nthermalisation", xy=(x_c, 0.80), xytext=(x_c * 1.6, 0.80), xycoords=tr, textcoords=tr,
+                          fontsize=7, color="0.3", va="center", arrowprops=dict(arrowstyle="<-", color="0.3", lw=0.6))
+    if x_kd is not None:
+        label_ax.text(x_kd * 1.08, 0.97, "kin. dec.", **kw)
 
 
 def omega_parts(d):
@@ -85,11 +199,13 @@ def plot(path, fig_dir):
     fig, (a1, a2, a3, a4) = plt.subplots(4, 1, figsize=(9, 12.5), sharex=True,
                                          gridspec_kw={"height_ratios": [1.2, 0.5, 0.5, 1.5]})
 
+    bands, start = validity(d, title, solver)
+    shade_validity((a1, a2, a3, a4), bands, x[-1], label_ax=a1)
     om1, om2, omA, omphi, w_phi = omega_parts(d)
     for o, key, lab in ((om1, "N1", r"$N_1$"), (om2, "N2", r"$N_2$"), (omA, "A", r"$A'$ ($\times 2\,N$)"),
                         (omphi, "phi", rf"$\phi$ ($\times {w_phi:.3g}\,N$)")):
-        a1.plot(x, o, color=SPECIES_COLOURS[key], ls=SPECIES_LS.get(key, "-"), label=lab)
-    a1.plot(x, d["omega_h2"], "k--", lw=1.3, label=r"total $\Omega h^2$")
+        plot_valid(a1, x, o, start[key], color=SPECIES_COLOURS[key], ls=SPECIES_LS.get(key, "-"), label=lab)
+    plot_valid(a1, x, d["omega_h2"], start["omega"], color="k", ls="--", lw=1.3, label=r"total $\Omega h^2$")
     a1.axhline(0.12, color="0.5", ls=":", lw=1)
     o_all = np.concatenate([om1, om2, omA])
     a1.set_ylim(max(o_all[o_all > 0].min(), 1e-30 * d["omega_h2"].max()), 30 * d["omega_h2"].max())
@@ -99,12 +215,12 @@ def plot(path, fig_dir):
     a1.set_title(f"{title}   ($\\Omega h^2$ = {d['omega_h2'][-1]:.3f})".replace("sin^2 2theta", r"$\sin^2 2\theta$"),
                  fontsize=9)
 
-    a2.plot(x, d["TN_Tnu"], "k-", lw=1.2)
+    plot_valid(a2, x, d["TN_Tnu"], start["T"], color="k", ls="-", lw=1.2)
     a2.set_yscale("log")
     a2.set_ylabel(r"$T_N/T_\nu$")
 
     g = d["gap_N1"]
-    a3.plot(x, g, "k-", lw=1.2)
+    plot_valid(a3, x, g, start["T"], color="k", ls="-", lw=1.2)
     a3.set_yscale("symlog", linthresh=1.0)
     # the gap can be < 0 (degenerate N) in the fluid; label 1-2-5 steps within the data
     ticks = [t * 10**e * sg for sg in (-1, 1) for e in range(-1, 4) for t in (1, 2, 5)] + [0.0]
@@ -125,21 +241,23 @@ def plot(path, fig_dir):
         lab = LABELS.get(name, name) + (" (exact)" if solver == "fluid" and name in FLUID_EXACT else "")
         c = RATE_COLOURS.get(name, "0.3")
         if solver == "network":
-            a4.plot(x, np.where(r > FLOOR, r * H, np.nan), ls=RATE_LS.get(name, "--" if name in PORTAL else "-"), color=c, lw=1.2,
-                    label=lab)
+            plot_valid(a4, x, np.where(r > FLOOR, r * H, np.nan), start["rates"], ls=RATE_LS.get(name, "--" if name in PORTAL else "-"),
+                       color=c, lw=1.2, label=lab)
         else:
-            a4.plot(x, np.where(r > FLOOR, r * H, np.nan), "-", color=c, lw=0.9, alpha=0.8, label=lab)
-            a4.plot(x, np.where(r < -FLOOR, -r * H, np.nan), "--", color=c, lw=0.9, alpha=0.8)
+            plot_valid(a4, x, np.where(r > FLOOR, r * H, np.nan), start["rates"], ls="-", color=c, lw=0.9, alpha=0.8, label=lab)
+            plot_valid(a4, x, np.where(r < -FLOOR, -r * H, np.nan), start["rates"], ls="--", color=c, lw=0.9, alpha=0.8)
     if solver == "fluid":
         tot = d["net_total"]
-        a4.plot(x, np.where(tot > FLOOR, tot * H, np.nan), "k-", lw=1.5, label=r"net $\dot{\tilde n}$ (solution)")
-        a4.plot(x, np.where(tot < -FLOOR, -tot * H, np.nan), "k--", lw=1.5)
+        plot_valid(a4, x, np.where(tot > FLOOR, tot * H, np.nan), start["rates"], color="k", ls="-", lw=1.5,
+                   label=r"net $\dot{\tilde n}$ (solution)")
+        plot_valid(a4, x, np.where(tot < -FLOOR, -tot * H, np.nan), start["rates"], color="k", ls="--", lw=1.5)
     a4.plot(x, d["Gamma_kd_H"] * H, color="0.6", lw=4, alpha=0.7, label=r"$\Gamma_\mathrm{kd}$", zorder=1)
     a4.plot(x, H, color="k", lw=3.5, label=r"$H$", zorder=10)
-    split = "conv_H" in d.dtype.names
+    if "conv_H" in d.dtype.names:
+        plot_valid(a4, x, np.where(d["conv_H"] > FLOOR, d["conv_H"] * H, np.nan), start["rates"], ls=":",
+                   color=RATE_COLOURS["N1N1_N2N2"], lw=2.2, label=r"$\lambda$: $N_1N_1\leftrightarrow N_2N_2$ relaxation")
+    split = "delta =" in title
     if split:
-        a4.plot(x, np.where(d["conv_H"] > FLOOR, d["conv_H"] * H, np.nan), ":", color=RATE_COLOURS["N1N1_N2N2"],
-                lw=2.2, label=r"$\lambda$: $N_1N_1\leftrightarrow N_2N_2$ relaxation")
         # the solver's end: after it the late conversions (with_conversions), rates of the solver absent
         x_fo = re.search(r"x_fo = ([\d.eE+-]+|NaN)", title)
         for a in (a1, a2, a3, a4):

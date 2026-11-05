@@ -33,10 +33,10 @@ suffixes for tables other than m_phi = 100 m_N, or with an N1-N2 splitting), wit
   phi <-> A'A'), which the fluid does not compute: it takes them in equilibrium
   (mu_A' = 2 mu, mu_N1 = mu_N2, mu_phi = 2 mu_A').
   A' and phi enter at the fluid's (equilibrium) densities.
-With an N1-N2 splitting (tables built with --delta) also
-- `conv_H`: lambda/H, the relaxation rate of n_N2/n_N1 through N1 N1 <-> N2 N2 (MB tables;
-  `conversion_lambda_H`), whose last crossing of H is the freeze-out x_fo of N2/N1;
-and after the solution (x = 100) 150 more rows up to x = 1e5 (past any x_fo; f_N2 today and
+Both: `conv_H`, lambda/H, the relaxation rate of n_N2/n_N1 through N1 N1 <-> N2 N2 (MB tables;
+`conversion_lambda_H`): the fluid's mu_N1 = mu_N2 holds where it is > 1 (plot/benchmark.py), and
+with a splitting its last crossing of H is the freeze-out x_fo of N2/N1.
+With an N1-N2 splitting (tables built with --delta) also, after the solution (x = 100) 150 more rows up to x = 1e5 (past any x_fo; f_N2 today and
 x_fo are in the header): the late conversions and their heat (`with_conversions`, as for the
 Lyman-alpha lengths and f_N2 of the scans), n_A' = n_phi = 0 and the solver's rate columns NaN. The fluid holds N1 <-> N2 in equilibrium up to x = 100; its late
 part starts from N2/N1 where lambda last exceeds 1e3 H, so Y_N2 can jump at x = 100.
@@ -109,11 +109,11 @@ function network_benchmark(itp, tT_rel, m, g, s2)
         fwd = [abs(exp(ur.lnGf + ur.cI[1] * lnA + ur.cI[2] * lnphi) * ur.xf) / n[k] / H for (ur, k) in zip(urs, first_species)]
         push!(rows, row(exp(z), [T_N / (m * exp(-z)), H, (n ./ s)..., network_omega_h2(net, u, z),
                                  dark_state(h, z)[2], kd_ratio(h, z), fwd...,
-                                 (split ? (conversion_lambda_H(h, itp, p, p.m2, z),) : ())...]))
+                                 conversion_lambda_H(h, itp, p, p.m2, z)]))
     end
     cols = ["fwd:$(r.name)" for r in used]
     om = network_omega_h2(net, sol.u[end], sol.t[end])
-    split || return cols, rows, om, nothing
+    split || return [cols; "conv_H"], rows, om, nothing
     late, f2, x_fo = late_rows(h, itp, p, p.m2, tT_rel, length(cols); frozen_at_end=true)
     return [cols; "conv_H"], [rows; late], om, (f2, x_fo)
 end
@@ -158,10 +158,10 @@ function fluid_benchmark(itp, tT_rel, m, g, s2)
         fwd = [abs(exp(ur.lnGf + ur.cI[1] * lnA + ur.cI[2] * lnphi) * ur.xf) / nk[k] / H for (ur, k) in zip(urs, first_species)]
         push!(rows, row(exp(z), [T_N / T_nu, H, (n ./ s)..., omega_h2_of(pan, u, z), N_temp_gap(pan, u)[2],
                                  kd_ratio(h, z), total, (br[k][1] / (ntilde * H) for k in names)..., fwd...,
-                                 (split ? (conversion_lambda_H(h, itp, p, pan.N2.m, z),) : ())...]))
+                                 conversion_lambda_H(h, itp, p, pan.N2.m, z)]))
     end
     cols = ["net_total"; ["net:$k" for k in names]; ["fwd:$(r.name)" for r in used]]
-    split || return cols, rows, om, nothing
+    split || return [cols; "conv_H"], rows, om, nothing
     late, f2, x_fo = late_rows(h, itp, p, pan.N2.m, tT_rel, length(cols); frozen_at_end=false)
     return [cols; "conv_H"], [rows; late], om, (f2, x_fo)
 end

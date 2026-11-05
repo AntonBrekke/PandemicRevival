@@ -28,7 +28,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-M_NU = 0.1e-9   # GeV, M_NU of src/thermal_rates.jl
+M_NU = 0.1e-9   # GeV: the m_nu of the stored m_A' = 2.5 scans (M_NU of src/thermal_rates.jl until 2026-11-05)
 SHIFT = 0.01    # root shift that counts as relevant
 G_DEP_MIN = 1e-5
 key = lambda r: (round(float(r["m_N"]) * 1e6, 3), round(math.log10(float(r["y"])), 3))

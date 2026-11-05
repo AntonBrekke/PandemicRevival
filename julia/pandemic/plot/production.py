@@ -30,6 +30,8 @@ the relaxation rate lambda of N2/N1 through N1 N1 <-> N2 N2: not a rate per DM p
 its crossing of H is the freeze-out of N2/N1.
 The first network point is the seed state (network_initial_state) and is left out: its
 seeds of N2, A' and phi relax within the first step.
+Lines are faded where their assumptions do not hold yet (DW production, before dark
+thermalisation), with grey bands and the kinetic decoupling marked: `validity` in benchmark.py.
 """
 import sys
 import os
@@ -40,7 +42,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FixedLocator, FixedFormatter, NullFormatter
-from benchmark import LABELS, RATE_COLOURS, RATE_LS, SPECIES_COLOURS, SPECIES_LS, omega_parts
+from benchmark import LABELS, RATE_COLOURS, RATE_LS, SPECIES_COLOURS, SPECIES_LS, omega_parts, validity, \
+    plot_valid, shade_validity
 
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
@@ -168,6 +171,8 @@ def plot(path, fig_dir, min_moved, mA=2.5):
         for s in a.spines.values():
             s.set_linewidth(0.5)
     xlim = (x[0], x[-1])
+    bands, start = validity(d, title, solver)
+    shade_validity((a1, a2, a3), bands, x[-1], label_ax=a3)
 
     # abundances
     total = d["omega_h2"] * keV_per_omega
@@ -178,18 +183,22 @@ def plot(path, fig_dir, min_moved, mA=2.5):
         y = o * keV_per_omega
         if np.nanmax(y) <= 1e2 * bottom:   # never visible
             continue
-        a1.loglog(x, y, color=SPECIES_COLOURS[key], ls=SPECIES_LS.get(key, "-"))
+        plot_valid(a1, x, y, start[key], color=SPECIES_COLOURS[key], ls=SPECIES_LS.get(key, "-"))
         curves.append((x, y, lab, SPECIES_COLOURS[key]))
     a1.loglog(xlim, [0.12 * keV_per_omega] * 2, color="0.55", ls="-.", zorder=-2)
     curves.append((np.array(xlim), np.array([0.12 * keV_per_omega] * 2), r"$\Omega h^2 = 0.12$", "0.55"))
     a1_curves = curves
+    a1.set_xscale("log")
+    a1.set_yscale("log")
     a1.set_xlim(*xlim)
     a1.set_ylabel(r"$m_N\, n / s\;\;\mathrm{[keV]}$")
     plt.setp(a1.get_xticklabels(), visible=False)
     log_ticks(a1, "y", bottom, top, every=2)
     a1.set_ylim(bottom, top)
 
-    a2.loglog(x, d["TN_Tnu"], color="0.4")
+    plot_valid(a2, x, d["TN_Tnu"], start["T"], color="0.4")
+    a2.set_xscale("log")
+    a2.set_yscale("log")
     a2.set_ylabel(r"$T_N/T_\nu$")
     a2.set_xlabel(r"$x = m_N / T_\nu$")
     t = d["TN_Tnu"]
@@ -208,13 +217,13 @@ def plot(path, fig_dir, min_moved, mA=2.5):
         if moved < min_moved:
             continue
         c = RATE_COLOURS.get(name, "0.3")
-        a3.loglog(x, np.where(r > 0, r * H, np.nan), color=c, ls=RATE_LS.get(name, "-"), zorder=-4)
+        plot_valid(a3, x, np.where(r > 0, r * H, np.nan), start["rates"], color=c, ls=RATE_LS.get(name, "-"), zorder=-4)
         curves.append((x, np.abs(r) * H, LABELS.get(name, name), c))
         rmax = max(rmax, np.nanmax(np.abs(r) * H))
     if "conv_H" in d.dtype.names:
         lam = np.where(d["conv_H"] > 0, d["conv_H"] * H, np.nan)
         c = RATE_COLOURS["N1N1_N2N2"]
-        a3.loglog(x, lam, color=c, ls=":", lw=1.5, zorder=-3)
+        plot_valid(a3, x, lam, start["rates"], color=c, ls=":", lw=1.5, zorder=-3)
         curves.append((x, lam, r"$\lambda_{N_2/N_1}$", c))
         rmax = max(rmax, np.nanmax(lam))
     a3.loglog(x, H, color=C_H, lw=2.0, zorder=0)

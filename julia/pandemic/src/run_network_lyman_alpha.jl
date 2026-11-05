@@ -9,7 +9,7 @@ the tables have phi -> A'A' closed, as in run_network_scan.jl. Use the one the r
 Defaults: tmp/network_scan/network_roots.csv -> tmp/network_scan/lyman_alpha.csv, one row
 per converged root (`LYMAN_ALPHA_HEADER`), with the m_phi = 100 m_N tables. With equal-mass
 tables the late N1 N1 <-> N2 N2 conversions are followed with the splitting at fixed m_nu
-(`mnu_splitting`; default m_nu = 0.1 eV, M_NU; 0 = none), which adds the columns x_fo, delta.
+(`mnu_splitting`; default m_nu = 0.01 eV, M_NU; 0 = none), which adds the columns x_fo, delta.
 """
 
 include(joinpath(@__DIR__, "lyman_alpha.jl"))

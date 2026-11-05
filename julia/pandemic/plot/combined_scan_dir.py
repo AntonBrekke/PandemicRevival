@@ -16,7 +16,7 @@ Output (default tmp/combined_scan):
   splitting delta_m: their column `delta` where they have it (the splitting at fixed m_nu that
   the post-processing used, `mnu_splitting`), else the constant `delta` of tables with an N1-N2
   splitting (rate_params; src/run_build_rate_tables.jl --delta), else sin^2(theta_1) m_N/m_nu at
-  m_nu = 0.1 eV.
+  m_nu = 0.01 eV (M_NU; 0.1 eV before 2026-11-05).
 """
 import sys
 import os
@@ -28,7 +28,7 @@ y_switch = float(sys.argv[2]) if len(sys.argv) > 2 else 1e-3
 root = sys.argv[3] if len(sys.argv) > 3 else "tmp"
 delta = float(sys.argv[4]) if len(sys.argv) > 4 else 0.0
 os.makedirs(out, exist_ok=True)
-M_NU = 0.1e-9   # GeV, M_NU of src/thermal_rates.jl
+M_NU = 0.01e-9   # GeV, M_NU of src/thermal_rates.jl (0.1 eV before 2026-11-05)
 
 key = lambda m, y: (round(float(m) * 1e6, 3), round(math.log10(float(y)), 3))
 

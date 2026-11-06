@@ -15,7 +15,7 @@ p = itp.p_ref
 m = p.m1
 rng = MersenneTwister(1)
 states = [(log(3e-5) + rand(rng) * (log(100.0) - log(3e-5)), log(1e-3) + rand(rng) * (log(2.0) - log(1e-3)),
-           12 * rand(rng)) for _ in 1:n]
+           12 * rand(rng)) for _ in 1:n]     # gap 0 .. 12: the fluid stays at gap >= 0
 res = Vector{Any}(undef, n)
 Threads.@threads for i in 1:n
     lxnu, lr, gap = states[i]
@@ -26,8 +26,11 @@ Threads.@threads for i in 1:n
         sym = portal_sym(name)
         direct = (c.fwd[1], c.bwd[1]) .* sym
         tab = portal_rates(itp, px, name, lxnu, lr, gap)[1]
-        mb = portal_rates(itp, nothing, name, lxnu, lr, gap)[1]
-        scale = max(abs(direct[1]), abs(direct[2]))
+        mb = portal_rates(itp, nothing, name, lxnu, lr, gap)[1]       # MB tables (no Pauli, ratio form)
+        # the size of the parts: near a sign change of the resonant rate the net is a small difference of a
+        # large non-resonant Z and an opposite resonant part, and errors on the scale of Z are what matters
+        zf, zb = haskey(c, :fwdZ) ? (c.fwdZ[1], c.bwdZ[1]) .* sym : direct
+        scale = abs(zf) + abs(zb) + abs(direct[1] - zf) + abs(direct[2] - zb)
         push!(out, (name, direct, tab, mb, scale))
     end
     res[i] = (states[i], out)
@@ -39,7 +42,7 @@ for (st, out) in res
         e_tab = abs(tab - (direct[1] - direct[2])) / scale
         e_mb = abs(mb - (direct[1] - direct[2])) / scale
         worst[name] = max(get(worst, name, 0.0), e_tab)
-        @printf("x_nu=%8.3g r=%7.3g gap=%5.2f %-10s net error / max(fwd,bwd): exact table %.2e, MB table %.2e\n",
+        @printf("x_nu=%8.3g r=%7.3g gap=%5.2f %-10s net error / (|Z| + |resonant|): exact table %.2e, MB table %.2e\n",
                 exp(-st[1]) > 0 ? exp(st[1]) : NaN, exp(st[2]), st[3], name, e_tab, e_mb)
     end
 end

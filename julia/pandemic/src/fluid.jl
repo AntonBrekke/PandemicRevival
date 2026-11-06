@@ -41,10 +41,11 @@ The table rates are evaluated at the fluid's MB fugacities e^(-gap_i), gap_i =
 (m_i - mu_i)/T_N: R_f prod_I e^(-gap) - R_r prod_F e^(-gap). That drops the
 quantum-statistical factors of the dark species, an O(f) correction, and keeps the fixed points
 exactly: at T_N = T_nu and sum_I mu = sum_F mu both directions are equal. For the portal processes
-N1 nu -> N2 N2 and N2 nu -> N1 N2 (PORTAL_EXACT) the FD/Pauli correction is added from the
-exact integrals (portal_tables.jl, coll_portal.jl): `pan.px`, loaded with the tables of the same
-mass ratios (`pauli=true`, the default); at large g the N are nearly degenerate there and the MB
-rates overestimate them by up to ~4x. `portal_scale` rescales the portal 2 -> 2 rates (a
+N1 nu -> N2 N2 and N2 nu -> N1 N2 (PORTAL_EXACT) the net rates come from the exact integrals
+instead (portal_tables.jl, coll_portal.jl): `pan.px`, loaded with the tables of the same mass
+ratios (`pauli=true`, the default). That includes the Pauli blocking of nearly degenerate N (the MB
+rates overestimate them by up to ~4x at large g) and avoids the MB tables' poor interpolation of the
+resonant rate. `portal_scale` rescales the portal 2 -> 2 rates (a
 sensitivity test).
 
 The solve starts at T_dw with the Dodelson-Widrow number and energy density, thermal.
@@ -360,14 +361,13 @@ function table_collision(pan::FluidSolver, T_N, T_nu, xi_N, gap_A; breakdown=not
             Q = exp(t.lnQf(lxnu, lr) + lnQ + side(r.I)) * t.ratio_Qf(lxnu, lr) -
                 exp(t.lnQr(lxnu, lr) + lnQ + side(r.F)) * t.ratio_Qr(lxnu, lr)
             if pan.px !== nothing && r.name in PORTAL_EXACT
-                # FD/Pauli correction of the net rates: delta x the MB envelope Z (1 + |ratio - 1|)
-                # summed over both directions (portal_tables.jl); both N share the gap (equal masses)
-                d = portal_exact_delta(pan.px, r.name, lxnu, lr, gaps[1])
-                env(lnz, ratio) = exp(lnz) * (1 + abs(ratio - 1))
-                G += d[1] * (env(t.lnRf(lxnu, lr) + lnR + side(r.I), t.ratio_Rf(lxnu, lr)) +
-                             env(t.lnRr(lxnu, lr) + lnR + side(r.F), t.ratio_Rr(lxnu, lr)))
-                Q += d[2] * (env(t.lnQf(lxnu, lr) + lnQ + side(r.I), t.ratio_Qf(lxnu, lr)) +
-                             env(t.lnQr(lxnu, lr) + lnQ + side(r.F), t.ratio_Qr(lxnu, lr)))
+                # the exact rates (FD/Pauli; portal_tables.jl): Z x (ratio + Delta) of each direction,
+                # Delta the Pauli change of the ratio; both N share the gap (equal masses)
+                y = portal_exact_y(pan.px, r.name, lxnu, lr, gaps[1])
+                G = (t.ratio_Rf(lxnu, lr) + y[1]) * exp(t.lnRf(lxnu, lr) + lnR + side(r.I)) -
+                    (t.ratio_Rr(lxnu, lr) + y[2]) * exp(t.lnRr(lxnu, lr) + lnR + side(r.F))
+                Q = (t.ratio_Qf(lxnu, lr) + y[3]) * exp(t.lnQf(lxnu, lr) + lnQ + side(r.I)) -
+                    (t.ratio_Qr(lxnu, lr) + y[4]) * exp(t.lnQr(lxnu, lr) + lnQ + side(r.F))
             end
             if r.kind === :portal2
                 G *= pan.portal_scale

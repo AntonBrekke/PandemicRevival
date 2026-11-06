@@ -9,7 +9,8 @@ labelled on the plot. The X-ray region is one line: the minimum over the current
 at each root (`scaled_xray_limit`), since only N1 decays to nu gamma. It is drawn over the
 constraint bounds below. Projected sensitivities (eROSITA, Athena, eXTP, rescaled the same way)
 only with --xray-proj, which writes <out>_xproj.pdf; --bp marks benchmark points; --mA sets
-m_A'/m_N (sigma/m and the label) for scans other than 2.5.
+m_A'/m_N (sigma/m and the label) for scans other than 2.5; --mlim LO HI [keV] and --slim LO HI
+set the frame (default 1 - 300 keV, 1e-18 - 1e-8).
 
 The roots are those of the freeze-in branch (the root searches only follow it). The
 lines are monotone (PCHIP) interpolations in log-log between the scanned masses and
@@ -166,6 +167,20 @@ def parse_args():
         "--bp",
         default=None,
         help="CSV (name,m_keV,sin2_2theta,...) of benchmark points to mark as stars"
+    )
+    p.add_argument(
+        "--mlim",
+        type=float,
+        nargs=2,
+        default=None,
+        help="m_N range of the frame [keV] (default M_LIM)"
+    )
+    p.add_argument(
+        "--slim",
+        type=float,
+        nargs=2,
+        default=None,
+        help="sin^2 2theta range of the frame (default S_LIM)"
     )
     p.add_argument(
         "--n2-fraction",
@@ -678,7 +693,12 @@ def y_label(y, first):
 
 
 def main():
+    global M_LIM, S_LIM
     args = parse_args()
+    if args.mlim:
+        M_LIM = tuple(args.mlim)
+    if args.slim:
+        S_LIM = tuple(args.slim)
     roots = load_roots(args.scan_dir)
     lam, r_s, mix = load_lyman_alpha(args.scan_dir)
     sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], args.mA, *mix[k]) for k in roots if k in mix}

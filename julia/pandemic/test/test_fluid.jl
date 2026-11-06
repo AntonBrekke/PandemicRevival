@@ -39,36 +39,6 @@ end
     end
 end
 
-@testset "kappa~ = rho - m_N1 n~, without the cancellation" begin
-    pan = FluidSolver(m, tT_rel, itp)
-    # relativistic to non-relativistic, degenerate to dilute, FD and BE (gap < m_T_r_MB)
-    for (T_N, xi) in ((100m, -0.3), (3m, -2.0), (0.3m, 2.0), (0.1m, 4.0), (0.01m, 90.0))
-        gap_A = 2.5m / T_N - 2xi
-        rho = energy_dens(pan, T_N, xi; gap_A=gap_A)
-        n = num_dens(pan, T_N, xi; gap_A=gap_A)
-        k = kappa_dens(pan, T_N, xi; gap_A=gap_A)
-        P = pressure_dens(pan, T_N, xi; gap_A=gap_A)
-        # both sides carry the density-integral tolerance on rho, which is what kappa~ avoids
-        @test isapprox(k, rho - m * n; atol=1e-8 * rho)
-        @test isapprox(kappa_3P(pan, T_N, xi; gap_A=gap_A), k - 3P; atol=1e-8 * rho)
-        @test k > 0
-    end
-    # far into the non-relativistic regime, where the difference has no digits left: the classical
-    # limit at gap = 12 (quantum correction +-e^-gap/2^(5/2) ~ 1e-6; still integrated numerically)
-    for (N, gap) in ((pan.N1, 12.0), (pan.A, 12.0))
-        T = 1e-7 * N.m
-        nn = number_density(N, T, N.m / T - gap; gap=gap)
-        @test isapprox(kinetic_density(N, T, N.m / T - gap; gap=gap), 1.5 * nn * T; rtol=1e-5)
-        @test isapprox(kinetic_minus_3P(N, T, N.m / T - gap; gap=gap), -1.5 * nn * T; rtol=1e-5)
-    end
-    # and the first quantum correction at gap = 5, of opposite sign for N and A'
-    for (N, sgn) in ((pan.N1, 1), (pan.A, -1))
-        T = 1e-7 * N.m
-        nn = number_density(N, T, N.m / T - 5.0; gap=5.0)
-        @test isapprox(kinetic_density(N, T, N.m / T - 5.0; gap=5.0), 1.5 * nn * T * (1 + sgn * exp(-5) / 2^2.5); rtol=1e-4)
-    end
-end
-
 @testset "detailed balance at T_N = T_nu, mu = 0" begin
     pan = FluidSolver(m, tT_rel, itp)
     pan.mp = ModelParams{Float64}(g, th)

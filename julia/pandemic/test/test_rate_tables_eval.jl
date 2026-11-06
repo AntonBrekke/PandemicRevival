@@ -4,8 +4,13 @@
 using Test
 include(joinpath(@__DIR__, "..", "src", "rate_tables.jl"))
 
-# TABLE_DELTA=<delta> checks the tables built with an N1-N2 splitting (default: equal masses)
-path = rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"); delta=parse(Float64, get(ENV, "TABLE_DELTA", "0")))
+# TABLE_DELTA=<delta> checks the tables built with an N1-N2 splitting (default: equal masses);
+# TABLE_MA, TABLE_MPHI another set of mass ratios (default 2.5, 100); TABLE_ALL=1 every reaction
+path = rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"); delta=parse(Float64, get(ENV, "TABLE_DELTA", "0")),
+                       mA_over_mN=parse(Float64, get(ENV, "TABLE_MA", "2.5")), mphi_over_mN=parse(Float64, get(ENV, "TABLE_MPHI", "100")))
+const NAMES = get(ENV, "TABLE_ALL", "0") == "1" ?
+    Tuple(r.name for r in REACTIONS) :
+    (:N1N1_N2N2, :A_N1N2, :N1N1_AA, :N2nu_A, :N1nu_phi, :N1nu_N2N2, :N2nu_N1N2, :N1nu_AA)
 tabs = load_rate_tables(path)
 itp = RateInterpolants(tabs)
 pref = tabs.p_ref
@@ -22,21 +27,22 @@ end
 
 @testset "interpolation off the grid points (reference parameters)" begin
     m = pref.m1
-    for name in (:N1N1_N2N2, :A_N1N2, :N1N1_AA, :N2nu_A, :N1nu_phi, :N1nu_N2N2, :N2nu_N1N2, :N1nu_AA), (a, b) in STATES
+    for name in NAMES, (a, b) in STATES
+        haskey(itp.dark, name) || haskey(itp.portal, name) || continue   # closed at these mass ratios
         r = reaction(name)
         T_N, T_nu = a * m, b * m
         lxN, lxnu, lr = log(m / T_N), log(m / T_nu), log(T_N / T_nu)
         d = direct(r, pref, T_N, T_nu)
+        # exponential shifts (ln R ~ -1e3 ... -3e4 at cold states, more so for a heavy A'): the
+        # spline error is ~1e-5 of |ln R| there, a rate of e^-1000 or less
+        tol(v) = 2e-3 + 1e-5 * abs(v)
         if r.kind in (:dark2, :dark12)
             t = itp.dark[name]
-            @test isapprox(t.lnRf(lxN), d[1]; atol=2e-3)
-            @test isapprox(t.lnRr(lxN), d[2]; atol=2e-3)
+            @test isapprox(t.lnRf(lxN), d[1]; atol=tol(d[1]))
+            @test isapprox(t.lnRr(lxN), d[2]; atol=tol(d[2]))
         else
             t = itp.portal[name]
             (lf, lr_, lqf, lqr), (xf, xr, xqf, xqr) = d
-            # the forward rates carry an exponential shift (ln R ~ -1e3 at cold
-            # states): the spline error is ~1e-5 of |ln R| there, i.e. ~1% of e^-1000
-            tol(v) = 2e-3 + 1e-5 * abs(v)
             @test isapprox(t.lnRf(lxnu, lr), lf; atol=tol(lf))
             @test isapprox(t.lnRr(lxnu, lr), lr_; atol=tol(lr_))
             @test isapprox(t.lnQf(lxnu, lr), lqf; atol=tol(lqf))

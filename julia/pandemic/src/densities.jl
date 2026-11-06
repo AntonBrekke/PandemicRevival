@@ -133,38 +133,3 @@ function rho_3P_diff_xi(p::Particle{T}, temp::R, xi::R; gap=nothing) where {T<:R
     # rho - 3P = dof/(2 pi^2) ∫ dE |p| f (E^2 - |p|^2) = dof/(2 pi^2) ∫ dE m^2 |p| f
     return thermal_moment(p, temp, x_xi_diff, (E, mom) -> p.m^2 * mom)
 end
-
-"""
-Kinetic energy per particle of a Maxwell-Boltzmann species over T at x = m/T, minus 3:
-x (K_1/K_2 - 1); for x > 1e3, where it loses digits to cancellation, its asymptotic series
-(error ~1e-12).
-"""
-function mb_kinetic_minus_3(x)
-    x > 1e3 && return -1.5 + 15 / (8x) - 15 / (8x^2) + 135 / (128x^3)
-    x < 1e-10 && return zero(x)
-    return x * (SF.besselkx(1, x) / SF.besselkx(2, x) - 1)
-end
-
-"""
-Kinetic energy density rho - m n. Integrated directly, E - m = |p|^2/(E + m), and not as the
-difference: non-relativistically that is a small part of rho, and the tolerance of the density
-integrals (`rtol_int`) would be a large error on it.
-"""
-function kinetic_density(p, temp, xi; gap=nothing)
-    x = p.m / temp
-    g = isnothing(gap) ? x - xi : gap
-    if p.k == 0 || g >= m_T_r_MB
-        return number_density(p, temp, xi; gap=g) * temp * (mb_kinetic_minus_3(x) + 3)
-    end
-    return thermal_moment(p, temp, g, (E, mom) -> mom^3 * E / (E + p.m))
-end
-
-"""rho - m n - 3 P, integrated directly as for `kinetic_density`: dof/(2 pi^2) ∫ dE (-m) |p|^3/(E + m) f."""
-function kinetic_minus_3P(p, temp, xi; gap=nothing)
-    x = p.m / temp
-    g = isnothing(gap) ? x - xi : gap
-    if p.k == 0 || g >= m_T_r_MB
-        return number_density(p, temp, xi; gap=g) * temp * mb_kinetic_minus_3(x)
-    end
-    return thermal_moment(p, temp, g, (E, mom) -> -p.m * mom^3 / (E + p.m))
-end

@@ -98,13 +98,18 @@ function reduced_closure(net::Network, Nt1, Nt2, kappat)
                nA * (kinetic_per_particle(mA, T) + dA) + nphi * (kinetic_per_particle(mphi, T) + dphi) - kappat
     end
     Nt = Nt1 + Nt2
-    b = log(8kappat / (3Nt))
-    a = log(kappat / (3Nt))
+    # T_N within the tables' range, m_N/T_N in [1e-6, 1e8]; trial states of the stiff solver outside
+    # it (or non-finite) give T = NaN, and reduced_rhs! rejects the step
+    lo_T, hi_T = log(m1) - log(1e8), log(m1) + log(1e6)
+    (isfinite(Nt) && isfinite(kappat) && Nt > 0 && kappat > 0) || return (NaN, NaN, NaN, NaN, NaN)
+    b = clamp(log(8kappat / (3Nt)), lo_T, hi_T)
+    a = clamp(log(kappat / (3Nt)), lo_T, hi_T)
     fa, fb = excess(a), excess(b)
-    while fa > 0                       # most of kappat stored in the rest mass of A', phi
-        a -= 1.0
+    while fa > 0 && a > lo_T            # most of kappat stored in the rest mass of A', phi
+        a = max(a - 1.0, lo_T)
         fa = excess(a)
     end
+    (fa <= 0 && fb >= 0) || return (NaN, NaN, NaN, NaN, NaN)
     for _ in 1:100
         abs(fb) <= 1e-15 * kappat && (a = b; break)
         abs(fa) <= 1e-15 * kappat && (b = a; break)
@@ -163,6 +168,10 @@ function reduced_rhs!(du, u, net::Network, z)
     xfac = x / net.dx_dt_interp_z(z)
     Nt1, Nt2, kappat = reduced_state(net, u, z)
     n1, n2, lnA, lnphi, T_N = reduced_closure(net, Nt1, Nt2, kappat)
+    if !(isfinite(T_N) && n1 > 0 && n2 > 0)
+        du .= 1e10     # a trial state outside the closure: large but finite, the step is rejected
+        return nothing
+    end
     urs = unit_rates(net, T_N, T_nu, n1, n2)
     C1, C2, Ctot, CK, Gcf, Gcr = reduced_collision(net, urs, lnA, lnphi)
     du[1] = xfac * Ctot / (Nt1 + Nt2)

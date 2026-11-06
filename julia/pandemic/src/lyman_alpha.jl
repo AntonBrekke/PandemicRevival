@@ -441,9 +441,12 @@ end
 Network solve at (m_N [GeV], g, sin^2 2theta) and its Lyman-alpha lengths:
 `lyman_alpha_lengths` plus `omega_h2`, `f_N2` = N2/(N1 + N2) today, and the splitting `delta`
 (`postproc_splitting`). NaN lengths if the solve fails.
+With `m_nu` (GeV) given it also sets the solver's couplings (the phi N1 N1 Yukawa y mu ∝ 1/m_nu,
+`table_params`), not only the splitting; without, they are at M_NU. (Before 2026-11-06 the solvers
+always ran at M_NU, so post-processing at another m_nu mixed the two.)
 """
 function lyman_alpha_network(itp, tT_rel, m, g, s2; m_nu=nothing)
-    p = table_params(itp, m, g, s2)
+    p = table_params(itp, m, g, s2; m_nu=something(m_nu, M_NU))
     net = Network(itp, p, tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
     # with a splitting the late conversions and their heat are followed by `with_conversions`
@@ -463,7 +466,7 @@ end
 
 """As `lyman_alpha_network` with A' and phi eliminated (network_reduced.jl)."""
 function lyman_alpha_reduced(itp, tT_rel, m, g, s2; m_nu=nothing)
-    p = table_params(itp, m, g, s2)
+    p = table_params(itp, m, g, s2; m_nu=something(m_nu, M_NU))
     net = Network(itp, p, tT_rel)
     dw = DodelsonWidrow{Float64}(m, asin(sqrt(s2)) / 2, tT_rel)
     delta = postproc_splitting(itp, m, s2, m_nu)
@@ -480,7 +483,7 @@ end
 
 """As `lyman_alpha_network` for the fluid (`solve_relic`; f_N2 = 1/2 for equal masses; with a
 splitting the late conversions and their heat from `with_conversions`)."""
-function lyman_alpha_fluid(itp, tT_rel, m, g, s2; pan=FluidSolver(m, tT_rel, itp), m_nu=nothing)
+function lyman_alpha_fluid(itp, tT_rel, m, g, s2; m_nu=nothing, pan=FluidSolver(m, tT_rel, itp; m_nu=something(m_nu, M_NU)))
     sol, om, plateau = solve_relic(pan, tT_rel, g, s2)
     plateau || return failed_lengths()
     delta = postproc_splitting(itp, m, s2, m_nu)

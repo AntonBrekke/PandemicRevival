@@ -47,7 +47,7 @@ addprocs(min(parse(Int, OPTS["nproc"]), length(todo)); exeflags=["--project=$(Ba
     const PER_POINT = M_NU_EV > 0 && table_delta(ITP) == 0
 
     function lya_job(m, g, s2)
-        pan = get!(() -> FluidSolver(m, TT_REL, ITP), PANS, m)
+        pan = get!(() -> FluidSolver(m, TT_REL, ITP; m_nu=PER_POINT ? M_NU_EV * 1e-9 : M_NU), PANS, m)
         r = try
             lyman_alpha_fluid(ITP, TT_REL, m, g, s2; pan=pan, m_nu=PER_POINT ? M_NU_EV * 1e-9 : nothing)
         catch e

@@ -9,6 +9,8 @@ Run from julia/pandemic:
 using Test
 
 include(joinpath(@__DIR__, "..", "src", "lyman_alpha.jl"))
+# the stored scans were made at m_nu = 0.1 eV (M_NU until 2026-11-06): solver couplings and splitting
+const MNU_REF = 1e-10
 
 """Rows of a CSV as Dicts keyed by (m_N [keV], y), rounded."""
 function csv_rows(path)
@@ -34,7 +36,7 @@ const ITP = RateInterpolants(load_rate_tables(rate_table_path(joinpath(TMP, "rat
     lya = csv_rows(joinpath(TMP, "network_scan", "lyman_alpha.csv"))
     for key in ((3.724, 1e-8), (10.57, 1e-6), (10.57, 1e-4))
         r, l = roots[key], lya[key]
-        res = lyman_alpha_network(ITP, TT, key[1] * 1e-6, key[2], num(r, "s2_network"))
+        res = lyman_alpha_network(ITP, TT, key[1] * 1e-6, key[2], num(r, "s2_network"); m_nu=MNU_REF)
         @test res.omega_h2 ≈ num(r, "omega_network") rtol = 2e-3
         @test res.f_N2 ≈ num(l, "f_N2") rtol = 1e-2
         @test res.lambda_fs ≈ num(l, "lambda_fs_Mpc") rtol = 2e-3
@@ -49,7 +51,7 @@ end
     lya = csv_rows(joinpath(TMP, "fluid_scan", "lyman_alpha.csv"))
     for key in ((30.0, 3.162e-3), (10.57, 0.01))
         r, l = roots[key], lya[key]
-        res = lyman_alpha_fluid(ITP, TT, key[1] * 1e-6, key[2], num(r, "s2_fluid"))
+        res = lyman_alpha_fluid(ITP, TT, key[1] * 1e-6, key[2], num(r, "s2_fluid"); m_nu=MNU_REF)
         # the fluid solve at reltol 1e-4 reproduces Omega h^2 to ~1e-3 at these roots
         @test res.omega_h2 ≈ num(l, "omega_h2") rtol = 5e-3
         @test res.lambda_fs ≈ num(l, "lambda_fs_Mpc") rtol = 5e-3

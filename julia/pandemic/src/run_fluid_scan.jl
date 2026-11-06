@@ -24,7 +24,7 @@ the fluid at mu = 0 (number-changing equilibrium), not whether the one-fluid ass
 using Distributed
 using Printf
 
-rate_table_path_default() = rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))
+rate_table_path_default() = joinpath(@__DIR__, "..", "tmp", "rate_tables", "rate_tables_mA3.0_mphi100.0.jls")
 
 function parse_opts(args)
     o = Dict("nproc" => "8", "ymin" => "1e-3", "out" => joinpath(@__DIR__, "..", "tmp", "fluid_scan"),

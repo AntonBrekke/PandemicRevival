@@ -16,7 +16,7 @@ using Distributed
 function parse_opts(args)
     dir = joinpath(@__DIR__, "..", "tmp", "fluid_scan")
     o = Dict("nproc" => "8", "roots" => joinpath(dir, "fluid_roots.csv"), "out" => joinpath(dir, "lyman_alpha.csv"),
-             "tables" => joinpath(@__DIR__, "..", "tmp", "rate_tables", "rate_tables_mA2.5_mphi100.0.jls"),
+             "tables" => joinpath(@__DIR__, "..", "tmp", "rate_tables", "rate_tables_mA3.0_mphi100.0.jls"),
              "m-nu" => "0.01")
     i = 1
     while i <= length(args)

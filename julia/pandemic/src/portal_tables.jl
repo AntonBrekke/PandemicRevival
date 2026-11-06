@@ -19,7 +19,8 @@ Detailed balance: at T_N = T_nu the exact rates obey full_bwd = e^(mu/T) full_fw
 Z_bwd / Z_fwd; so y_bwd = y_fwd, and Delta_bwd = Delta_fwd, at every node with r = 1 (on the grid): the
 fluid's fixed point at equilibrium with the neutrinos is that of the MB tables (balanced to ~1e-6).
 Domain: gap >= 0. The fluid never reaches degenerate N (gap < 0) in any run so far (benchmarks at
-m_A' = 2.5 and 50 up to g = 1.33: gap >= 0.0, and >= 0.2 where the portal 2 <-> 2 matter). Below gap 0
+m_A' = 2.5, 3 and 50 up to g = 1.33: gap >= 0.0; where the portal 2 <-> 2 matter >= 0.2 at m_A' = 50 and
+>= 7.6 at m_A' = 3, so there the correction is negligible). Below gap 0
 Delta is clamped at gap 0. (No occupation factor at rest is divided out: with T_N << T_nu the final N
 carry the neutrino's energy and are barely blocked, f (1 - f)^2 = 1/8 at gap 0 against a true
 suppression of ~0.8, and the ratio would vary steeply in the gap.)

@@ -21,6 +21,11 @@ singular phi -> A'A' threshold (2 m_A'); 150 keeps it open with the quartic lamb
 - Portal 2 -> 2 rates (MB tables, no Pauli blocking of the final N): `portal_scale/`. Root shift for
   portal rates x0.5 / x0.25: 10.6 keV g = 0.1: +1% / +1.5%; 10.6 keV g = 1: x1.9 / x3.6; 300 keV g = 1:
   x1.4 / x1.7. With f_N ~ 0.5 at those roots the g ~ 1 roots are likely too low by up to that much.
+- Pauli blocking, exactly (branch pauli-exact, `portal_tables.jl`; `pauli/`, `run_pauli_reroot.sh`): roots
+  of the fluid with the Pauli-corrected portal 2 <-> 2 rates, seeded with the MB pilot roots. sin^2 2theta
+  rises by 0% (10.6 keV, g = 0.1), +20% (10.6 keV, g = 0.5 - 1.333), +0.5 / +7 / +9% (300 keV,
+  g = 0.1 / 1 / 1.333), +5 / +7% (600 keV, g = 1 / 1.333). Far below the portal-scale bracket above: the
+  final N carry the neutrino's energy (T_N << T_nu) and are barely blocked even at f_N(rest) ~ 0.5.
 
 ## Coarse scan
 13 masses 0.6 - 754 keV, half-decades of g from 1e-8, plus 1.333 (`make_coarse_seeds.py`); couplings with

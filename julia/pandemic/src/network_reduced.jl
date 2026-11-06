@@ -131,8 +131,9 @@ end
 function reduced_state(net::Network, u, z)
     s = net.ent_interp_z(z)
     N = exp(u[1]) * s
-    Nt1 = N / (1 + exp(u[2]))
-    return Nt1, N - Nt1, exp(u[3]) * s^(4 / 3)
+    r = exp(u[2])
+    # N r/(1 + r), not N - Nt1, which is 0 for r < 1e-16 (as in network.jl's state_densities)
+    return N / (1 + r), N * r / (1 + r), exp(u[3]) * s^(4 / 3)
 end
 
 """dN of the eliminated reactions, A' -> N1 N2 and phi -> A'A'."""
@@ -194,11 +195,10 @@ transient of the full network at large g (CLAUDE.md).
 """
 function reduced_initial_state(net::Network, dw::DodelsonWidrow, tT_rel::TimeTempRelation; dz_seed=1e-3)
     u0, z0 = network_initial_state(net, dw, tT_rel; dz_seed=dz_seed)
-    n, _ = state_densities(net, u0, z0)
     s = net.ent_interp_z(z0)
-    r = n[2] / n[1]
+    r = exp(u0[2])             # n_N2/n_N1 of the seed, directly (it can be ~1e-30)
     Nt1 = dw.n_ic / (1 + r)
-    Nt2 = dw.n_ic - Nt1
+    Nt2 = dw.n_ic * r / (1 + r)
     kappat = dw.rho_ic - net.masses[1] * Nt1 - net.masses[2] * Nt2
     return [log(dw.n_ic / s), log(r), log(kappat / s^(4 / 3))], z0
 end

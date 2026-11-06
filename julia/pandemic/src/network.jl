@@ -271,7 +271,9 @@ function state_densities(net::Network, u, z)
     N = exp(u[1]) * s
     r = exp(u[2])
     n1 = N / (1 + r)
-    n = (n1, N - n1, exp(u[3]) * s, exp(u[4]) * s)
+    # n_N2 = N r/(1 + r), not N - n1: that is 0 for r < 1e-16 (a heavy A' and small g seed N2 at
+    # ~1e-30 n_N1), and log(0) in the rates gave NaN steps
+    n = (n1, N * r / (1 + r), exp(u[3]) * s, exp(u[4]) * s)
     return n, exp(u[5]) * s^(4 / 3)
 end
 

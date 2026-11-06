@@ -84,3 +84,36 @@ end
         @test isapprox(-d[1], net_fwd; rtol=2e-3)
     end
 end
+
+@testset "FD/Pauli correction of the portal 2 -> 2 rates" begin
+    pan = FluidSolver(m, tT_rel, itp)
+    if pan.px === nothing
+        @test_skip "no Pauli-correction tables for these mass ratios (src/run_build_portal_tables.jl)"
+    else
+        pan.mp = ModelParams{Float64}(g, th)
+        mb = FluidSolver(m, tT_rel, itp; pauli=false)
+        mb.mp = pan.mp
+        T_N, T_nu = 0.3m, 0.4m
+        for (gap, same) in ((12.0, true), (0.3, false))
+            xi = m / T_N - gap
+            gA = RA * m / T_N - 2xi
+            b1, b0 = Dict{Symbol,Tuple{Float64,Float64}}(), Dict{Symbol,Tuple{Float64,Float64}}()
+            table_collision(pan, T_N, T_nu, xi, gA; breakdown=b1)
+            table_collision(mb, T_N, T_nu, xi, gA; breakdown=b0)
+            for name in PORTAL_EXACT
+                if same
+                    # dilute: the MB rates (the correction vanishes)
+                    @test isapprox(b1[name][1], b0[name][1]; rtol=1e-3)
+                else
+                    # nearly degenerate N: the corrected net rate is the direct exact integral (to the
+                    # tables' accuracy), and differs from MB
+                    pr = fluid_rates!(pan)
+                    c = coll_portal(_tree(name), pr, portal_parts(name, pr), (T_N, T_nu, T_N, T_N), (gap, 0.0, gap, gap))
+                    exact = delta_ntilde(reaction(name)) * portal_sym(name) * (c.fwd[1] - c.bwd[1])
+                    @test isapprox(b1[name][1], exact; rtol=0.05)
+                    @test abs(b0[name][1] / exact - 1) > 0.05
+                end
+            end
+        end
+    end
+end

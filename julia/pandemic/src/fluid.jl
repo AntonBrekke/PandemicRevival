@@ -39,10 +39,13 @@ From the rate tables of the network (rate_tables.jl), MB in the dark sector:
   N1 N1 <-> phi phi, phi -> N1 N1.
 The table rates are evaluated at the fluid's MB fugacities e^(-gap_i), gap_i =
 (m_i - mu_i)/T_N: R_f prod_I e^(-gap) - R_r prod_F e^(-gap). That drops the
-quantum-statistical factors of the dark species, an O(f) correction (N1 nu -> N2 N2 is
-0.82-0.88 of the MB rate while T_N >> m_N; `portal_scale` rescales the portal 2 -> 2
-rates for that sensitivity), and keeps the fixed points exactly: at T_N = T_nu and
-sum_I mu = sum_F mu both directions are equal.
+quantum-statistical factors of the dark species, an O(f) correction, and keeps the fixed points
+exactly: at T_N = T_nu and sum_I mu = sum_F mu both directions are equal. For the portal processes
+N1 nu -> N2 N2 and N2 nu -> N1 N2 (PORTAL_EXACT) the FD/Pauli correction is added from the
+exact integrals (portal_tables.jl, coll_portal.jl): `pan.px`, loaded with the tables of the same
+mass ratios (`pauli=true`, the default); at large g the N are nearly degenerate there and the MB
+rates overestimate them by up to ~4x. `portal_scale` rescales the portal 2 -> 2 rates (a
+sensitivity test).
 
 The solve starts at T_dw with the Dodelson-Widrow number and energy density, thermal.
 """
@@ -60,6 +63,7 @@ include(joinpath(@__DIR__, "coll_3_12.jl"))
 include(joinpath(@__DIR__, "coll_12_34_legendre.jl"))
 include(joinpath(@__DIR__, "interpolation_helpers.jl"))
 include(joinpath(@__DIR__, "rate_tables.jl"))
+include(joinpath(@__DIR__, "portal_tables.jl"))
 
 """Delta n~ per forward reaction (weights 1, 1, 2, 4 for N1, N2, A', phi)."""
 delta_ntilde(r::Reaction) = sum((1, 1, 2, 4) .* delta_N(r))
@@ -99,17 +103,21 @@ mutable struct FluidSolver{FdX, FEnt, FH}
     portal_scale::Float64
     # light-neutrino mass of the couplings (`table_params`; equal-mass tables only)
     m_nu::Float64
+    # FD/Pauli correction of the portal 2 -> 2 processes (portal_tables.jl), or nothing (MB)
+    px::Any
 end
 
 """
-    FluidSolver(m_N, tT_rel, itp; portal_scale=1, m_nu=M_NU)
+    FluidSolver(m_N, tT_rel, itp; portal_scale=1, m_nu=M_NU, pauli=true)
 
 `itp` = RateInterpolants of the tables; the mass ratios m_A'/m_N, m_phi/m_N are theirs. Needs
 m_phi > 2 m_A': mu_phi = 2 mu_A' holds only while phi <-> A'A' is open (and fast). The couplings
 are set through `pan.mp = ModelParams{Float64}(g, theta_1)`, with m_nu [GeV] (`table_params`).
+`pauli`: add the FD/Pauli correction of the portal 2 -> 2 processes from the tables of the same mass
+ratios in tmp/rate_tables (`load_portal_exact`); without them (or with pauli=false) MB rates.
 """
 function FluidSolver(m_N::Float64, tT_rel::TimeTempRelation{Float64}, itp::RateInterpolants;
-                     portal_scale=1.0, m_nu=M_NU, T_ratio_min=1e-6, T_ratio_max=1e3)
+                     portal_scale=1.0, m_nu=M_NU, T_ratio_min=1e-6, T_ratio_max=1e3, pauli=true)
     mA_over_mN, mphi_over_mN = mass_ratios(itp)
     N1 = Particle{Float64}(m_N, 1, dof=2)
     N2 = Particle{Float64}(m_N * (1 + table_delta(itp)), 1, dof=2)
@@ -134,7 +142,27 @@ function FluidSolver(m_N::Float64, tT_rel::TimeTempRelation{Float64}, itp::RateI
     return FluidSolver{typeof(dx_i),typeof(ent_i),typeof(H_i)}(
         ModelParams{Float64}(1e-3, 1e-8), N1, N2, A, nu, phi, T_ratio_min, T_ratio_max, Inf,
         dx_i, ent_i, H_i, itp, reactions, (NaN, NaN), nothing, Dict{Symbol,Tuple{Float64,Float64}}(), portal_scale,
-        m_nu)
+        m_nu, pauli ? load_portal_exact(itp) : nothing)
+end
+
+const _PX_CACHE = Dict{Tuple{Float64,Float64},Any}()
+
+"""
+The FD/Pauli portal correction (PortalExact) for the mass ratios of `itp`, from tmp/rate_tables
+(cached), or nothing with a warning if there is none (and for tables with an N1-N2 splitting).
+"""
+function load_portal_exact(itp::RateInterpolants)
+    table_delta(itp) == 0 || return nothing
+    key = mass_ratios(itp)
+    return get!(_PX_CACHE, key) do
+        path = portal_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"); mA_over_mN=key[1], mphi_over_mN=key[2])
+        if isfile(path)
+            PortalExact(Serialization.deserialize(path))
+        else
+            @warn "no Pauli-correction tables $path: MB portal 2 -> 2 rates (src/run_build_portal_tables.jl)"
+            nothing
+        end
+    end
 end
 
 """rate_params and table normalisations for the current pan.mp (cached)."""
@@ -331,6 +359,16 @@ function table_collision(pan::FluidSolver, T_N, T_nu, xi_N, gap_A; breakdown=not
                 exp(t.lnRr(lxnu, lr) + lnR + side(r.F)) * t.ratio_Rr(lxnu, lr)
             Q = exp(t.lnQf(lxnu, lr) + lnQ + side(r.I)) * t.ratio_Qf(lxnu, lr) -
                 exp(t.lnQr(lxnu, lr) + lnQ + side(r.F)) * t.ratio_Qr(lxnu, lr)
+            if pan.px !== nothing && r.name in PORTAL_EXACT
+                # FD/Pauli correction of the net rates: delta x the MB envelope Z (1 + |ratio - 1|)
+                # summed over both directions (portal_tables.jl); both N share the gap (equal masses)
+                d = portal_exact_delta(pan.px, r.name, lxnu, lr, gaps[1])
+                env(lnz, ratio) = exp(lnz) * (1 + abs(ratio - 1))
+                G += d[1] * (env(t.lnRf(lxnu, lr) + lnR + side(r.I), t.ratio_Rf(lxnu, lr)) +
+                             env(t.lnRr(lxnu, lr) + lnR + side(r.F), t.ratio_Rr(lxnu, lr)))
+                Q += d[2] * (env(t.lnQf(lxnu, lr) + lnQ + side(r.I), t.ratio_Qf(lxnu, lr)) +
+                             env(t.lnQr(lxnu, lr) + lnQ + side(r.F), t.ratio_Qr(lxnu, lr)))
+            end
             if r.kind === :portal2
                 G *= pan.portal_scale
                 Q *= pan.portal_scale

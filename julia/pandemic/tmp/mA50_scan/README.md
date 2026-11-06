@@ -33,7 +33,13 @@ Upper mass: the X-ray limit / f_N1 closes the region at ~670 keV for g = 1.333 (
 - `fluid_scan/`: 73 converged, 10 bracketed (Omega jumps at the take-off; excluded as in the other scans).
 - `combined/`: 138 network + 73 fluid, 2 failed; Lyman-alpha for all 211.
 
-    python plot/relic_scan_theta.py tmp/mA50_scan/combined figures/mA50/relic_contours --mA 50 --mlim 1 800 --slim 1e-24 1e-8
+    python plot/relic_scan_theta.py tmp/mA50_scan/combined figures/mA50/relic_contours --mA 50 --mlim 1 800 \
+        --slim 1e-24 1e-8 --g-pert 1.333 [--all-points]
+
+`--g-pert 1.333` hatches the couplings above the largest scanned one (below its line of roots) as not
+computed. Allowed region: ~7 - 600 keV, g ~ 1e-3 - 1, closed by self-interactions below, X-rays above and
+at high mass, Lyman-alpha at low mass. Stopped at the coarse scan (user, 2026-11-06): the g ~ 1 roots
+carry the Pauli-blocking systematic above.
 
 Commands: `run_pilot.sh`, `run_pilot_benchmarks.sh`, `run_portal_scale.sh`, then the network scan
 (`src/run_network_scan.jl <tables> tmp/mA50_scan/network_scan tmp/mA50_scan/seeds/network_seeds.csv`,

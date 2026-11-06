@@ -169,6 +169,13 @@ def parse_args():
         help="CSV (name,m_keV,sin2_2theta,...) of benchmark points to mark as stars"
     )
     p.add_argument(
+        "--g-pert",
+        type=float,
+        default=None,
+        help="hatch the region of couplings above this one (the largest scanned, at the perturbative "
+             "limit) as not computed: below its line of roots"
+    )
+    p.add_argument(
         "--mlim",
         type=float,
         nargs=2,
@@ -556,6 +563,33 @@ def plot_n2_fraction(fig, ax, roots, mix, vmin, n=400):
     fig.colorbar(pc, ax=ax, pad=0.02, label=r"$n_{N_2}/n_{N_1}$ today")
 
 
+def plot_nonpert(ax, roots, g_pert):
+    """
+    Couplings above g_pert (--g-pert: the largest scanned, at the perturbative limit) were not
+    computed: hatched grey below the line of its roots (larger g, smaller mixing) down to the frame,
+    carried to the right edge along the slope of its last two roots. Not an exclusion.
+    """
+    pts = sorted((k[0], s) for k, s in roots.items() if np.isclose(k[1], g_pert, rtol=1e-3))
+    if len(pts) < 2:
+        print(f"--g-pert {g_pert}: fewer than two roots at that coupling, not drawn")
+        return
+    m, s = np.array(pts).T
+    if m[-1] < M_LIM[1]:
+        k = np.log(s[-1] / s[-2]) / np.log(m[-1] / m[-2])
+        m = np.append(m, M_LIM[1] * 2)
+        s = np.append(s, s[-1] * (M_LIM[1] * 2 / m[-2]) ** k)
+    lo = S_LIM[0] * 0.5
+    ax.fill(np.concatenate([m, m[::-1]]), np.concatenate([s, np.full_like(s, lo)]), facecolor="none",
+            edgecolor="0.45", hatch="\\\\\\\\", lw=0, zorder=Z_BOUND["si"] + 0.5)
+    ax.plot(m, s, color="0.45", lw=0.8, ls="--", zorder=Z_BOUND["si"] + 0.5)
+    # label in the middle of the visible part, a decade below the line
+    m_t = np.sqrt(max(m[0], M_LIM[0]) * min(m[-1], M_LIM[1]))
+    s_t = np.exp(np.interp(np.log(m_t), np.log(m), np.log(s))) / 30
+    ax.text(m_t, s_t, rf"$g > {g_pert:g}$" + "\n(non-perturbative)", fontsize=7, color="0.3",
+            ha="center", va="top", zorder=Z_LABEL,
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.8, pad=1.0))
+
+
 def plot_xrays(ax, m, s, hatch=None):
     """The X-ray region: grey over an opaque white underlay that hides the
     bounds below it, or with `hatch` (over the N2/N1 field) hatched in black
@@ -739,6 +773,8 @@ def main():
     )
     plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"], frac=0.55,
                hatch=hatch.get("si"))
+    if args.g_pert:
+        plot_nonpert(ax, roots, args.g_pert)
 
     excluded = {
         k: (

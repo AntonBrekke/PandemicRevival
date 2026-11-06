@@ -51,7 +51,8 @@ end
             A = Species(m, 2, T, m / T); nu = Species(0.0, 2, T, 0.0)
             ris = rate_density_scaled(tab, A, nu; propagator=:ris, rtol=1e-6)
             nw = nw_rate_density(tab, m, (T, T), s -> W_scaled(s, A, nu))
-            tol = tab.M == 0 ? 1e-6 : 5 * tab.Gamma / tab.M
+            # non-resonant: both quadratures at rtol 1e-6 (3.5e-6 apart at m_A' = 3 m_N)
+            tol = tab.M == 0 ? 1e-5 : 5 * tab.Gamma / tab.M
             @test isapprox(nw, ris; rtol=tol)
         end
     end
@@ -127,7 +128,7 @@ end
     mp = ModelParams{Float64}(g, th)
     N2 = Particle{Float64}(m, 1, dof=2)
     nu = Particle{Float64}(0.0, 1, dof=2)
-    A = Particle{Float64}(2.5m, -1, dof=3)
+    A = Particle{Float64}(pp.mA, -1, dof=3)
     r = reaction(:N2nu_A)
     for (x, ratio) in ((0.5, 0.3), (2.0, 1.0), (5.0, 0.6))
         T_nu = m / x
@@ -137,7 +138,7 @@ end
         c1, cEN2, cEA = coll_3_12_moments(mp, N2, nu, A, (T_N, T_nu, T_N), (xi_N, 0.0, xi_A))
         (lnRf, lnRr, lnQf, lnQr), _ = portal_point(r, pp, nothing, T_N, T_nu)
         gapN = m / T_N - xi_N
-        gapA = 2.5m / T_N - xi_A
+        gapA = pp.mA / T_N - xi_A
         Cn = exp(lnRf - gapN) - exp(lnRr - gapA)
         Crho = exp(lnQf - gapN) - exp(lnQr - gapA)
         @test isapprox(-c1, Cn; rtol=1e-4)

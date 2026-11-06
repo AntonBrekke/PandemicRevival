@@ -4,7 +4,7 @@ converged root and writes one row per root (`LYMAN_ALPHA_HEADER`). Distributed o
 worker processes.
 
     julia --project=. src/run_fluid_lyman_alpha.jl [--nproc 8] [--roots tmp/fluid_scan/fluid_roots.csv] [--out tmp/fluid_scan/lyman_alpha.csv]
-        [--tables tmp/rate_tables/rate_tables_mA2.5_mphi100.0.jls] [--m-nu 0.01]
+        [--tables tmp/rate_tables/rate_tables_mA3.0_mphi100.0.jls] [--m-nu 0.01]
 
 --m-nu [eV]: with equal-mass tables the late N1 N1 <-> N2 N2 conversions are followed with the
 splitting at fixed m_nu (`mnu_splitting`, default 0.01 eV = M_NU; 0 = none), which adds the

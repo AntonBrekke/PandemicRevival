@@ -9,7 +9,7 @@ labelled on the plot. The X-ray region is one line: the minimum over the current
 at each root (`scaled_xray_limit`), since only N1 decays to nu gamma. It is drawn over the
 constraint bounds below. Projected sensitivities (eROSITA, Athena, eXTP, rescaled the same way)
 only with --xray-proj, which writes <out>_xproj.pdf; --bp marks benchmark points; --mA sets
-m_A'/m_N (sigma/m and the label) for scans other than 2.5; --mlim LO HI [keV] and --slim LO HI
+m_A'/m_N (sigma/m and the label) for scans other than 3; --mlim LO HI [keV] and --slim LO HI
 set the frame (default 1 - 300 keV, 1e-18 - 1e-8).
 
 The roots are those of the freeze-in branch (the root searches only follow it). The
@@ -72,7 +72,7 @@ XRAY_DIR = os.path.join(ROOT, "..", "..", "xray_constraints")
 DW_DIR = os.path.join(ROOT, "data", "dw")
 
 OMEGA_TARGET = 0.12
-M_A_OVER_M_N = 2.5   # default of --mA
+M_A_OVER_M_N = 3.0   # default of --mA (2.5 before 2026-11-06)
 
 # Projected X-ray sensitivities (--xray-proj), as in Fig. 3 of 2206.10630: file in XRAY_DIR: label
 XRAY_PROJECTIONS = {
@@ -156,7 +156,7 @@ def parse_args():
         "--mA",
         type=float,
         default=M_A_OVER_M_N,
-        help="m_A'/m_N of the scan (sigma/m and the label; default 2.5)"
+        help="m_A'/m_N of the scan (sigma/m and the label; default 3)"
     )
     p.add_argument(
         "--xray-proj",

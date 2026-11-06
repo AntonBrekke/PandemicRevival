@@ -58,14 +58,15 @@ const M_NU = 1e-11
 
 # --------------------------------------------------------------------------- model
 """
-    rate_params(m_N, g, sin2_2theta; delta=0, m_nu, m_0, mphi_over_mN=100.0, mA_over_mN=2.5)
+    rate_params(m_N, g, sin2_2theta; delta=0, m_nu, m_0, mphi_over_mN=100.0, mA_over_mN=3.0)
 
 Couplings and masses of tree_amplitudes.jl for a relic point (masses in GeV).
 sin(theta_1) from sin^2(2 theta); m_alpha = sqrt(m_nu m_0), sin(theta_0) =
 m_alpha/m_0, m_M = sin(theta_1) m_0 m_D/(sqrt2 m_alpha), mu = m_M/m_0,
 y_+ = sqrt2 m_M/v_phi with v_phi = m_A'/g (draft, benchmark table).
 
-m_N is the mass of N1 (the dark matter), and m_A', m_phi are multiples of it.
+m_N is the mass of N1 (the dark matter), and m_A', m_phi are multiples of it (default m_A' = 3 m_N
+since 2026-11-06; 2.5 before).
 - delta = 0 (default): m_N1 = m_N2 = m_N, m_nu = M_NU = 0.01 eV, m_0 = 1 TeV, as in the
   original solver (the splitting `mnu_splitting` that m_nu implies is not carried by the
   masses of the solvers; the post-processing takes it per point, lyman_alpha.jl).
@@ -73,7 +74,7 @@ m_N is the mass of N1 (the dark matter), and m_A', m_phi are multiples of it.
   defdm) so that the couplings match the splitting; m_0 = 10 GeV by default (keeps y_+
   perturbative). m_nu cannot then be given.
 """
-function rate_params(m_N, g, sin2_2theta; delta=0.0, m_nu=nothing, m_0=nothing, mphi_over_mN=100.0, mA_over_mN=2.5)
+function rate_params(m_N, g, sin2_2theta; delta=0.0, m_nu=nothing, m_0=nothing, mphi_over_mN=100.0, mA_over_mN=3.0)
     th1 = sin(asin(sqrt(sin2_2theta)) / 2)
     m_D = m_N * (1 + delta)
     if delta > 0

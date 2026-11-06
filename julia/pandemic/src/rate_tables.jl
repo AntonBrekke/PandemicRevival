@@ -489,7 +489,7 @@ const LNR_GRID = range(log(1e-5), log(10.0), length=31)
 
 """Reference parameters of the tables: 10 keV, g = 1e-3, sin^2 2theta = 1e-14 (narrow widths),
 N1-N2 splitting `delta` (rate_params)."""
-reference_params(; mA_over_mN=2.5, mphi_over_mN=100.0, delta=0.0) =
+reference_params(; mA_over_mN=3.0, mphi_over_mN=100.0, delta=0.0) =
     rate_params(1e-5, 1e-3, 1e-14; mA_over_mN=mA_over_mN, mphi_over_mN=mphi_over_mN, delta=delta)
 
 """
@@ -500,7 +500,7 @@ NamedTuple (p_ref, grids, dark::Dict(name => (lnRf, lnRr)), portal::Dict(name
 => (lnRf, lnRr, lnQf, lnQr, ratio_Rf, ratio_Rr, ratio_Qf, ratio_Qr))) ready for
 `save_rate_tables`; a portal rate is exp(ln...) * ratio_... (`portal_point`).
 """
-function build_rate_tables(; mA_over_mN=2.5, mphi_over_mN=100.0, delta=0.0, reactions=REACTIONS,
+function build_rate_tables(; mA_over_mN=3.0, mphi_over_mN=100.0, delta=0.0, reactions=REACTIONS,
                            lnxN=LNXN_GRID, lnxnu=LNXNU_GRID, lnr=LNR_GRID, verbose=true)
     p = reference_params(; mA_over_mN=mA_over_mN, mphi_over_mN=mphi_over_mN, delta=delta)
     m = p.m1
@@ -534,7 +534,7 @@ function build_rate_tables(; mA_over_mN=2.5, mphi_over_mN=100.0, delta=0.0, reac
 end
 
 """File of a table set; tables with an N1-N2 splitting carry `_delta<delta>`."""
-rate_table_path(dir; mA_over_mN=2.5, mphi_over_mN=100.0, delta=0.0) =
+rate_table_path(dir; mA_over_mN=3.0, mphi_over_mN=100.0, delta=0.0) =
     joinpath(dir, "rate_tables_mA$(mA_over_mN)_mphi$(mphi_over_mN)" * (delta > 0 ? "_delta$(delta)" : "") * ".jls")
 
 save_rate_tables(path, tabs) = (mkpath(dirname(path)); Serialization.serialize(path, tabs); path)

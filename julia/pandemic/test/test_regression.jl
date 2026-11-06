@@ -29,7 +29,8 @@ same(a, b; kw...) = (isnan(a) && isnan(b)) || isapprox(a, b; kw...)
 
 const TMP = joinpath(@__DIR__, "..", "tmp")
 const TT = TimeTempRelation{Float64}()
-const ITP = RateInterpolants(load_rate_tables(rate_table_path(joinpath(TMP, "rate_tables"))))
+# the stored scans (tmp/network_scan, tmp/fluid_scan) are those of m_A' = 2.5 m_N
+const ITP = RateInterpolants(load_rate_tables(rate_table_path(joinpath(TMP, "rate_tables"); mA_over_mN=2.5)))
 
 @testset "network roots" begin
     roots = csv_rows(joinpath(TMP, "network_scan", "network_roots.csv"))

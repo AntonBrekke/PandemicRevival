@@ -2,7 +2,7 @@
 Build the rate tables of src/rate_tables.jl for one (m_A'/m_N, m_phi/m_N) and
 save them to tmp/rate_tables/.
 
-    julia --project=. -t 8 src/run_build_rate_tables.jl [--mA 2.5] [--mphi 100] [--delta 0] [--only name1,name2]
+    julia --project=. -t 8 src/run_build_rate_tables.jl [--mA 3] [--mphi 100] [--delta 0] [--only name1,name2]
 
 The tables do not depend on m_N or the couplings. `--delta` is the N1-N2 splitting
 (m_N2 - m_N1)/m_N1 (rate_params; default 0, the original equal-mass tables). Threads parallelise over
@@ -14,7 +14,7 @@ checks; the network needs all of them).
 include(joinpath(@__DIR__, "rate_tables.jl"))
 
 function parse_args(args)
-    opts = Dict("mA" => "2.5", "mphi" => "100", "delta" => "0", "only" => "")
+    opts = Dict("mA" => "3", "mphi" => "100", "delta" => "0", "only" => "")
     i = 1
     while i <= length(args)
         key = lstrip(args[i], '-')

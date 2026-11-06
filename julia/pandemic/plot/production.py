@@ -2,7 +2,7 @@
 Production figures in the style of the draft's Fig. (evolution), from the benchmark CSVs of
 src/run_benchmarks.jl: one PDF per point, for either solver.
 
-    python plot/production.py [csv | dir] [fig_dir] [--min 1e-2] [--mA 2.5]
+    python plot/production.py [csv | dir] [fig_dir] [--min 1e-2] [--mA 3]
 
 Defaults: tmp/benchmarks -> figures/production. Against x = m_N/T_nu:
 - top left: m_N n/s [keV] of each species, counting the N it decays into (A' -> 2 N,
@@ -142,7 +142,7 @@ def sci_tex(v):
     return rf"{m}\times 10^{{{int(e)}}}" if m != "1.00" else rf"10^{{{int(e)}}}"
 
 
-def plot(path, fig_dir, min_moved, mA=2.5):
+def plot(path, fig_dir, min_moved, mA=3.0):
     title = open(path).readline().lstrip("# ").strip()
     solver = title.split()[0]
     m_keV = float(re.search(r"m_N = ([\d.eE+-]+) keV", title).group(1))
@@ -262,7 +262,7 @@ if __name__ == "__main__":
         i = args.index("--min")
         min_moved = float(args[i + 1])
         del args[i:i + 2]
-    mA = 2.5
+    mA = 3.0
     if "--mA" in args:
         i = args.index("--mA")
         mA = float(args[i + 1])

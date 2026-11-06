@@ -87,8 +87,9 @@ end
     end
     # N2 N2 -> N1 N1 from the equal-mass tables (ln_conversion_shift) vs the delta = 1e-4 tables
     dir = joinpath(@__DIR__, "..", "tmp", "rate_tables")
-    t0 = RateInterpolants(load_rate_tables(rate_table_path(dir)))
-    t4 = RateInterpolants(load_rate_tables(rate_table_path(dir; delta=1e-4)))
+    # the delta = 1e-4 tables exist for m_A' = 2.5 m_N only
+    t0 = RateInterpolants(load_rate_tables(rate_table_path(dir; mA_over_mN=2.5)))
+    t4 = RateInterpolants(load_rate_tables(rate_table_path(dir; mA_over_mN=2.5, delta=1e-4)))
     m = 1.057e-5
     r = reaction(:N1N1_N2N2)
     l0, l4 = (ln_norm(r, table_params(t, m, 1e-3, 3.6e-15), t.p_ref) for t in (t0, t4))

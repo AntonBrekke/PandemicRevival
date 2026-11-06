@@ -6,6 +6,7 @@ include(joinpath(@__DIR__, "..", "src", "fluid.jl"))
 
 tT_rel = TimeTempRelation{Float64}()
 itp = RateInterpolants(load_rate_tables(rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))))
+const RA = mass_ratios(itp)[1]   # m_A'/m_N of the tables
 m = 10.57e-6
 g, th = 1e-2, asin(sqrt(2.6761e-17)) / 2
 
@@ -29,7 +30,7 @@ end
 @testset "chemical potentials of the fluid" begin
     pan = FluidSolver(m, tT_rel, itp)
     for (T_N, xi) in ((3m, -2.0), (0.1m, 4.0), (100m, -0.3))
-        gap_A = 2.5m / T_N - 2xi
+        gap_A = RA * m / T_N - 2xi
         gphi = gap_phi_of(pan, T_N, gap_A)
         @test isapprox(pan.phi.m / T_N - gphi, 4xi; rtol=1e-10, atol=1e-10)
         n = num_dens(pan, T_N, xi; gap_A=gap_A)
@@ -43,10 +44,10 @@ end
     pan = FluidSolver(m, tT_rel, itp)
     pan.mp = ModelParams{Float64}(g, th)
     for T in (3m, 0.5m)
-        gA = 2.5m / T
+        gA = RA * m / T
         # the scale: the linear response, at mu/T = +-0.02
-        tp = table_collision(pan, T, T, 0.02, 2.5m / T - 0.04)
-        tm = table_collision(pan, T, T, -0.02, 2.5m / T + 0.04)
+        tp = table_collision(pan, T, T, 0.02, RA * m / T - 0.04)
+        tm = table_collision(pan, T, T, -0.02, RA * m / T + 0.04)
         cn, cr = table_collision(pan, T, T, 0.0, gA)
         @test tp[1] * tm[1] < 0      # (not symmetric: Delta mu reaches 15 mu, e^(15 * 0.02) = 1.35)
         # the fixed point moves by less than 1e-3 in mu/T (the portal tables balance to ~1e-6-1e-4)
@@ -56,8 +57,8 @@ end
         # rounding noise and the quadrature never meets its relative tolerance, so test that
         # the net rate is odd in mu around 0 instead
         dl = 0.02
-        for f in ((T, xi) -> phi_N1nu_moments(pan, T, T, xi, 2.5m / T - 2xi)[1],
-                  (T, xi) -> A_N2nu_moments(pan, T, T, xi; gap_A=2.5m / T - 2xi)[1])
+        for f in ((T, xi) -> phi_N1nu_moments(pan, T, T, xi, RA * m / T - 2xi)[1],
+                  (T, xi) -> A_N2nu_moments(pan, T, T, xi; gap_A=RA * m / T - 2xi)[1])
             cp, cm = f(T, dl), f(T, -dl)
             @test cp * cm < 0
             @test isapprox(cp, -cm; rtol=0.1)
@@ -73,7 +74,7 @@ end
     p = fluid_rates!(pan)
     for (T_N, T_nu) in ((20m, 20m), (5m, 8m))
         xi = -15.0
-        gA = 2.5m / T_N - 2xi
+        gA = RA * m / T_N - 2xi
         d = phi_N1nu_moments(pan, T_nu, T_N, xi, gA)          # net phi decay (phi -> N1 nu)
         t = itp.portal[:N1nu_phi]
         lnR, _ = pan.norms[:N1nu_phi]

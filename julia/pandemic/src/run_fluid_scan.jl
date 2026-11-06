@@ -5,7 +5,7 @@ y >= ymin, starting from the seed's sin^2 2theta. Distributed over worker proces
 
     julia --project=. src/run_fluid_scan.jl [--nproc 8] [--ymin 1e-3] [--out tmp/fluid_scan]
         [--points tmp/network_scan/network_roots.csv] [--only m_keV:y,...] [--portal-scale 1.0]
-        [--tables tmp/rate_tables/rate_tables_mA2.5_mphi100.0.jls] [--min-step 0.3]
+        [--tables tmp/rate_tables/rate_tables_mA3.0_mphi100.0.jls] [--min-step 0.3]
 
 --min-step: smallest step in ln sin^2 2theta before the root is bracketed (`fluid_root`);
 smaller than the default 0.3 for seeds that are already close (e.g. 0.03 for seeds within ~5%).
@@ -24,7 +24,7 @@ the fluid at mu = 0 (number-changing equilibrium), not whether the one-fluid ass
 using Distributed
 using Printf
 
-rate_table_path_default() = joinpath(@__DIR__, "..", "tmp", "rate_tables", "rate_tables_mA2.5_mphi100.0.jls")
+rate_table_path_default() = rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"))
 
 function parse_opts(args)
     o = Dict("nproc" => "8", "ymin" => "1e-3", "out" => joinpath(@__DIR__, "..", "tmp", "fluid_scan"),

@@ -5,9 +5,9 @@ using Test
 include(joinpath(@__DIR__, "..", "src", "rate_tables.jl"))
 
 # TABLE_DELTA=<delta> checks the tables built with an N1-N2 splitting (default: equal masses);
-# TABLE_MA, TABLE_MPHI another set of mass ratios (default 2.5, 100); TABLE_ALL=1 every reaction
+# TABLE_MA, TABLE_MPHI another set of mass ratios (default 3, 100); TABLE_ALL=1 every reaction
 path = rate_table_path(joinpath(@__DIR__, "..", "tmp", "rate_tables"); delta=parse(Float64, get(ENV, "TABLE_DELTA", "0")),
-                       mA_over_mN=parse(Float64, get(ENV, "TABLE_MA", "2.5")), mphi_over_mN=parse(Float64, get(ENV, "TABLE_MPHI", "100")))
+                       mA_over_mN=parse(Float64, get(ENV, "TABLE_MA", "3")), mphi_over_mN=parse(Float64, get(ENV, "TABLE_MPHI", "100")))
 const NAMES = get(ENV, "TABLE_ALL", "0") == "1" ?
     Tuple(r.name for r in REACTIONS) :
     (:N1N1_N2N2, :A_N1N2, :N1N1_AA, :N2nu_A, :N1nu_phi, :N1nu_N2N2, :N2nu_N1N2, :N1nu_AA)

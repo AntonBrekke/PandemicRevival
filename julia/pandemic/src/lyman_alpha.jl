@@ -134,8 +134,8 @@ function DarkHistory(pan::FluidSolver, sol; delta=pan.N2.m / pan.N1.m - 1)
     dm_extra = delta * pan.N1.m - (pan.N2.m - pan.N1.m)
     function state(u, z)
         T, gap = N_temp_gap(pan, u)
-        xi = xi_from_eta(pan, u[4], u[3])
-        gA = gap_A_from_eta(u[4])
+        xi = xi_of(pan, u[4], u[3])
+        gA = gap_A_of(pan, u[4], u[3])
         return (T, gap, N2_gap(pan, u) + dm_extra / T, number_density(pan.N1, T, 0.0; gap=gap),
                 pressure_dens(pan, T, xi; gap_A=gA), energy_dens(pan, T, xi; gap_A=gA))
     end

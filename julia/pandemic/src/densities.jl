@@ -114,6 +114,28 @@ function rho_xi(p, temp, xi; gap=nothing)
 end
 
 
+"""
+    kinetic_density(p, temp, xi; gap)
+
+rho - m n = dof/(2 pi^2) ∫ dE E |p| (E - m) f, without the cancellation of the difference (the
+fluid's temperature variable, cold fluids: T/m ~ 1e-5). In the MB closed form
+(m^4/(2 pi^2 x)) e^-gap [besselkx(1, x) + 3 besselkx(2, x)/x - besselkx(2, x)], which loses
+~x eps (<= 1e-11 for x <= 1e5); the quadrature uses E - m = |p|^2/(E + m).
+"""
+function kinetic_density(p::Particle{T}, temp::R, xi::S; gap=nothing) where {T<:Real, R<:Real, S<:Real}
+    x = p.m / temp
+    x_xi_diff = isnothing(gap) ? x - xi : gap
+    if (p.k == 0) || (x_xi_diff >= m_T_r_MB)
+        if x > 1e-10
+            k1, k2 = SF.besselkx(1, x), SF.besselkx(2, x)
+            return p.dof * exp(-x_xi_diff) * p.m^4 * (k1 - k2 + 3. / x * k2) / (2. * pi^2 * x)
+        end
+        return p.dof * 3 * exp(-x_xi_diff) * (temp^4) / pi^2
+    end
+    return thermal_moment(p, temp, x_xi_diff, (E, mom) -> E * mom^3 / (E + p.m))
+end
+
+
 function rho_3P_diff(p::Particle{T}, temp::R, xi::R; gap=nothing) where {T<:Real, R<:Real}
     x = p.m / temp
     x_xi_diff = isnothing(gap) ? x - xi : gap

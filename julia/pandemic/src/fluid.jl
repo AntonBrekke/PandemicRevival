@@ -16,15 +16,29 @@ positive for m_phi > 2 m_A' whenever the A' gap is: no condensation.
 
 STATE
 =====
-u = [ln Y_n, ln Y_rho, ln x_N, eta] against z = ln(m_N/T_nu), with Y_n = n~/s,
-Y_rho = rho/s^(4/3), x_N = m_N/T_N and e^eta = (m_A' - mu_A')/T_N. The last two are
+u = [ln Y_n, ln w, ln x_N, gap_N] against z = ln(m_N/T_nu), with Y_n = n~/s,
+w = ln(rho/(m_N n~)), x_N = m_N/T_N and gap_N = (m_N - mu)/T_N. The last two are
 algebraic (mass matrix diag(1, 1, 0, 0)): (T_N, mu) such that the equilibrium n~ and rho
 equal the state. n~ = n_N1 + n_N2 + 2 n_A' + 4 n_phi is the number of N after all decays;
 A' -> N1 N2, phi -> A'A' and N1 N1 <-> N2 N2 do not change it. Per reaction,
 Delta n~ = sum_F w - sum_I w with w = (1, 1, 2, 4) for (N1, N2, A', phi) (0 for nu).
 
-    d ln Y_n/dz   = (x/xdot) C_n~ / n~,
-    d ln Y_rho/dz = (x/xdot) [H (rho - 3P) + C_rho] / rho.
+    d ln Y_n/dz = (x/xdot) C_n~ / n~,
+    d ln w/dz   = (x/xdot) [-3 H P/rho + C_rho/rho - C_n~/n~] / w.
+
+w > 0 (every particle carries at least m_N per unit of n~, as m_A' > 2 m_N, m_phi > 4 m_N), and
+w ~ (3/2) T_N/m_N for a cold fluid: the solver's tolerance applies to the kinetic energy itself.
+The constraint takes w of the state as ln(1 + K/(m_N n~)), K = rho - m_N n~ from `kin_dens`
+without cancellation: ln(rho/(m_N n~)) from the separate density quadratures (rtol 1e-10) is noise
+at the scale the finite-difference Jacobian probes (w changes by ~w 1e-7), and the solve stalled.
+The A' gap follows as (m_A'/m_N - 2) x_N + 2 gap_N, without cancellation for gap_N >= 0. (The state
+carried e^eta = A' gap before, and gap_N = e^eta/2 - (m_A'/(2 m_N) - 1) x_N: a difference of two
+numbers ~ x_N, ill-conditioned once the fluid is cold, x_N ~ 1e3 - 1e5; with the correct cooling the
+solves stalled there, at x ~ 35 for m_A' = 50 m_N and x ~ 600 for 3 m_N. eta is kept for the initial
+state, where the A' can be relativistic and near condensation.) The domain requires A' gap > 0. (With ln Y_rho, |u| ~ 5 - 40, reltol 1e-4 left ln rho and ln n uncertain by ~1e-3, and T_N,
+read off rho/n - m_N, froze at ~1e-3 m_N once the fluid had cooled below that: at m_A' = 50,
+6.3 keV, g = 3e-3, T_N/T_nu rose from 0.04 at x = 20 to 0.19 at x = 100 where the network, and
+adiabatic cooling, give 0.0065. Relic densities were unaffected; the Lyman-alpha lengths were not.)
 
 COLLISION TERMS
 ===============
@@ -191,17 +205,21 @@ spurious Bose condensation.
 """
 gap_A_from_eta(eta) = max(exp(eta), 1e-300)
 
-"""xi_N = mu/T_N from (eta, ln x_N), with mu_A' = 2 mu."""
+"""xi_N = mu/T_N from (eta, ln x_N), with mu_A' = 2 mu (initial state)."""
 xi_from_eta(pan, eta, ln_x_N) = (pan.A.m / pan.N1.m * exp(ln_x_N) - gap_A_from_eta(eta)) / 2
+
+"""xi_N = mu/T_N of the state: x_N - gap_N."""
+xi_of(pan, gap_N, ln_x_N) = exp(ln_x_N) - gap_N
+
+"""The A' gap of the state, (m_A'/m_N - 2) x_N + 2 gap_N (mu_A' = 2 mu), floored at 1e-300."""
+gap_A_of(pan, gap_N, ln_x_N) = max((pan.A.m / pan.N1.m - 2) * exp(ln_x_N) + 2 * gap_N, 1e-300)
 
 """(m_phi - mu_phi)/T_N with mu_phi = 2 mu_A'."""
 gap_phi_of(pan::FluidSolver, T_N, gap_A) = (pan.phi.m - 2 * pan.A.m) / T_N + 2 * gap_A
 
 """(T_N, (m_N1 - mu)/T_N) of N1 in the state u (N2: `N2_gap`)."""
 function N_temp_gap(pan::FluidSolver, u)
-    x_N = exp(u[3])
-    gap = x_N * (1 - pan.A.m / (2 * pan.N1.m)) + gap_A_from_eta(u[4]) / 2
-    return T_N_from_ln_x_N(pan, u[3]), gap
+    return T_N_from_ln_x_N(pan, u[3]), u[4]
 end
 
 """(m_N2 - mu)/T_N in the state u: the N1 gap plus (m_N2 - m_N1)/T_N (equal for delta = 0)."""
@@ -221,6 +239,17 @@ function energy_dens(pan::FluidSolver, T_N, xi_N; gap_A)
     return max(rho, 1e-300)
 end
 
+"""rho - m_N n~ of the fluid without cancellation (see `kinetic_density`): the N kinetic energies and
+rho - 2 m_N n_A', rho - 4 m_N n_phi (>= 0 for m_A' > 2 m_N, m_phi > 4 m_N; negligible whenever the N are cold)."""
+function kin_dens(pan::FluidSolver, T_N, xi_N; gap_A)
+    gphi = gap_phi_of(pan, T_N, gap_A)
+    m = pan.N1.m
+    return kinetic_density(pan.N1, T_N, xi_N) + kinetic_density(pan.N2, T_N, xi_N) +
+           (pan.N2.m - m) * number_density(pan.N2, T_N, xi_N) +
+           (energy_density(pan.A, T_N, 2 * xi_N; gap=gap_A) - 2m * number_density(pan.A, T_N, 2 * xi_N; gap=gap_A)) +
+           (energy_density(pan.phi, T_N, 4 * xi_N; gap=gphi) - 4m * number_density(pan.phi, T_N, 4 * xi_N; gap=gphi))
+end
+
 function rho_3P(pan::FluidSolver, T_N, xi_N; gap_A)
     return rho_3P_diff(pan.N1, T_N, xi_N) + rho_3P_diff(pan.N2, T_N, xi_N) +
            rho_3P_diff(pan.A, T_N, 2 * xi_N; gap=gap_A) +
@@ -234,8 +263,8 @@ pressure_dens(pan::FluidSolver, T_N, xi_N; gap_A) =
 """Densities (n_N1, n_N2, n_A', n_phi), T_N, xi_N and the A' gap of a state u."""
 function fluid_state(pan::FluidSolver, u)
     T_N = T_N_from_ln_x_N(pan, u[3])
-    xi_N = xi_from_eta(pan, u[4], u[3])
-    gap_A = gap_A_from_eta(u[4])
+    xi_N = xi_of(pan, u[4], u[3])
+    gap_A = gap_A_of(pan, u[4], u[3])
     n = (number_density(pan.N1, T_N, xi_N), number_density(pan.N2, T_N, xi_N),
          number_density(pan.A, T_N, 2xi_N; gap=gap_A),
          number_density(pan.phi, T_N, 4xi_N; gap=gap_phi_of(pan, T_N, gap_A)))
@@ -265,11 +294,11 @@ stiff solver can still jump to absurd values (T_N/T_nu from 1e-70 to 1e8 have be
 where the densities and collision terms break down. Required: all components finite;
 T_N <= T_ratio_max T_nu (the dark sector only receives energy from the DW population and
 the neutrinos); T_N >= T_ratio_min min(T_nu, T_nu^2/m_N) (a decoupled dark sector cools
-at most like a^-2); e^eta >= 1e-300.
+at most like a^-2); A' gap > 0.
 """
 function in_physical_domain(pan, u, T_nu)
     all(isfinite, u) || return false
-    u[4] >= log(1e-300) || return false
+    (pan.A.m / pan.N1.m - 2) * exp(u[3]) + 2 * u[4] > 1e-300 || return false
     ln_x_nu = log(pan.N1.m / T_nu)
     ln_T_ratio = ln_x_nu - u[3]
     return log(pan.T_ratio_min) - max(zero(ln_x_nu), ln_x_nu) <= ln_T_ratio <= log(pan.T_ratio_max)
@@ -415,16 +444,19 @@ function fluid_rhs!(du, u, pan::FluidSolver, z)
     ent = pan.ent_interp_z(z)
     dx_dt = pan.dx_dt_interp_z(z)
     n = exp(u[1]) * ent
-    rho = exp(u[2]) * ent^(4 / 3)
+    rho = pan.N1.m * n * exp(exp(u[2]))
     T_nu = pan.N1.m / x
     T_N = T_N_from_ln_x_N(pan, u[3])
-    xi_N = xi_from_eta(pan, u[4], u[3])
-    gap_A = gap_A_from_eta(u[4])
+    xi_N = xi_of(pan, u[4], u[3])
+    gap_A = gap_A_of(pan, u[4], u[3])
     coll_n, coll_rho = collision_terms(pan, T_nu, T_N, xi_N; gap_A=gap_A)
+    E = energy_dens(pan, T_N, xi_N; gap_A=gap_A)
+    nE = num_dens(pan, T_N, xi_N; gap_A=gap_A)
+    P_over_rho = (E - rho_3P(pan, T_N, xi_N; gap_A=gap_A)) / (3E)
     du[1] = x * coll_n / (n * dx_dt)
-    du[2] = x * (H * rho_3P(pan, T_N, xi_N; gap_A=gap_A) + coll_rho) / (rho * dx_dt)
-    du[3] = u[1] - log(num_dens(pan, T_N, xi_N; gap_A=gap_A) / ent)
-    du[4] = u[2] - log(energy_dens(pan, T_N, xi_N; gap_A=gap_A) / ent^(4 / 3))
+    du[2] = x * (-3H * P_over_rho + coll_rho / rho - coll_n / n) / (exp(u[2]) * dx_dt)
+    du[3] = u[1] - log(nE / ent)
+    du[4] = u[2] - log(log1p(kin_dens(pan, T_N, xi_N; gap_A=gap_A) / (pan.N1.m * nE)))
     return nothing
 end
 
@@ -444,7 +476,8 @@ function initial_conditions(tT_rel, dw, pan::FluidSolver)
     z_0 = log(pan.N1.m / tT_rel.T_nu_grid[dw.i_ic])
     ent0 = pan.ent_interp_z(z_0)
     sol = NLS.solve(NLS.NonlinearProblem(n_rho_root, [z_0, 0.0], (pan=pan, n_ic=dw.n_ic, rho_ic=dw.rho_ic)))
-    return [log(dw.n_ic / ent0), log(dw.rho_ic / ent0^(4 / 3)), sol.u[1], sol.u[2]]
+    gap_N = exp(sol.u[1]) - xi_from_eta(pan, sol.u[2], sol.u[1])
+    return [log(dw.n_ic / ent0), log(log(dw.rho_ic / (pan.N1.m * dw.n_ic))), sol.u[1], gap_N]
 end
 
 """Solve from T_dw to x_end of `dw`."""
@@ -457,11 +490,14 @@ function solve_fluid(tT_rel::TimeTempRelation, dw::DodelsonWidrow, pan::FluidSol
                     isoutofdomain=(u, p, t) -> !in_physical_domain(p, u, p.N1.m / exp(t)), kw...)
 end
 
-"""Whether Omega h^2 has settled over the last `frac` of the solution, to relative spread `tol`."""
-function check_plateau(pan::FluidSolver, sol; frac=0.05, tol=1e-3)
-    n = length(sol.t)
-    idx = (n - min(n, max(3, ceil(Int, frac * n))) + 1):n
-    tail = [omega_h2_of(pan, sol.u[i], sol.t[i]) for i in idx]
+"""
+Whether Omega h^2 has settled over the last factor `span` in x of the solution (6 points of the dense
+output), to relative spread `tol`. (A fraction of the steps does not do: the late, frozen phase is
+crossed in a few large steps, and the last 5% of them reached back into the production.)
+"""
+function check_plateau(pan::FluidSolver, sol; span=3.0, tol=1e-3)
+    zs = range(sol.t[end] - log(span), sol.t[end]; length=6)
+    tail = [omega_h2_of(pan, sol(z), z) for z in zs]
     return (maximum(tail) - minimum(tail)) / abs(sum(tail) / length(tail)) < tol
 end
 

@@ -1,4 +1,29 @@
-# Scan at m_A' = 3 m_N (2026-10-27)
+# Scan at m_A' = 3 m_N (2026-10-27; rerun 2026-11-07, the default scan)
+
+## Rerun 2026-11-07 (branch pauli-exact)
+
+All roots and Lyman-alpha lengths of `network_scan{,_fine}`, `fluid_scan{,_fine}`, `combined` recomputed
+with the current solvers: reduced network, m_nu = 0.01 eV (M_NU; 0.1 eV before), the fluid with the
+exact Pauli blocking of the portal 2 <-> 2 (`portal_tables.jl`) and with the cold-temperature fix (its
+T_N froze at ~1e-3 m_N late on before, so its Lyman-alpha lengths were too large). Seeds: the first
+scan's roots (`make_seeds_v2.py`, `seeds/*_v2*`); driver `run_mA3_v2.sh` (ThinkStation, 10 workers:
+network 27 min, fluid base 154 min, fine 103 min, with Lyman-alpha ~6 h in all). The first scan is in
+git history (commit b1cb53f and before). `mnu0.01/` (post-processing of the first scan at 0.01 eV) is
+superseded.
+
+- network: 492/654 (base; the rest degenerate at g >~ 3e-3, fluid domain) and 420/420 (fine) converged.
+- fluid: 226/234 and 201/208 converged (8 + 7 bracketed: Omega jumps at the take-off).
+- combined: 1275 roots, all with Lyman-alpha lengths.
+- Against the first scan (new/old, median [5%, 95%]): roots 1.000 for 1e-6 <= g < 1e-2; 1.063
+  [1.010, 1.175] at g >= 1e-2 (Pauli); down to 0.886 at a few points with g < 1e-6 (m_nu = 0.01 eV:
+  the splitting threshold of `figures/mnu_threshold.pdf`). lambda_fs,kd 0.979 [0.918, 1.006] at
+  g = 1e-3 - 1e-2 and 0.836 [0.591, 1.002] at g >= 1e-2 (the temperature fix); unchanged below.
+- The money plot is unchanged to the eye: all of it happens at g >= 1e-2, inside the self-interaction
+  region. X-ray BPs (`xray_bps.csv`, kept): roots and margins unchanged (network, g ~ 1e-4);
+  `xray_bps_candidates.csv` lists all 15 candidates. Benchmarks rerun at the new roots
+  (`run_benchmarks_v2.sh`; the fluid at g = 1e-3 at its bracket, 3.775e-15).
+
+The sections below describe the first scan.
 
 m_phi = 100 m_N, equal-mass tables (`tmp/rate_tables/rate_tables_mA3.0_mphi100.0.jls`, 44 min on
 12 threads), post-processing with the N1-N2 splitting at m_nu = 0.1 eV (`mnu_splitting`; changes

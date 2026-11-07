@@ -16,7 +16,7 @@ positive for m_phi > 2 m_A' whenever the A' gap is: no condensation.
 
 STATE
 =====
-u = [ln Y_n, ln w, ln x_N, gap_N] against z = ln(m_N/T_nu), with Y_n = n~/s,
+u = [ln Y_n, w, ln x_N, gap_N] against z = ln(m_N/T_nu), with Y_n = n~/s,
 w = ln(rho/(m_N n~)), x_N = m_N/T_N and gap_N = (m_N - mu)/T_N. The last two are
 algebraic (mass matrix diag(1, 1, 0, 0)): (T_N, mu) such that the equilibrium n~ and rho
 equal the state. n~ = n_N1 + n_N2 + 2 n_A' + 4 n_phi is the number of N after all decays;
@@ -24,10 +24,12 @@ A' -> N1 N2, phi -> A'A' and N1 N1 <-> N2 N2 do not change it. Per reaction,
 Delta n~ = sum_F w - sum_I w with w = (1, 1, 2, 4) for (N1, N2, A', phi) (0 for nu).
 
     d ln Y_n/dz = (x/xdot) C_n~ / n~,
-    d ln w/dz   = (x/xdot) [-3 H P/rho + C_rho/rho - C_n~/n~] / w.
+    dw/dz       = (x/xdot) [-3 H P/rho + C_rho/rho - C_n~/n~].
 
 w > 0 (every particle carries at least m_N per unit of n~, as m_A' > 2 m_N, m_phi > 4 m_N), and
-w ~ (3/2) T_N/m_N for a cold fluid: the solver's tolerance applies to the kinetic energy itself.
+w ~ (3/2) T_N/m_N for a cold fluid: with absolute tolerance 1e-12 on it (`solve_fluid`) the
+solver's relative tolerance applies to the kinetic energy itself. (ln w as the variable stalled at
+the take-off at large g, where n~ grows by e^12 within dx/x ~ 5%: steps of dx/x ~ 1e-4.)
 The constraint takes w of the state as ln(1 + K/(m_N n~)), K = rho - m_N n~ from `kin_dens`
 without cancellation: ln(rho/(m_N n~)) from the separate density quadratures (rtol 1e-10) is noise
 at the scale the finite-difference Jacobian probes (w changes by ~w 1e-7), and the solve stalled.
@@ -444,7 +446,7 @@ function fluid_rhs!(du, u, pan::FluidSolver, z)
     ent = pan.ent_interp_z(z)
     dx_dt = pan.dx_dt_interp_z(z)
     n = exp(u[1]) * ent
-    rho = pan.N1.m * n * exp(exp(u[2]))
+    rho = pan.N1.m * n * exp(u[2])
     T_nu = pan.N1.m / x
     T_N = T_N_from_ln_x_N(pan, u[3])
     xi_N = xi_of(pan, u[4], u[3])
@@ -454,9 +456,9 @@ function fluid_rhs!(du, u, pan::FluidSolver, z)
     nE = num_dens(pan, T_N, xi_N; gap_A=gap_A)
     P_over_rho = (E - rho_3P(pan, T_N, xi_N; gap_A=gap_A)) / (3E)
     du[1] = x * coll_n / (n * dx_dt)
-    du[2] = x * (-3H * P_over_rho + coll_rho / rho - coll_n / n) / (exp(u[2]) * dx_dt)
+    du[2] = x * (-3H * P_over_rho + coll_rho / rho - coll_n / n) / dx_dt
     du[3] = u[1] - log(nE / ent)
-    du[4] = u[2] - log(log1p(kin_dens(pan, T_N, xi_N; gap_A=gap_A) / (pan.N1.m * nE)))
+    du[4] = u[2] - log1p(kin_dens(pan, T_N, xi_N; gap_A=gap_A) / (pan.N1.m * nE))
     return nothing
 end
 
@@ -477,7 +479,7 @@ function initial_conditions(tT_rel, dw, pan::FluidSolver)
     ent0 = pan.ent_interp_z(z_0)
     sol = NLS.solve(NLS.NonlinearProblem(n_rho_root, [z_0, 0.0], (pan=pan, n_ic=dw.n_ic, rho_ic=dw.rho_ic)))
     gap_N = exp(sol.u[1]) - xi_from_eta(pan, sol.u[2], sol.u[1])
-    return [log(dw.n_ic / ent0), log(log(dw.rho_ic / (pan.N1.m * dw.n_ic))), sol.u[1], gap_N]
+    return [log(dw.n_ic / ent0), log(dw.rho_ic / (pan.N1.m * dw.n_ic)), sol.u[1], gap_N]
 end
 
 """Solve from T_dw to x_end of `dw`."""
@@ -486,7 +488,7 @@ function solve_fluid(tT_rel::TimeTempRelation, dw::DodelsonWidrow, pan::FluidSol
     z_lim = (log(pan.N1.m / tT_rel.T_nu_grid[dw.i_ic]), log(pan.N1.m / tT_rel.T_nu_grid[dw.i_end+1]))
     f = DE.ODEFunction(fluid_rhs!, mass_matrix=LA.Diagonal([1.0, 1.0, 0.0, 0.0]))
     prob = DE.ODEProblem(f, initial_conditions(tT_rel, dw, pan), z_lim, pan)
-    return DE.solve(prob, ODER.Rodas4P(autodiff=AutoFiniteDiff()); reltol=reltol,
+    return DE.solve(prob, ODER.Rodas4P(autodiff=AutoFiniteDiff()); reltol=reltol, abstol=[1e-6, 1e-12, 1e-6, 1e-6],
                     isoutofdomain=(u, p, t) -> !in_physical_domain(p, u, p.N1.m / exp(t)), kw...)
 end
 

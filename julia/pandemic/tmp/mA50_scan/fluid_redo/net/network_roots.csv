@@ -1,0 +1,3 @@
+m_N,y,s2_reduced,omega_reduced,s2_network,omega_network,status,n_solves,seconds
+6e-07,0.01,5.402e-18,0.12,5.37464e-18,NaN,degenerate,21,12.1
+6.274e-06,0.003162,6.342e-16,0.12,6.33426e-16,0.11989,converged,7,9.1

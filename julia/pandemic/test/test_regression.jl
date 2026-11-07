@@ -53,8 +53,10 @@ end
     for key in ((30.0, 3.162e-3), (10.57, 0.01))
         r, l = roots[key], lya[key]
         res = lyman_alpha_fluid(ITP, TT, key[1] * 1e-6, key[2], num(r, "s2_fluid"); m_nu=MNU_REF)
-        # the fluid solve at reltol 1e-4 reproduces Omega h^2 to ~1e-3 at these roots
-        @test res.omega_h2 ≈ num(l, "omega_h2") rtol = 5e-3
+        # the fluid solve at reltol 1e-4 reproduces Omega h^2 to ~1e-3 at these roots with the state of the
+        # stored scan; with the state [ln Y_n, w, ln x_N, gap_N] (2026-11-07) the take-off is stepped
+        # differently and Omega h^2 moves by up to 0.6% (the root by < 0.1%: d ln Omega/d ln s2 >~ 5)
+        @test res.omega_h2 ≈ num(l, "omega_h2") rtol = 1e-2
         @test res.lambda_fs ≈ num(l, "lambda_fs_Mpc") rtol = 5e-3
         @test res.lambda_fs_kd ≈ num(l, "lambda_fs_kd_Mpc") rtol = 1e-2
         @test res.r_s ≈ num(l, "r_s_Mpc") rtol = 1e-2

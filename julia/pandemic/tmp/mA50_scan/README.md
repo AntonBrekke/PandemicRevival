@@ -47,6 +47,17 @@ alternating fluid and network roots along g = 1e-3 - 3e-3 folded the lambda_fs b
   stops degenerate at g = 1e-2); Lyman-alpha for all 211. Pauli shifts against the MB scan: +5 - 15% in
   sin^2 2theta at g >= 0.3, < 5% below.
 
+Fluid roots again on 2026-11-08 with the final fluid (the 11-07 rerun had the Pauli tables but the old
+fluid state; only its Lyman-alpha lengths were from the fixed fluid): `run_mA50_v3.sh`, seeds from the
+roots above (`make_seeds_v3.py`), 9 workers, 23 min + 16 min Lyman-alpha.
+- `fluid_scan/`: 78 converged, 5 bracketed. `combined/`: 134 network + 78 fluid, 1 failed (0.6 keV,
+  g = 1e-2); 212 with Lyman-alpha lengths. Against the 11-07 scan roots agree to 0.1% and lambda_fs,kd to
+  1% (medians 1.000); 33 allowed roots, as before.
+- `benchmark_roots/`: the off-grid fluid benchmarks (300 keV at g = 0.1, 1; 600 keV at 1.333; 10.57 keV
+  at 1), seeded from `pauli/`; all four seeds already within 1% of 0.12.
+- `benchmarks/`: all 11 histories at these roots with the final code (`run_benchmarks_v3.sh`; network
+  roots unchanged). The earlier ones were MB with the frozen fluid temperature.
+
     python plot/relic_scan_theta.py tmp/mA50_scan/combined figures/mA50/relic_contours --mA 50 --mlim 1 800 \
         --slim 1e-24 1e-8 --g-pert 1.333 [--all-points]
 

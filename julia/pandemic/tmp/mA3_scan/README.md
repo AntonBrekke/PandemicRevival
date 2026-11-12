@@ -1,5 +1,19 @@
 # Scan at m_A' = 3 m_N (2026-10-27; rerun 2026-11-07, the default scan)
 
+## Benchmark points: which file is which (read first)
+
+| file | points | role |
+|---|---|---|
+| `bp_round/bps.csv` | BP1 10 keV, g = 2e-4; BP2 20 keV, g = 1e-3 | **the benchmark points** (round m_N, g; chosen 2026-11-05). Pass this to `--bp`. |
+| `xray_bps.csv` | 10.57, 13.72, 17.81 keV, g ~ 1e-4 - 4e-4 | older X-ray candidates (2026-10-27): allowed now, within Athena/eXTP reach. Not the BPs. |
+| `xray_bps_candidates.csv` | 15 points | all X-ray candidates |
+| `benchmarks/` | 10.57 keV, g = 1e-7 - 0.056 | standard histories across g (not BPs) |
+
+`bp_round/README.md` has the BP roots and history; `bp_round/run_bps.sh` recomputes them (roots,
+Lyman-alpha, histories). Make all m_A' = 3 figures with `./tmp/mA3_scan/make_figures.sh`: the money plots
+with the BPs are `figures/mA3/relic_contours_bp{,_xproj}.pdf`, their histories `figures/mA3/{benchmarks,production}_bp_round/`.
+`relic_scan_theta.py --xray-proj` writes only `<out>_xproj.pdf`, not `<out>.pdf`: run it twice.
+
 ## Rerun 2026-11-07 (branch pauli-exact)
 
 All roots and Lyman-alpha lengths of `network_scan{,_fine}`, `fluid_scan{,_fine}`, `combined` recomputed
@@ -74,7 +88,6 @@ Fine fluid grid (~2 h + ~0.6 h Lyman-alpha on the ThinkStation with 12 workers):
     julia --project=. src/run_fluid_lyman_alpha.jl --nproc 11 --roots tmp/mA3_scan/fluid_scan_fine/fluid_roots.csv \
         --out tmp/mA3_scan/fluid_scan_fine/lyman_alpha.csv --tables tmp/rate_tables/rate_tables_mA3.0_mphi100.0.jls
     conda run -n pandemic python plot/combined_scan_dir.py tmp/mA3_scan/combined 1e-3 tmp/mA3_scan
-    conda run -n pandemic python plot/relic_scan_theta.py tmp/mA3_scan/combined figures/mA3/relic_contours --mA 3 [--xray-proj --bp tmp/mA3_scan/xray_bps.csv]
+    ./tmp/mA3_scan/make_figures.sh        # every m_A' = 3 figure (money plots with/without BPs, histories)
 
-Figures: `production.py tmp/mA3_scan/benchmarks{,_xray} figures/mA3/production{,_xray} --mA 3`,
-`benchmark.py tmp/mA3_scan/benchmarks{,_xray} figures/mA3/benchmarks{,_xray}`.
+The BPs for `--bp` are `bp_round/bps.csv` (see the top of this file), not `xray_bps.csv`.

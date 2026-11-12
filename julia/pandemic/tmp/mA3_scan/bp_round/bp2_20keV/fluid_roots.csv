@@ -1,2 +1,2 @@
 m_N,y,s2_reduced,omega_reduced,s2_network,status_network,s2_fluid,omega_fluid,status,n_solves,seconds,TN_Tnu_max,rate_AA_min_over_H
-2e-05,0.001,5.34e-15,0.12,5.34e-15,converged,5.34e-15,0.11904,converged,1,114.2,1.326,0.03952
+2e-05,0.001,5.34e-15,0.12,5.34e-15,converged,5.34707e-15,0.12024,converged,4,147.7,1.326,0.0396

@@ -7,7 +7,7 @@ import os
 import sys
 import numpy as np
 sys.path.insert(0, "plot")
-from benchmark import validity
+from benchmark_debug import validity
 
 d_in = sys.argv[1] if len(sys.argv) > 1 else "tmp/mA50_scan/benchmarks"
 for p in sorted(glob.glob(os.path.join(d_in, "*.csv"))):

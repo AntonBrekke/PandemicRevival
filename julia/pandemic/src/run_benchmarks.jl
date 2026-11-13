@@ -34,13 +34,13 @@ suffixes for tables other than m_phi = 100 m_N, or with an N1-N2 splitting), wit
   (mu_A' = 2 mu, mu_N1 = mu_N2, mu_phi = 2 mu_A').
   A' and phi enter at the fluid's (equilibrium) densities.
 Both: `conv_H`, lambda/H, the relaxation rate of n_N2/n_N1 through N1 N1 <-> N2 N2 (MB tables;
-`conversion_lambda_H`): the fluid's mu_N1 = mu_N2 holds where it is > 1 (plot/benchmark.py), and
+`conversion_lambda_H`, `relaxation_rate`; half of it in CSVs before 2026-11-13): the fluid's mu_N1 = mu_N2 holds where it is > 1 (plot/benchmark_debug.py), and
 with a splitting its last crossing of H is the freeze-out x_fo of N2/N1.
 With an N1-N2 splitting (tables built with --delta) also, after the solution (x = 100) 150 more rows up to x = 1e5 (past any x_fo; f_N2 today and
 x_fo are in the header): the late conversions and their heat (`with_conversions`, as for the
 Lyman-alpha lengths and f_N2 of the scans), n_A' = n_phi = 0 and the solver's rate columns NaN. The fluid holds N1 <-> N2 in equilibrium up to x = 100; its late
 part starts from N2/N1 where lambda last exceeds 1e3 H, so Y_N2 can jump at x = 100.
-Plot with plot/benchmark.py.
+Plot with plot/benchmark.py (the benchmark figure; plot/benchmark_debug.py: per-process detail for debugging).
 """
 
 include(joinpath(@__DIR__, "lyman_alpha.jl"))

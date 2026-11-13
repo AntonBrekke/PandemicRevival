@@ -13,7 +13,7 @@ julia --project=. -t 8 src/run_benchmarks.jl \
     $OUT/benchmarks_xray $T
 mkdir -p figures/mA3
 for s in "" _xray; do
-    conda run -n pandemic python plot/production.py $OUT/benchmarks$s figures/mA3/production$s --mA 3
-    conda run -n pandemic python plot/benchmark.py $OUT/benchmarks$s figures/mA3/benchmarks$s
+    conda run -n pandemic python plot/benchmark.py $OUT/benchmarks$s figures/mA3/benchmarks$s --mA 3
+    conda run -n pandemic python plot/benchmark_debug.py $OUT/benchmarks$s figures/mA3/benchmarks_debug$s
 done
 echo "benchmarks done $(date)"

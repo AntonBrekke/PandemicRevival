@@ -50,6 +50,14 @@ contours in white and hatches the constraint regions, X-rays included, instead o
 <output>_n2.pdf. For both scans:
     conda run -n pandemic python plot/relic_scan_theta.py tmp/combined_scan figures/relic_contours_equal --n2-fraction
     conda run -n pandemic python plot/relic_scan_theta.py tmp/delta_runs/delta1e-4/combined figures/relic_contours_delta1e-4 --n2-fraction
+
+--dm-contours draws lines of constant relative N1-N2 mass splitting, the draft's
+delta_m = (m_N2 - m_N1)/m_N1 (every two decades), instead of the Omega h^2 = 0.12 lines of
+constant g. At fixed m_nu (the scans: delta_m = sin^2 theta_1 m_N1/m_nu, `mnu_splitting`)
+delta_m = (sin^2 2theta/4) m_N1/m_nu is a function of the plane alone: straight lines of slope -1.
+m_nu is read off the scan's delta_m column. --bound-lines draws the constraints (Lyman-alpha, self-interaction, X-rays) as
+their edges only, without tint or hatching. With --n2-fraction:
+    ... --n2-fraction --dm-contours --bound-lines   -> <output>_n2_dm_lines.pdf
 """
 
 import argparse
@@ -193,6 +201,16 @@ def parse_args():
         "--n2-fraction",
         action="store_true",
         help="shade the plane by N2/N1 today at the roots and write <out>_n2.pdf"
+    )
+    p.add_argument(
+        "--dm-contours",
+        action="store_true",
+        help="lines of constant N1-N2 mass splitting instead of the lines of constant g",
+    )
+    p.add_argument(
+        "--bound-lines",
+        action="store_true",
+        help="constraints as edge lines only (no tint, no hatching)",
     )
     p.add_argument(
         "--n2-vmin",
@@ -357,7 +375,8 @@ def plot_bound(
         label,
         zorder,
         frac=0.5,
-        hatch=None
+        hatch=None,
+        line_only=False
     ):
     """Shade the region of smaller m_N than the crossings of `limit` and label
     the boundary inside the shaded side, `frac` of the way up its visible part
@@ -381,7 +400,9 @@ def plot_bound(
         close_hi=min(y_c) > min(ys) and excluded_line(roots, hi[2], hi[0], hi[1]))
     m_lo = M_LIM[0] * 0.5   # off the left edge, so the shading is flush with it
     region = (np.concatenate(([m_lo], m_e, [m_lo])), np.concatenate(([s_e[0]], s_e, [s_e[-1]])))
-    if hatch:
+    if line_only:
+        pass   # the edge alone (--bound-lines)
+    elif hatch:
         ax.fill(*region, facecolor="none", edgecolor=color, hatch=hatch, lw=0, zorder=zorder)
     else:
         ax.fill(*region, color=color, alpha=0.25, lw=0, zorder=zorder)
@@ -404,7 +425,7 @@ def plot_bound(
     import matplotlib.patheffects as pe
     ax.text(m_t, s_t, label, color=color, fontsize=BOUND_LABEL_SIZE,
             ha=ha, va="top", zorder=Z_LABEL,
-            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")] if hatch else None)
+            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")] if hatch or line_only else None)
     return True
 
 
@@ -590,19 +611,21 @@ def plot_nonpert(ax, roots, g_pert):
             bbox=dict(facecolor="white", edgecolor="none", alpha=0.8, pad=1.0))
 
 
-def plot_xrays(ax, m, s, hatch=None):
+def plot_xrays(ax, m, s, hatch=None, line_only=False):
     """The X-ray region: grey over an opaque white underlay that hides the
     bounds below it, or with `hatch` (over the N2/N1 field) hatched in black
     and transparent."""
     import matplotlib.patheffects as pe
-    if hatch:
+    if line_only:
+        pass
+    elif hatch:
         ax.fill_between(m, s, 1.0, facecolor="none", edgecolor="black", hatch=hatch, lw=0, zorder=-3)
     else:
         ax.fill_between(m, s, 1.0, color="white", lw=0, zorder=-3)
         ax.fill_between(m, s, 1.0, color="black", alpha=0.25, lw=0, zorder=-3)
     ax.plot(m, s, color="black", lw=1.3, zorder=-2)
-    ax.text(10**1.45, 1e-13, "X-rays", color="black", zorder=Z_LABEL if hatch else None,
-            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")] if hatch else None)
+    ax.text(10**1.45, 1e-13, "X-rays", color="black", zorder=Z_LABEL if hatch or line_only else None,
+            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")] if hatch or line_only else None)
 
 
 def plot_contours(ax, roots, excluded, debug, mono=None):
@@ -701,6 +724,55 @@ def plot_contours(ax, roots, excluded, debug, mono=None):
             first[0] = False
 
 
+def m_nu_of_scan(roots, mix):
+    """m_nu [eV] of a fixed-m_nu scan, from its splittings: delta = sin^2 theta_1 m_N/m_nu (median)."""
+    vals = [(roots[k] / 4) * (1 + roots[k] / 4) * k[0] * 1e3 / mix[k][1]
+            for k in roots if k in mix and mix[k][1] > 0]
+    return float(np.median(vals))
+
+
+DM_DECADES = range(-16, -1, 2)   # delta_m = 10^k drawn (--dm-contours), those in the frame
+
+
+def plot_dm_contours(ax, m_nu, color=C_CONTOUR_N2, fracs=(0.82, 0.9, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1), avoid=()):
+    """
+    Lines of constant delta_m = (m_N2 - m_N1)/m_N1 = (sin^2 2theta/4) m_N1/m_nu (--dm-contours), labelled
+    along the line at the first of `fracs` (of the way along its visible part) where the label stays in
+    the frame and clear of the boxes `avoid` (display coordinates) and of the labels before it. Call
+    after the layout is final (the labels follow the lines' angle on the page).
+    """
+    import matplotlib.patheffects as pe
+    outline = [pe.withStroke(linewidth=2.2, foreground="0.15")]
+    lm = np.linspace(np.log10(M_LIM[0]), np.log10(M_LIM[1]), 400)
+    m = 10**lm
+    first = True
+    for k in sorted(DM_DECADES, reverse=True):   # the top line carries "delta_m ="
+        s = 4 * m_nu * 10.0**k / (m * 1e3)
+        vis = (s > S_LIM[0]) & (s < S_LIM[1])
+        if vis.sum() < 2:
+            continue
+        ax.plot(m, s, color=color, lw=0.9, ls="--", zorder=-1, path_effects=outline)
+        iv = np.nonzero(vis)[0]
+        lab = (r"$\delta_m = " if first else r"$") + rf"10^{{{k}}}$"
+        renderer = ax.figure.canvas.get_renderer()
+        frame = ax.get_window_extent(renderer)
+        for frac in fracs:
+            j = iv[int(frac * (len(iv) - 1))]
+            p0, p1 = ax.transData.transform([(m[j], s[j]), (m[min(j + 5, len(m) - 1)], s[min(j + 5, len(m) - 1)])])
+            ang = np.degrees(np.arctan2(p1[1] - p0[1], p1[0] - p0[0]))
+            t = ax.text(m[j], s[j] * 1.5, lab, color=color, fontsize=8, rotation=ang, rotation_mode="anchor",
+                        ha="center", va="bottom", zorder=Z_LABEL, path_effects=outline)
+            bb = t.get_window_extent(renderer)
+            inside = frame.x0 < bb.x0 and bb.x1 < frame.x1 and frame.y0 < bb.y0 and bb.y1 < frame.y1
+            if inside and not any(bb.overlaps(a) for a in avoid):
+                avoid = list(avoid) + [bb]
+                break
+            t.remove()
+        else:
+            continue   # no room: the line stays unlabelled
+        first = False
+
+
 def plot_all_points(fig, ax, roots, excluded):
     """Every root of the scan, all y, coloured by log10 g (--all-points)."""
     from matplotlib.colors import Normalize
@@ -736,7 +808,8 @@ def main():
     roots = load_roots(args.scan_dir)
     lam, r_s, mix = load_lyman_alpha(args.scan_dir)
     sig_m = {k: sigma_over_m(k[0] * 1e-6, k[1], args.mA, *mix[k]) for k in roots if k in mix}
-    out = args.out + ("_n2" if args.n2_fraction else "") + \
+    out = args.out + ("_n2" if args.n2_fraction else "") + ("_dm" if args.dm_contours else "") + \
+        ("_lines" if args.bound_lines else "") + \
         ("_debug_all" if args.all_points else "_debug" if args.debug else
          "_xproj" if args.xray_proj else "")
 
@@ -749,11 +822,12 @@ def main():
     for axis in ["top", "bottom", "left", "right"]:
         ax.spines[axis].set_linewidth(0.5)
 
-    hatch = HATCH_N2 if args.n2_fraction else {}
+    hatch = HATCH_N2 if args.n2_fraction and not args.bound_lines else {}
+    lines = args.bound_lines
     plt.rcParams["hatch.linewidth"] = 0.5
     plot_dodelson_widrow(ax)
     m_x, s_x = scaled_xray_limit(roots, mix)
-    plot_xrays(ax, m_x, s_x, hatch=hatch.get("xray"))
+    plot_xrays(ax, m_x, s_x, hatch=hatch.get("xray"), line_only=lines)
     # Both Lyman-alpha bounds are labelled by the length that sets them.
     # Both bounds are Lyman-alpha; the length in brackets says which one, as in
     # Bringmann et al. (2206.10630). Ly-alpha (lambda_fs) is labelled low on
@@ -761,7 +835,7 @@ def main():
     n_lya = plot_bound(
         ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
         r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28,
-        hatch=hatch.get("lya")
+        hatch=hatch.get("lya"), line_only=lines
     )
     # The r_s label sits on the upper part of its boundary, above the
     # lambda_fs line. Both label positions depend on the data: recheck them
@@ -769,10 +843,10 @@ def main():
     plot_bound(
         ax, roots, r_s, R_S_MAX_MPC, C_RS,
         r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.45,
-        hatch=hatch.get("r_s")
+        hatch=hatch.get("r_s"), line_only=lines
     )
     plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"], frac=0.55,
-               hatch=hatch.get("si"))
+               hatch=hatch.get("si"), line_only=lines)
     if args.g_pert:
         plot_nonpert(ax, roots, args.g_pert)
 
@@ -784,8 +858,9 @@ def main():
             or sig_m.get(k, 0.0) > SIGMA_M_MAX
         ) for k in roots
     }
-    plot_contours(ax, roots, excluded, args.debug and not args.all_points,
-                  mono=C_CONTOUR_N2 if args.n2_fraction else None)
+    if not args.dm_contours:
+        plot_contours(ax, roots, excluded, args.debug and not args.all_points,
+                      mono=C_CONTOUR_N2 if args.n2_fraction else None)
     if args.n2_fraction:
         plot_n2_fraction(fig, ax, roots, mix, args.n2_vmin)
     if args.all_points:
@@ -817,7 +892,7 @@ def main():
         linewidth=1,
         edgecolor="0.8"
     )
-    ax.text(
+    info = ax.text(
         0.97, 0.96, 
         rf"$m_{{A'}} = {args.mA:g}\,m_{{N_1}}$",
         transform=ax.transAxes,
@@ -825,6 +900,13 @@ def main():
     )
 
     fig.tight_layout()
+    if args.dm_contours:
+        m_nu = m_nu_of_scan(roots, mix)
+        rend = fig.canvas.get_renderer()
+        # every text already on the plot (bound labels, DW, overproduction, X-rays), the m_A' box padded
+        avoid = [t.get_window_extent(rend).padded(8 if t is info else 2) for t in ax.texts]
+        plot_dm_contours(ax, m_nu, color=C_CONTOUR_N2 if args.n2_fraction else "0.25", avoid=avoid)
+        print(f"delta_m lines at m_nu = {m_nu:.4g} eV")
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     fig.savefig(out + ".pdf")
     print(f"wrote {out}.pdf with {len(roots)} points, "

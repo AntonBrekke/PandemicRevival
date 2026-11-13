@@ -11,8 +11,23 @@
 
 `bp_round/README.md` has the BP roots and history; `bp_round/run_bps.sh` recomputes them (roots,
 Lyman-alpha, histories). Make all m_A' = 3 figures with `./tmp/mA3_scan/make_figures.sh`: the money plots
-with the BPs are `figures/mA3/relic_contours_bp{,_xproj}.pdf`, their histories `figures/mA3/{benchmarks,production}_bp_round/`.
+with the BPs are `figures/mA3/relic_contours_bp{,_xproj}.pdf`, their benchmark figures `figures/mA3/benchmarks_bp_round/` (plot/benchmark.py).
 `relic_scan_theta.py --xray-proj` writes only `<out>_xproj.pdf`, not `<out>.pdf`: run it twice.
+
+## Gamma_kd and lambda, 2026-11-13 (branch kd-transfer)
+
+Lyman-alpha lengths of all roots (both grids) and every benchmark history recomputed
+(`tmp/run_kd_transfer.sh`): Gamma_kd now weights its cross sections by the momentum transfer
+(kinetic_decoupling.jl), and the N2/N1 relaxation rate lambda (`relaxation_rate`, conv_H, x_fo) is
+no longer half the true one. Roots unchanged.
+- x_c moves later wherever the unweighted rate was set by forward t/u-channel scattering at T >> m_A':
+  median x_c at g = 1e-6 - 1e-3 from ~5e-5 to ~1.2e-3 (on-shell A' takes over); unchanged at g < 1e-6.
+- lambda_fs,kd: new/old median 1.000, max +1.5% (one fluid root at 1e-6 Mpc: +20%); r_s within 1%
+  except a few tiny ones (< 0.004 Mpc); lambda_fs (no coupling), f_N2 identical. No root changes its
+  verdict for either Lyman-alpha bound: the money plot is unchanged to the eye.
+- x_fo: later (it was the crossing of half the rate).
+- Benchmark figures: `plot/benchmark.py` (until 2026-11-13 `production.py`), validity bands from x_c;
+  all figures by `make_figures.sh`.
 
 ## Rerun 2026-11-07 (branch pauli-exact)
 
@@ -60,7 +75,7 @@ nothing at 0.1 eV: N2 is not depleted anywhere). Everything else as the main sca
   422 fluid roots, 1274 with Lyman-alpha lengths (both grids, 8 values of g per decade throughout).
 - `xray_bps.csv`: benchmark points allowed by every current bound and inside the projected reach of
   Athena/eXTP (`plot/xray_benchmarks.py tmp/mA3_scan/combined ... --mA 3`). Histories in
-  `benchmarks_xray/`; standard histories at 10.57 keV in `benchmarks/`.
+  `benchmarks_xray/`; standard histories at 10.57 keV in `benchmarks/` (figures: same names under `figures/mA3/`).
 - `compare_roots.py`: roots against m_A' = 2.5 per g.
 
 ## Results

@@ -36,13 +36,30 @@ end
     ref = [(1.0000000000000002e-06, 15.0, 2.439227453379171e-42),
            (1.0000000000000001e-07, 20.0, 1.6922053549806285e-50),
            (3.3333333333333334e-09, 20.0, 1.0673413519199331e-55)]
-    tab = CkdTable(M, MA, G)
+    tab = CkdTable(M, MA, G; transfer=false)   # the old code: unweighted cross sections
     for (T, gap, py) in ref
         @test isapprox(1e3 * C_kd(tab, T, gap; gap2=Inf), py; rtol=2e-3)
     end
     # asymptotic e^x K_1(x) beyond the Amos limit
     @test isapprox(_besselk1x(1e4 - 1), SF.besselkx(1, 1e4 - 1); rtol=1e-12)
     @test isfinite(C_kd(tab, 1e-16, 20.0)) && C_kd(tab, 1e-16, 20.0) > 0
+end
+
+@testset "momentum-transfer weighting" begin
+    # isotropic at threshold: weighted = unweighted; forward-peaked A' exchange at s >> m_A^2
+    s0 = 4M^2 * (1 + 1e-8)
+    @test isapprox(sigma_NN(s0, M, MA, G; transfer=true), sigma_NN(s0, M, MA, G); rtol=1e-6)
+    GA = width_A(M, MA, G)
+    @test isapprox(sigma_NN12(s0, M, MA, G, GA; transfer=true), sigma_NN12(s0, M, MA, G, GA); rtol=1e-6)
+    s1 = (1e4 * M)^2
+    for r in (sigma_NN(s1, M, MA, G; transfer=true) / sigma_NN(s1, M, MA, G),
+              sigma_NN12(s1, M, MA, G, GA; transfer=true) / sigma_NN12(s1, M, MA, G, GA))
+        @test 0 < r < 1e-4
+    end
+    # the rate: unchanged where the N are non-relativistic, suppressed at T >> m_A
+    tw, tu = CkdTable(M, MA, G), CkdTable(M, MA, G; transfer=false)
+    @test isapprox(C_kd(tw, 1e-3M, 15.0), C_kd(tu, 1e-3M, 15.0); rtol=5e-3)
+    @test C_kd(tw, 1e3M, 15.0) < 1e-3 * C_kd(tu, 1e3M, 15.0)
 end
 
 @testset "C_kd with N1 N2 -> N1 N2" begin

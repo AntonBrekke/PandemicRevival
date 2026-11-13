@@ -17,7 +17,7 @@ BP2 sits at the solver switch (g = 1e-3): network and fluid roots agree to 0.03%
 the network root (the fluid one would be the scan's choice at g >= 1e-3; indistinguishable in the plot).
 
 Files: `bp1_10keV/`, `bp2_20keV/` (seeds, roots, Lyman-alpha lengths); `benchmarks/` (histories of
-both, BP2 with both solvers; figures `figures/mA3/{benchmarks,production}_bp_round/` by
+both, BP2 with both solvers; benchmark figures `figures/mA3/benchmarks_bp_round/` by
 `../make_figures.sh`); `earlier/` (an earlier choice, 14 keV g = 3e-4 and 30 keV g = 3e-3, from
 the 11-05 code; BP2 there replaced because NN -> A'A' at 1.3e4 H was too extreme).
 

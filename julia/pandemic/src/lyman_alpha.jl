@@ -15,10 +15,13 @@ KINETIC COUPLING
 ================
 Gamma_kd = C_kd/n_N1 (kinetic_decoupling.jl) against H, from the start of the solution:
 the onset x_c is the first time Gamma_kd > H, the decoupling x_kd the last time
-Gamma_kd drops below H (short dips in between count as coupled). The fluid starts
-thermal and is coupled from the start (x_c = start); at small g the network sector is
-produced free-streaming by the Dodelson-Widrow mechanism and couples only later, or (if
-Gamma_kd < H throughout) never. Then
+Gamma_kd drops below H (short dips in between count as coupled), the same test for both
+solvers. Gamma_kd weights each cross section by the momentum it transfers (kinetic_decoupling.jl,
+since 2026-11-13): at T >> m_A' the t/u-channel A' exchange is forward and transfers almost
+nothing, so x_c is set by the on-shell N1 N2 -> A' -> N1 N2 (before, the unweighted rate exceeded
+H from the first step at every root, x_c = start). At small g the network sector is produced
+free-streaming by the Dodelson-Widrow mechanism and couples only later, or (if Gamma_kd < H
+throughout) never. Then
 
     lambda_fs_kd = free streaming before x_c + after x_kd,   r_s = sound horizon x_c -> x_kd,
 
@@ -215,15 +218,31 @@ function conversion_rates(itp::RateInterpolants, lnR, m1, m2, T, N, r)
 end
 
 """
+    relaxation_rate(gf, gr, r)
+
+Relaxation rate of r = n_N2/n_N1 through N1 N1 <-> N2 N2 at fixed N = n_N1 + n_N2, from
+`conversion_rates` (gf = G_f/n_N1, gr = G_r/n_N1, G the reactions per volume and time):
+
+    lambda = 4 (G_f/n_N1 + G_r/n_N2) = 4 (gf + gr/r).
+
+dr/dt = (1 + r) 2 (G_f - G_r)/n_N1 with G_f ∝ n_N1^2, G_r ∝ n_N2^2, linearised around G_f = G_r:
+d(delta r)/dt = -lambda delta r. Each conversion moves two N, and the rate goes as n^2: hence
+4, not the 2 of the conversion probability per particle (2 G_f/n_N1 + 2 G_r/n_N2), which is half
+of it and was used until 2026-11-13. The network's own conversion stiffness (`lamc` in
+network.jl) is this lambda.
+"""
+relaxation_rate(gf, gr, r) = 4 * (gf + gr / r)
+
+"""
 lambda/H at z along the history `h` (`with_conversions` for after the solution): the
-relaxation rate of n_N2/n_N1 through N1 N1 <-> N2 N2, lambda = 2 G_f/n_N1 + 2 G_r/n_N2
-(tables at parameters `p`, m_N2 = m2), whose crossing of H is x_fo of `with_conversions`.
+relaxation rate of n_N2/n_N1 through N1 N1 <-> N2 N2 (`relaxation_rate`; tables at parameters
+`p`, m_N2 = m2), whose crossing of H is x_fo of `with_conversions`.
 """
 function conversion_lambda_H(h::DarkHistory, itp::RateInterpolants, p, m2, z)
     T, g1, g2, n1 = dark_state(h, z)
     r = n_scaled_safe(m2, 2, T) / n_scaled_safe(h.N1.m, 2, T) * exp(g1 - g2)
     gf, gr = conversion_rates(itp, ln_norm(reaction(:N1N1_N2N2), p, itp.p_ref), h.N1.m, m2, T, n1 * (1 + r), r)
-    return 2 * (gf + gr / r) / h.bg.H_interp_z(z)
+    return relaxation_rate(gf, gr, r) / h.bg.H_interp_z(z)
 end
 
 """
@@ -245,7 +264,7 @@ history's.
 - `frozen_at_end = true` (the network, which follows N2 itself): from the history at its end
   (the conversions that remain, even slower than H, still deplete N2 by ~10%).
 - `frozen_at_end = false` (the fluid, which holds N1 <-> N2 in equilibrium): r from the last z
-  (after x = 1) where the relaxation rate lambda = 2 G_f/n_N1 + 2 G_r/n_N2 exceeds 1e3 H,
+  (after x = 1) where the relaxation rate lambda (`relaxation_rate`) exceeds 2e3 H,
   where the equilibrium still holds. Up to the end of the solution the fluid's T, which has
   the heat of its equilibrium conversions; for g >= 1e-3 those are faster than H there.
 Integrated to z_hi. Returns (history, f_N2, x where lambda last exceeds H; NaN if never).
@@ -271,15 +290,16 @@ function with_conversions(h::DarkHistory, itp::RateInterpolants, p, m2; frozen_a
         gf, gr = rates(T, N, exp(l))
         return dt_dz(h.bg, z) * (1 + exp(l)) * 2 * (gf * exp(min(-l, 700.0)) - gr * exp(-l))
     end
-    lam_H(z, T, N, rr) = (g = rates(T, N, rr); 2 * (g[1] + g[2] / rr) / h.bg.H_interp_z(z))
+    lam_H(z, T, N, rr) = (g = rates(T, N, rr); relaxation_rate(g[1], g[2], rr) / h.bg.H_interp_z(z))
     T_f, N_f, r_f = hist(h.z_f)
     alg = ODER.Rodas4P(autodiff=AutoFiniteDiff())
     if frozen_at_end
         l_f = log(r_f)
     else
-        # equilibrium until lambda ~ 1e3 H, then the conversion equation with the fluid's T and N
+        # equilibrium until lambda ~ 2e3 H, then the conversion equation with the fluid's T and N
+        # (2e3 with the relaxation rate = the 1e3 of the halved lambda before 2026-11-13: f_N2 unchanged)
         zs = collect(range(max(h.z_i, 0.0), h.z_f, length=max(2, ceil(Int, (h.z_f - max(h.z_i, 0.0)) / dz) + 1)))
-        i0 = findlast(z -> lam_H(z, hist(z)...) >= 1e3, zs)
+        i0 = findlast(z -> lam_H(z, hist(z)...) >= 2e3, zs)
         z0 = i0 === nothing ? zs[1] : zs[i0]
         s1 = DE.solve(DE.ODEProblem((du, u, _, z) -> (hz = hist(z); du[1] = dlnr(z, hz[1], hz[2], u[1])),
                                     [log(hist(z0)[3])], (z0, h.z_f)), alg; reltol=1e-6, abstol=1e-8)

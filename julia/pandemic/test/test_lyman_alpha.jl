@@ -101,3 +101,21 @@ end
     println("  max |ln R_r(tables, delta = 1e-4) - ln R_r(equal-mass tables + shift)| = $err")
     @test err < 0.01
 end
+
+@testset "relaxation_rate: linear relaxation of n_N2/n_N1" begin
+    # dr/dt = (1 + r) 2 (G_f - G_r)/n_N1 at fixed N, G_f = R (n_N1/nh1)^2, G_r = R (n_N2/nh2)^2:
+    # -d(dr/dt)/dr at r_eq must equal relaxation_rate (equal masses: nh1 = nh2; split: nh2 < nh1)
+    for (nh1, nh2) in ((1.0, 1.0), (1.0, 0.3))
+        R, N = 2.5, 0.7
+        req = nh2 / nh1
+        function drdt(r)
+            n1, n2 = N / (1 + r), N * r / (1 + r)
+            return (1 + r) * 2 * (R * (n1 / nh1)^2 - R * (n2 / nh2)^2) / n1
+        end
+        h = 1e-6 * req
+        slope = (drdt(req + h) - drdt(req - h)) / (2h)
+        n1 = N / (1 + req)
+        gf, gr = R * (n1 / nh1)^2 / n1, R * (req * n1 / nh2)^2 / n1   # as conversion_rates: G/n_N1
+        @test isapprox(-slope, relaxation_rate(gf, gr, req); rtol=1e-6)
+    end
+end

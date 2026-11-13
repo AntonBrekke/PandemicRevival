@@ -45,8 +45,8 @@ The delta = 1e-3 tables are not in the repository (a copy is in
     # benchmarks (roots above), then figures; N2/N1 at the roots, equal masses and delta = 1e-4:
     julia --project=. -t 4 src/run_benchmarks.jl network:10:1e-4:1.21154e-12,... \
         tmp/delta_runs/delta1e-4/benchmarks tmp/rate_tables/rate_tables_mA2.5_mphi100.0_delta0.0001.jls
+    conda run -n pandemic python plot/benchmark_debug.py tmp/delta_runs/delta1e-4/benchmarks figures/benchmarks_debug_10keV_delta1e-4
     conda run -n pandemic python plot/benchmark.py tmp/delta_runs/delta1e-4/benchmarks figures/benchmarks_10keV_delta1e-4
-    conda run -n pandemic python plot/production.py tmp/delta_runs/delta1e-4/benchmarks figures/production_10keV_delta1e-4
     conda run -n pandemic python plot/n2_fraction.py figures/n2_over_n1
 
 The first network pass used dz_seed = 1e-9 for every solve, which fails at small g;

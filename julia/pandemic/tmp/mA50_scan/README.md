@@ -1,5 +1,21 @@
 # m_A' = 50 m_N, m_phi = 150 m_N, m_nu = 0.01 eV (2026-11-06, coarse scan)
 
+## Gamma_kd and lambda, 2026-11-13 (branch kd-transfer)
+
+Lyman-alpha lengths of all roots (network and fluid) and every benchmark history recomputed
+(`tmp/run_kd_transfer.sh`): Gamma_kd now weights its cross sections by the momentum transfer
+(kinetic_decoupling.jl), and the N2/N1 relaxation rate lambda (`relaxation_rate`, conv_H, x_fo) is
+no longer half the true one. Roots unchanged.
+- x_c moves later wherever the unweighted rate was set by forward t/u-channel scattering at T >> m_A':
+  median x_c at g = 1e-4 - 1e-2 from ~3e-5 - 7e-5 to ~1.2e-4 - 1.8e-4 (on-shell A' takes over); unchanged at g < 1e-6.
+- lambda_fs,kd: new/old median 1.000, max +1.5%; r_s down by up to 12% at a few fluid roots,
+  all far from the bound; lambda_fs (no coupling), f_N2 identical. No root changes its
+  verdict for either Lyman-alpha bound: the money plot is unchanged to the eye.
+- x_fo: later (it was the crossing of half the rate).
+- Benchmark figures: `plot/benchmark.py` (until 2026-11-13 `production.py`), validity bands from x_c;
+  all figures by `make_figures.sh`.
+
+
 Tables: `tmp/rate_tables/rate_tables_mA50.0_mphi150.0.jls`. m_phi = 100 m_N would sit exactly at the
 singular phi -> A'A' threshold (2 m_A'); 150 keeps it open with the quartic lambda = g^2 (m_phi/m_A')^2/2
 = 4.5 g^2 perturbative up to g ~ 1.7.

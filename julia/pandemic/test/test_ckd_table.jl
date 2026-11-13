@@ -2,7 +2,8 @@
 The tabulated momentum-exchange rate `C_kd(::CkdTable, ...)` of src/kinetic_decoupling.jl
 against nested adaptive quadrature (`C_kd_adaptive` below, ~2 s per call), over the
 temperatures of a kinetic-decoupling search (T/m from 1e2 to 1e-10), for small and
-large couplings and unequal N1/N2 gaps. ~2 min. Run from julia/pandemic:
+large couplings and unequal N1/N2 gaps. ~14 min (one reference integral, see below; in the
+slow set of runtests.jl). Run from julia/pandemic:
     julia --project=. test/test_ckd_table.jl
 """
 
@@ -11,14 +12,16 @@ using Test
 include(joinpath(@__DIR__, "..", "src", "kinetic_decoupling.jl"))
 
 """
-C_kd by adaptive quadrature in w = (sqrt(s) - 2m)/T, with breakpoints around the A' pole
-on the scale of its width. Resolves the pole only while its width is above the float
-resolution of sqrt(s) (g >~ 1e-6).
+C_kd by adaptive quadrature in w = (sqrt(s) - 2m)/T (momentum-transfer weighted, as CkdTable by
+default), with breakpoints around the A' pole on the scale of its width. Resolves the pole only
+while its width is above the float resolution of sqrt(s) (g >~ 1e-6). With the weight the narrow
+pole dominates the rate at T >> m, and the reference at T = 100 m, g = 1e-3 takes ~13 min (the
+integrand is smooth; the cost is the adaptive refinement of an expensive integrand).
 """
 function C_kd_adaptive(T, gap, m, m_A, g; gap2=gap)
     Gamma_A = width_A(m, m_A, g)
     w12 = exp(gap - gap2)
-    sig(s) = sigma_NN(s, m, m_A, g) / 2 + w12 * sigma_NN12(s, m, m_A, g, Gamma_A)
+    sig(s) = sigma_NN(s, m, m_A, g; transfer=true) / 2 + w12 * sigma_NN12(s, m, m_A, g, Gamma_A; transfer=true)
     integrand(w) = (rs = 2m + w * T; s = rs^2; 2 * rs * T * sig(s) * (s - 4m^2) * rs * _besselk1x(rs / T) * exp(-w))
     w_res, dw = (m_A - 2m) / T, Gamma_A / (2T)
     pts = [0.0, 1.0, 5.0, 20.0, 80.0]

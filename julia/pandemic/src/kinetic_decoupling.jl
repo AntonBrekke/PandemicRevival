@@ -20,6 +20,20 @@ elastic scattering).
   inside the thermal integral; its on-shell part (inverse decay N1 N2 -> A' and decay
   back) is genuine momentum exchange. Near threshold sigma_12 = 32.5 sigma_11.
 
+Momentum-transfer weighting (2026-11-13). Each cross section is weighted by (3/2) sin^2(theta_cm)
+(`transfer=true`, the default of `CkdTable`): sigma_kd = (3/2) ∫ dsigma sin^2 theta, the viscosity
+cross section normalised to equal sigma for isotropic scattering. sin^2 rather than 1 - cos: the
+final states are identical (N1 N1 -> N2 N2) or, with N1 <-> N2 fast, equivalent (a backward
+N1 N2 -> N1 N2 only swaps the labels). Non-relativistically all three processes are nearly
+isotropic and nothing changes (sigma_kd/sigma = 1.000 at threshold, 0.95 at sqrt(s) = 3m). At
+T >> m_A' the t/u-channel A' exchange is forward-peaked with |t| ~ m_A'^2 << s: the total sigma
+saturates at ~g^4/m_A'^2 while sigma_kd/sigma ~ m_A'^2/s (1e-7 at sqrt(s) = 1e5 m). Without the
+weight (as in arXiv:2206.10630 and the old Python `C_therm_kd`, which consider the late,
+non-relativistic decoupling only) Gamma_kd exceeded H from the first step at every root, so the
+coupling onset x_c (Lyman-alpha) and the "dark thermalisation" of the benchmark plots were set by
+scatterings that exchange almost no momentum. With it, x_c is set by the on-shell A' (N1 N2 -> A'
+-> N1 N2) where that dominates. `transfer=false` gives the old, unweighted rate.
+
 `CkdTable` tabulates the cross sections once per (m, g); `C_kd(tab, T, gap; gap2)` is
 then a fixed-grid quadrature (test/test_ckd_table.jl checks it against nested adaptive
 quadrature to 2e-3).
@@ -47,11 +61,35 @@ function sq_amp_NN(s, t, m, m_A, g)
     )
 end
 
-"""∫ dt sum|M|^2 / (64 pi s p_cm^2) of N1 N1 -> N2 N2, all masses m: summed over all dof, no symmetry factor."""
-function sigma_NN(s, m, m_A, g)
+"""
+(3/2) sin^2 theta for t = t0 + w cos theta (the momentum-transfer weight of `transfer`), and the
+quadrature points of [t0 - w, t0 + w]: the ends, the middle, and 10^k m_A^2 (k = 0, 1, ...) in from
+each end up to the middle. At s >> m_A^2 the t- and u-channel peaks of A' exchange sit within ~m_A^2
+of the ends, and the weighted integrand falls as 1/|t| from there over log10(s/m_A^2) decades: without
+a point per decade, adaptive quadrature took minutes at sqrt(s) ~ 1e4 m (test_ckd_table.jl).
+"""
+_kd_weight(t, t0, w) = 1.5 * (1 - ((t - t0) / w)^2)
+function _t_points(t0, w, m_A)
+    lo, hi = t0 - w, t0 + w
+    inner = Float64[]
+    k = m_A^2
+    while k < w
+        append!(inner, (lo + k, hi - k))
+        k *= 10
+    end
+    return sort!(unique!([lo; inner; t0; hi]))
+end
+
+"""
+∫ dt sum|M|^2 / (64 pi s p_cm^2) of N1 N1 -> N2 N2, all masses m: summed over all dof, no symmetry
+factor. transfer = true: weighted by (3/2) sin^2 theta (see the header).
+"""
+function sigma_NN(s, m, m_A, g; transfer=false)
     p2 = s / 4 - m * m
     p2 > 0 || return 0.0
-    val = QuadGK.quadgk(t -> sq_amp_NN(s, t, m, m_A, g), -4 * p2, 0.0; rtol=1e-8)[1]
+    t0, w = -2 * p2, 2 * p2
+    f = transfer ? (t -> sq_amp_NN(s, t, m, m_A, g) * _kd_weight(t, t0, w)) : (t -> sq_amp_NN(s, t, m, m_A, g))
+    val = QuadGK.quadgk(f, _t_points(t0, w, m_A)...; rtol=1e-8)[1]
     return val / (64 * pi * s * p2)
 end
 
@@ -62,14 +100,15 @@ _kd_params(m, m_A, g; m2=m) = (g=g, y=0.0, th0=0.0, th1=0.0, mu=0.0, m1=m, m2=m2
 the general-mass amplitude of tree_amplitudes.jl (process 1), zero below s = 4 m_N2^2. Equal
 to `sigma_NN` for delta = 0.
 """
-function sigma_NN_split(s, m, delta, m_A, g)
+function sigma_NN_split(s, m, delta, m_A, g; transfer=false)
     m2 = m * (1 + delta)
     pin2, pout2 = s / 4 - m * m, s / 4 - m2 * m2
     (pin2 > 0 && pout2 > 0) || return 0.0
     p = _kd_params(m, m_A, g; m2=m2)
     # t = m^2 + m2^2 - 2 (E1 E3 - p_in p_out cos), E1 = E3 = sqrt(s)/2
     t0, w = m * m + m2 * m2 - s / 2, 2 * sqrt(pin2 * pout2)
-    val = QuadGK.quadgk(t -> msq_N1N1_N2N2(s, t, p), t0 - w, t0 + w; rtol=1e-8)[1]
+    f = transfer ? (t -> msq_N1N1_N2N2(s, t, p) * _kd_weight(t, t0, w)) : (t -> msq_N1N1_N2N2(s, t, p))
+    val = QuadGK.quadgk(f, _t_points(t0, w, m_A)...; rtol=1e-8)[1]
     return val / (64 * pi * s * pin2)
 end
 
@@ -79,12 +118,18 @@ sqrt(lambda) sum|M|^2 / (48 pi m_A^3), averaged over the 3 polarisations.
 """
 width_A(m, m_A, g) = sqrt(m_A^2 * (m_A^2 - 4m^2)) * msq_A_N1N2(_kd_params(m, m_A, g)) / (48pi * m_A^3)
 
-"""∫ dt sum|M|^2 / (64 pi s p_cm^2) of N1 N2 -> N1 N2, m_N1 = m_N2 = m, all dof, Breit-Wigner A' of width Gamma_A."""
-function sigma_NN12(s, m, m_A, g, Gamma_A)
+"""
+∫ dt sum|M|^2 / (64 pi s p_cm^2) of N1 N2 -> N1 N2, m_N1 = m_N2 = m, all dof, Breit-Wigner A' of
+width Gamma_A. transfer = true: weighted by (3/2) sin^2 theta (see the header).
+"""
+function sigma_NN12(s, m, m_A, g, Gamma_A; transfer=false)
     p2 = s / 4 - m * m
     p2 > 0 || return 0.0
     p = _kd_params(m, m_A, g)
-    val = QuadGK.quadgk(t -> msq_bw(xyz_N1N2_N1N2(s, t, p), s, m_A, Gamma_A), -4 * p2, 0.0; rtol=1e-8)[1]
+    t0, w = -2 * p2, 2 * p2
+    amp(t) = msq_bw(xyz_N1N2_N1N2(s, t, p), s, m_A, Gamma_A)
+    f = transfer ? (t -> amp(t) * _kd_weight(t, t0, w)) : amp
+    val = QuadGK.quadgk(f, _t_points(t0, w, m_A)...; rtol=1e-8)[1]
     return val / (64 * pi * s * p2)
 end
 
@@ -95,7 +140,7 @@ routine behind `besselkx` refuses the argument.
 _besselk1x(x) = x < 1e4 ? SF.besselkx(1, x) : sqrt(pi / (2x)) * (1 + 3 / (8x) - 15 / (128x^2) + 315 / (3072x^3))
 
 """
-    CkdTable(m, m_A, g; per_decade=60, narrow_du=1e-9)
+    CkdTable(m, m_A, g; delta=0, transfer=true, per_decade=60, narrow_du=1e-9)
 
 sigma_11/2 and sigma_12 tabulated once per (m, m_A, g) on a fixed grid in
 u = sqrt(s) - 2m: log-spaced from 1e-18 m to 1e7 m, plus a cluster around the A' pole
@@ -118,7 +163,7 @@ struct CkdTable
     res_area::Float64      # narrow-width pole of w12 (0 if the pole is on the grid)
 end
 
-function CkdTable(m, m_A, g; delta=0.0, per_decade=60, narrow_du=1e-9)
+function CkdTable(m, m_A, g; delta=0.0, transfer=true, per_decade=60, narrow_du=1e-9)
     Gamma_A = width_A(m, m_A, g)
     u = collect(m .* 10 .^ range(-18, 7, length=25 * per_decade + 1))
     # N1 N1 -> N2 N2 opens at u = 2 delta m: resolve the threshold
@@ -132,13 +177,14 @@ function CkdTable(m, m_A, g; delta=0.0, per_decade=60, narrow_du=1e-9)
     sort!(unique!(u))
     narrow && filter!(x -> abs(x - u_res) >= L_in * (1 - 1e-6), u)
     s = @. (2m + u)^2
-    sig11(si) = delta > 0 ? sigma_NN_split(si, m, delta, m_A, g) : sigma_NN(si, m, m_A, g)
+    sig11(si) = delta > 0 ? sigma_NN_split(si, m, delta, m_A, g; transfer) : sigma_NN(si, m, m_A, g; transfer)
+    sig12(si) = sigma_NN12(si, m, m_A, g, Gamma_A; transfer)
     w11 = [2 * si * sig11(si) / 2 * (si - 4m^2) for si in s]
-    w12 = [2 * si * sigma_NN12(si, m, m_A, g, Gamma_A) * (si - 4m^2) for si in s]
+    w12 = [2 * si * sig12(si) * (si - 4m^2) for si in s]
     res_area = 0.0
     if narrow
         sA = m_A^2
-        res_area = 2 * sA * sigma_NN12(sA, m, m_A, g, Gamma_A) * (sA - 4m^2) * 2du * atan(L_in / du)
+        res_area = 2 * sA * sig12(sA) * (sA - 4m^2) * 2du * atan(L_in / du)
     end
     return CkdTable(m, u, w11, w12, u_res, res_area)
 end

@@ -128,6 +128,9 @@ LABEL_Y_MIN = 1e-6
 Z_BOUND = {"lya": -3.5, "r_s": -3.7, "si": -3.9}
 Z_LABEL = 2.5   # all on-plot text, above every shaded region
 
+# The Omega h^2 = 0.12 lines of constant g, all one colour (black is the X-ray limit)
+C_CONTOUR = "#1A2A6C"
+
 # --n2-fraction: the N2/N1 field under everything, the contours in one colour over it
 N2_VMIN = 1e-8
 Z_N2 = -6
@@ -630,15 +633,14 @@ def plot_xrays(ax, m, s, hatch=None, line_only=False):
 
 def plot_contours(ax, roots, excluded, debug, mono=None):
     """The Omega h^2 = 0.12 lines, drawn for whole decades of y only; all in colour `mono`
-    with a dark outline if given (over the N2/N1 field), else coloured by y."""
+    with a dark outline if given (over the N2/N1 field), else all in C_CONTOUR."""
     import matplotlib.patheffects as pe
     masses = np.array(sorted({k[0] for k in roots}))
     ys = np.array(sorted({k[1] for k in roots}))
     decade_ys = np.array(
         [y for y in ys if abs(np.log10(y) - round(np.log10(y))) < 1e-6]
     )
-    colors = ([mono] * len(decade_ys) if mono else
-              plt.cm.viridis(np.linspace(0.0, 0.85, len(decade_ys))))
+    colors = [mono or C_CONTOUR] * len(decade_ys)
     outline = [pe.withStroke(linewidth=2.2, foreground="0.15")] if mono else None
     first = [True]   # the first line that gets a label carries the "g =" prefix
     for y, c in zip(decade_ys, colors):

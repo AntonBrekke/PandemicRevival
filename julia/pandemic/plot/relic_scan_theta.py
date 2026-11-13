@@ -135,6 +135,7 @@ C_CONTOUR = "#1A2A6C"
 N2_VMIN = 1e-8
 Z_N2 = -6
 C_CONTOUR_N2 = "white"
+C_VALUE_N2 = C_CONTOUR   # the contour values (g, delta_m): dark, no outline, to stand out on the yellow
 HATCH_N2 = {"lya": "//", "r_s": "\\\\", "si": "||", "xray": "xx"}   # the bounds hatched, not tinted
 
 def parse_args():
@@ -411,6 +412,8 @@ def plot_bound(
         ax.fill(*region, color=color, alpha=0.25, lw=0, zorder=zorder)
     ax.plot(m_e, s_e, color=color, lw=1.3, zorder=zorder + 0.1)
 
+    if label is None:   # --n2-fraction: the bounds unlabelled
+        return True
     # Label offset into the excluded (left) side and below the anchor, so it
     # clears the boundary line instead of sitting on it. The text is above
     # everything, since the shading is drawn under the X-ray region.
@@ -468,6 +471,7 @@ def plot_dodelson_widrow(ax):
         color=C_OVERPROD_TEXT,
         rotation=-24
     )
+    return m_up, s_up
 
 
 def load_xray_limit():
@@ -614,7 +618,7 @@ def plot_nonpert(ax, roots, g_pert):
             bbox=dict(facecolor="white", edgecolor="none", alpha=0.8, pad=1.0))
 
 
-def plot_xrays(ax, m, s, hatch=None, line_only=False):
+def plot_xrays(ax, m, s, hatch=None, line_only=False, label=True):
     """The X-ray region: grey over an opaque white underlay that hides the
     bounds below it, or with `hatch` (over the N2/N1 field) hatched in black
     and transparent."""
@@ -626,14 +630,17 @@ def plot_xrays(ax, m, s, hatch=None, line_only=False):
     else:
         ax.fill_between(m, s, 1.0, color="white", lw=0, zorder=-3)
         ax.fill_between(m, s, 1.0, color="black", alpha=0.25, lw=0, zorder=-3)
-    ax.plot(m, s, color="black", lw=1.3, zorder=-2)
-    ax.text(10**1.45, 1e-13, "X-rays", color="black", zorder=Z_LABEL if hatch or line_only else None,
-            path_effects=[pe.withStroke(linewidth=2.5, foreground="white")] if hatch or line_only else None)
+    (edge,) = ax.plot(m, s, color="black", lw=1.3, zorder=-2)
+    if label:
+            ax.text(10**1.45, 1e-13, "X-rays", color="black", zorder=Z_LABEL if hatch or line_only else None,
+                path_effects=[pe.withStroke(linewidth=2.5, foreground="white")] if hatch or line_only else None)
+    return edge
 
 
 def plot_contours(ax, roots, excluded, debug, mono=None):
     """The Omega h^2 = 0.12 lines, drawn for whole decades of y only; all in colour `mono`
-    with a dark outline if given (over the N2/N1 field), else all in C_CONTOUR."""
+    with a dark outline if given (over the N2/N1 field; their values then in C_VALUE_N2, no outline),
+    else all in C_CONTOUR."""
     import matplotlib.patheffects as pe
     masses = np.array(sorted({k[0] for k in roots}))
     ys = np.array(sorted({k[1] for k in roots}))
@@ -718,10 +725,9 @@ def plot_contours(ax, roots, excluded, debug, mono=None):
             ax.text(
                 m_t, s_t,
                 y_label(y, first=first[0]),
-                color=c,
+                color=C_VALUE_N2 if mono else c,
                 ha="left", va=va,
-                zorder=Z_LABEL,
-                path_effects=outline
+                zorder=Z_LABEL
             )
             first[0] = False
 
@@ -736,12 +742,16 @@ def m_nu_of_scan(roots, mix):
 DM_DECADES = range(-16, -1, 2)   # delta_m = 10^k drawn (--dm-contours), those in the frame
 
 
-def plot_dm_contours(ax, m_nu, color=C_CONTOUR_N2, fracs=(0.82, 0.9, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1), avoid=()):
+def plot_dm_contours(ax, m_nu, color=C_CONTOUR_N2, text_color=C_VALUE_N2, overprod=None,
+                     fracs=(0.82, 0.9, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1), avoid=(), avoid_lines=((),)):
     """
     Lines of constant delta_m = (m_N2 - m_N1)/m_N1 = (sin^2 2theta/4) m_N1/m_nu (--dm-contours), labelled
     along the line at the first of `fracs` (of the way along its visible part) where the label stays in
     the frame and clear of the boxes `avoid` (display coordinates) and of the labels before it. Call
-    after the layout is final (the labels follow the lines' angle on the page).
+    after the layout is final (the labels follow the lines' angle on the page). `overprod` = (m, s) of
+    the overproduction edge: the lines stop there (not drawn in the overproduction region). The labels
+    carry no outline, so they also keep off lines: `avoid_lines` is a list of sets of Line2D, tried in
+    turn (all edges first, then only the X-ray edge) until a label fits.
     """
     import matplotlib.patheffects as pe
     outline = [pe.withStroke(linewidth=2.2, foreground="0.15")]
@@ -751,22 +761,27 @@ def plot_dm_contours(ax, m_nu, color=C_CONTOUR_N2, fracs=(0.82, 0.9, 0.7, 0.6, 0
     for k in sorted(DM_DECADES, reverse=True):   # the top line carries "delta_m ="
         s = 4 * m_nu * 10.0**k / (m * 1e3)
         vis = (s > S_LIM[0]) & (s < S_LIM[1])
+        if overprod is not None:
+            vis &= s < np.exp(np.interp(np.log(m), np.log(overprod[0]), np.log(overprod[1]),
+                                        left=np.inf, right=np.inf))
         if vis.sum() < 2:
             continue
-        ax.plot(m, s, color=color, lw=0.9, ls="--", zorder=-1, path_effects=outline)
+        ax.plot(np.where(vis, m, np.nan), s, color=color, lw=0.9, ls="--", zorder=-1, path_effects=outline)
         iv = np.nonzero(vis)[0]
         lab = (r"$\delta_m = " if first else r"$") + rf"10^{{{k}}}$"
         renderer = ax.figure.canvas.get_renderer()
         frame = ax.get_window_extent(renderer)
-        for frac in fracs:
+        for frac, lines in [(f, ls) for ls in avoid_lines for f in fracs]:
             j = iv[int(frac * (len(iv) - 1))]
             p0, p1 = ax.transData.transform([(m[j], s[j]), (m[min(j + 5, len(m) - 1)], s[min(j + 5, len(m) - 1)])])
             ang = np.degrees(np.arctan2(p1[1] - p0[1], p1[0] - p0[0]))
-            t = ax.text(m[j], s[j] * 1.5, lab, color=color, fontsize=8, rotation=ang, rotation_mode="anchor",
-                        ha="center", va="bottom", zorder=Z_LABEL, path_effects=outline)
+            t = ax.text(m[j], s[j] * 2.2, lab, color=text_color, fontsize=8, rotation=ang,
+                        rotation_mode="anchor", ha="center", va="bottom", zorder=Z_LABEL)
             bb = t.get_window_extent(renderer)
             inside = frame.x0 < bb.x0 and bb.x1 < frame.x1 and frame.y0 < bb.y0 and bb.y1 < frame.y1
-            if inside and not any(bb.overlaps(a) for a in avoid):
+            crosses = any(l.get_path().transformed(l.get_transform()).intersects_bbox(bb, filled=False)
+                          for l in lines)
+            if inside and not crosses and not any(bb.overlaps(a) for a in avoid):
                 avoid = list(avoid) + [bb]
                 break
             t.remove()
@@ -827,16 +842,18 @@ def main():
     hatch = HATCH_N2 if args.n2_fraction and not args.bound_lines else {}
     lines = args.bound_lines
     plt.rcParams["hatch.linewidth"] = 0.5
-    plot_dodelson_widrow(ax)
+    overprod = plot_dodelson_widrow(ax)
     m_x, s_x = scaled_xray_limit(roots, mix)
-    plot_xrays(ax, m_x, s_x, hatch=hatch.get("xray"), line_only=lines)
+    # --n2-fraction: the constraints unlabelled (hatched or edges only, the plot is full enough)
+    blab = not args.n2_fraction
+    xray_edge = plot_xrays(ax, m_x, s_x, hatch=hatch.get("xray"), line_only=lines, label=blab)
     # Both Lyman-alpha bounds are labelled by the length that sets them.
     # Both bounds are Lyman-alpha; the length in brackets says which one, as in
     # Bringmann et al. (2206.10630). Ly-alpha (lambda_fs) is labelled low on
     # its boundary, clear of the ragged X-ray curve.
     n_lya = plot_bound(
         ax, roots, lam, LAMBDA_FS_MAX_MPC, C_LYA,
-        r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)", Z_BOUND["lya"], frac=0.28,
+        r"Ly-$\alpha$ ($\lambda_\mathrm{fs}$)" if blab else None, Z_BOUND["lya"], frac=0.28,
         hatch=hatch.get("lya"), line_only=lines
     )
     # The r_s label sits on the upper part of its boundary, above the
@@ -844,10 +861,10 @@ def main():
     # (and those of Ly-alpha (lambda_fs) and self-int.) when the bounds move.
     plot_bound(
         ax, roots, r_s, R_S_MAX_MPC, C_RS,
-        r"Ly-$\alpha$ ($r_s$)", Z_BOUND["r_s"], frac=0.45,
+        r"Ly-$\alpha$ ($r_s$)" if blab else None, Z_BOUND["r_s"], frac=0.45,
         hatch=hatch.get("r_s"), line_only=lines
     )
-    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int.", Z_BOUND["si"], frac=0.55,
+    plot_bound(ax, roots, sig_m, SIGMA_M_MAX, C_SI, r"self-int." if blab else None, Z_BOUND["si"], frac=0.55,
                hatch=hatch.get("si"), line_only=lines)
     if args.g_pert:
         plot_nonpert(ax, roots, args.g_pert)
@@ -907,7 +924,9 @@ def main():
         rend = fig.canvas.get_renderer()
         # every text already on the plot (bound labels, DW, overproduction, X-rays), the m_A' box padded
         avoid = [t.get_window_extent(rend).padded(8 if t is info else 2) for t in ax.texts]
-        plot_dm_contours(ax, m_nu, color=C_CONTOUR_N2 if args.n2_fraction else "0.25", avoid=avoid)
+        plot_dm_contours(ax, m_nu, color=C_CONTOUR_N2 if args.n2_fraction else "0.25",
+                         text_color=C_VALUE_N2 if args.n2_fraction else "0.25", overprod=overprod, avoid=avoid,
+                         avoid_lines=(list(ax.lines), [xray_edge]))
         print(f"delta_m lines at m_nu = {m_nu:.4g} eV")
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     fig.savefig(out + ".pdf")

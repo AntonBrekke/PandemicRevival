@@ -46,8 +46,8 @@ julia --project=. -t 8 src/run_benchmarks.jl \
 echo "benchmarks done $(date)"
 
 # --- figures
-./$S3/make_figures.sh
-./$S50/make_figures.sh
+plot/make_figures.sh mA3
+plot/make_figures.sh mA50
 echo "all done $(date)"
 # Run on 2026-11-13 (ThinkPad P14s, 10 workers): Lyman-alpha 2 h 20 min, histories 22 min. The x_fo
 # column of the m_A' = 3 network (both grids) and fluid base grid was then redone with the corrected

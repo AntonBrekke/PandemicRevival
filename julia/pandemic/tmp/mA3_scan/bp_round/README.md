@@ -18,7 +18,7 @@ the network root (the fluid one would be the scan's choice at g >= 1e-3; indisti
 
 Files: `bp1_10keV/`, `bp2_20keV/` (seeds, roots, Lyman-alpha lengths); `benchmarks/` (histories of
 both, BP2 with both solvers; benchmark figures `figures/mA3/benchmarks_bp_round/` by
-`../make_figures.sh`); `earlier/` (an earlier choice, 14 keV g = 3e-4 and 30 keV g = 3e-3, from
+`plot/make_figures.sh mA3`); `earlier/` (an earlier choice, 14 keV g = 3e-4 and 30 keV g = 3e-3, from
 the 11-05 code; BP2 there replaced because NN -> A'A' at 1.3e4 H was too extreme).
 
 Peak forward rates over H (11-05): BP1 N2 nu -> A' 15.5, NN -> A'A' 0.04; BP2 5.2 and 9.9.

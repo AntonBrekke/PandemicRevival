@@ -2,7 +2,7 @@
 # Roots, Lyman-alpha lengths and histories of the benchmark points (bps.csv) with the current solvers,
 # m_A' = 3 m_N, m_phi = 100 m_N, m_nu = 0.01 eV (M_NU). ~10 min. From julia/pandemic.
 # Root searches start from the seeds in bp*/network_seeds.csv (BP2 also bp2_20keV/fluid_points.csv).
-# After it, put the new roots into bps.csv and the README, then ./tmp/mA3_scan/make_figures.sh.
+# After it, put the new roots into bps.csv and the README, then plot/make_figures.sh mA3.
 set -e
 T=tmp/rate_tables/rate_tables_mA3.0_mphi100.0.jls
 B=tmp/mA3_scan/bp_round

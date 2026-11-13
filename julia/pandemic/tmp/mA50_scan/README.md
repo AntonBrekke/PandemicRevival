@@ -13,7 +13,7 @@ no longer half the true one. Roots unchanged.
   verdict for either Lyman-alpha bound: the money plot is unchanged to the eye.
 - x_fo: later (it was the crossing of half the rate).
 - Benchmark figures: `plot/benchmark.py` (until 2026-11-13 `production.py`), validity bands from x_c;
-  all figures by `make_figures.sh`.
+  all figures by `plot/make_figures.sh mA50`.
 
 
 Tables: `tmp/rate_tables/rate_tables_mA50.0_mphi150.0.jls`. m_phi = 100 m_N would sit exactly at the

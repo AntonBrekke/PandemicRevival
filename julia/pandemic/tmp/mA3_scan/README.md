@@ -10,7 +10,7 @@
 | `benchmarks/` | 10.57 keV, g = 1e-7 - 0.056 | standard histories across g (not BPs) |
 
 `bp_round/README.md` has the BP roots and history; `bp_round/run_bps.sh` recomputes them (roots,
-Lyman-alpha, histories). Make all m_A' = 3 figures with `./tmp/mA3_scan/make_figures.sh`: the money plots
+Lyman-alpha, histories). Make all m_A' = 3 figures with `plot/make_figures.sh mA3`: the money plots
 with the BPs are `figures/mA3/relic_contours_bp{,_xproj}.pdf`, their benchmark figures `figures/mA3/benchmarks_bp_round/` (plot/benchmark.py).
 `relic_scan_theta.py --xray-proj` writes only `<out>_xproj.pdf`, not `<out>.pdf`: run it twice.
 
@@ -27,7 +27,7 @@ no longer half the true one. Roots unchanged.
   verdict for either Lyman-alpha bound: the money plot is unchanged to the eye.
 - x_fo: later (it was the crossing of half the rate).
 - Benchmark figures: `plot/benchmark.py` (until 2026-11-13 `production.py`), validity bands from x_c;
-  all figures by `make_figures.sh`.
+  all figures by `plot/make_figures.sh mA3`.
 
 ## Rerun 2026-11-07 (branch pauli-exact)
 
@@ -103,6 +103,6 @@ Fine fluid grid (~2 h + ~0.6 h Lyman-alpha on the ThinkStation with 12 workers):
     julia --project=. src/run_fluid_lyman_alpha.jl --nproc 11 --roots tmp/mA3_scan/fluid_scan_fine/fluid_roots.csv \
         --out tmp/mA3_scan/fluid_scan_fine/lyman_alpha.csv --tables tmp/rate_tables/rate_tables_mA3.0_mphi100.0.jls
     conda run -n pandemic python plot/combined_scan_dir.py tmp/mA3_scan/combined 1e-3 tmp/mA3_scan
-    ./tmp/mA3_scan/make_figures.sh        # every m_A' = 3 figure (money plots with/without BPs, histories)
+    plot/make_figures.sh mA3              # every m_A' = 3 figure (money plots with/without BPs, histories)
 
 The BPs for `--bp` are `bp_round/bps.csv` (see the top of this file), not `xray_bps.csv`.

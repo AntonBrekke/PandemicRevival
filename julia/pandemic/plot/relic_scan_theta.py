@@ -44,7 +44,7 @@ instead, sub-decade couplings included (small dots coloured by g, on a colour
 bar; open where excluded), and writes <output>_debug_all.pdf.
 
 --n2-fraction shades the plane by N2/N1 today at the roots (f_N2 of lyman_alpha.csv,
-interpolated between them; colour bar from --n2-vmin, default 1e-8, to 1), draws the
+interpolated between them; colour bar from --n2-vmin, default 1e-3, to 1), draws the
 contours in white and hatches the constraint regions, X-rays included, instead of tinting them
 (the field shows through), and writes
 <output>_n2.pdf. For both scans:
@@ -132,7 +132,9 @@ Z_LABEL = 2.5   # all on-plot text, above every shaded region
 C_CONTOUR = "#1A2A6C"
 
 # --n2-fraction: the N2/N1 field under everything, the contours in one colour over it
-N2_VMIN = 1e-8
+# 1e-3: at m_A' = 3 the field below the DW band never drops under 7e-3 (smaller ratios only at
+# g < 1e-6, hidden by the band); mA50 reaches 6e-9 just below it and passes --n2-vmin 1e-8
+N2_VMIN = 1e-3
 Z_N2 = -6
 C_CONTOUR_N2 = "white"
 C_VALUE_N2 = C_CONTOUR   # the contour values (g, delta_m): dark, no outline, to stand out on the yellow

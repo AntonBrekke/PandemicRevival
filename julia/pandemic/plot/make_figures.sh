@@ -46,8 +46,9 @@ if [ "$SCAN" = mA3 ]; then
 else
     money $F/relic_contours
     money $F/relic_contours --all-points
-    money $F/relic_contours --n2-fraction
-    money $F/relic_contours --n2-fraction --dm-contours --bound-lines
+    # N2/N1 reaches 6e-9 just below the DW band (100 - 300 keV): keep the colour scale down to 1e-8
+    money $F/relic_contours --n2-fraction --n2-vmin 1e-8
+    money $F/relic_contours --n2-fraction --dm-contours --bound-lines --n2-vmin 1e-8
     benchmarks benchmarks ""
 fi
 echo "figures in $F"
